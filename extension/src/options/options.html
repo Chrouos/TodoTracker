@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>TodoTracker</title>
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TodoTracker</h1>
+    <p class="cap">本機時間追蹤 · 資料存在這台瀏覽器</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="report">報表</button>
+    <button class="tab" data-tab="projects">專案</button>
+    <button class="tab" data-tab="todos">Todo</button>
+    <button class="tab" data-tab="tags">標籤</button>
+    <button class="tab" data-tab="entries">紀錄</button>
+    <button class="tab" data-tab="settings">設定</button>
+  </nav>
+
+  <!-- ── 報表 ── -->
+  <section id="p-report">
+    <div class="toolbar">
+      <div class="seg" id="range">
+        <button class="seg-btn active" data-range="today">今日</button>
+        <button class="seg-btn" data-range="week">本週</button>
+        <button class="seg-btn" data-range="month">本月</button>
+        <button class="seg-btn" data-range="all">全部</button>
+      </div>
+      <div class="grow"></div>
+      <button id="exportCsv">↓ CSV</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><span class="cap">總時數</span><span id="kTime" class="num">0m</span></div>
+      <div class="kpi"><span class="cap">筆數</span><span id="kCount" class="num">0</span></div>
+      <div class="kpi"><span class="cap">平均每筆</span><span id="kAvg" class="num">—</span></div>
+      <div class="kpi"><span class="cap">有紀錄天數</span><span id="kDays" class="num">0</span></div>
+    </div>
+
+    <h2 class="sec" data-collapse="rep-donut"><span class="mark">[-]</span> 專案時間分配</h2>
+    <div id="byProject" data-collapse-body="rep-donut"></div>
+
+    <h2 class="sec" data-collapse="rep-time">
+      <span class="mark">[-]</span> 時間軸 <span id="timeLabel" class="mute"></span>
+    </h2>
+    <div id="timeline" class="chart-box scroll-x" data-collapse-body="rep-time"></div>
+
+    <h2 class="sec" data-collapse="rep-line">
+      <span class="mark">[-]</span> 每日趨勢 <span id="lineLabel" class="mute"></span>
+    </h2>
+    <div id="byDay" class="chart-box" data-collapse-body="rep-line"></div>
+  </section>
+
+  <!-- ── 專案 ── -->
+  <section id="p-projects" hidden>
+    <form id="projForm" class="card">
+      <input type="hidden" id="pjId" />
+      <div class="grid4">
+        <label class="field"><span>名稱</span><input id="pjName" required placeholder="例：內部工具" /></label>
+        <label class="field"><span>顏色</span><input id="pjColor" type="color" value="#201d1d" /></label>
+        <label class="field" style="grid-column: span 2">
+          <span>上層專案</span>
+          <select id="pjParent"></select>
+          <span class="hint">留空就是最上層。可以一直往下掛，時數會自動累加到上層。</span>
+        </label>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-primary">儲存專案</button>
+        <button type="button" id="pjCancel" hidden>取消編輯</button>
+      </div>
+    </form>
+    <div id="projList"></div>
+  </section>
+
+  <!-- ── Todo ── -->
+  <section id="p-todos" hidden>
+    <form id="todoForm" class="card">
+      <input type="hidden" id="tdId" />
+      <div class="grid4">
+        <label class="field"><span>項目</span><input id="tdTitle" required placeholder="要做什麼？" /></label>
+        <label class="field"><span>專案</span><select id="tdProject"></select></label>
+        <label class="field"><span>到期日</span><input id="tdDue" type="date" /></label>
+        <label class="field"><span>狀態</span>
+          <select id="tdStatus">
+            <option value="todo">待辦</option>
+            <option value="doing">進行中</option>
+            <option value="done">已完成</option>
+          </select>
+        </label>
+      </div>
+      <label class="field" style="margin-top:12px"><span>備註</span>
+        <textarea id="tdNotes" placeholder="細節、連結、驗收條件…"></textarea></label>
+      <div class="actions">
+        <button type="submit" class="btn-primary">儲存 Todo</button>
+        <button type="button" id="tdCancel" hidden>取消編輯</button>
+      </div>
+    </form>
+
+    <div class="toolbar">
+      <select id="tdFilter" style="width:260px"></select>
+      <button id="tdToggleDone">[ ] 顯示已完成</button>
+      <div class="grow"></div>
+      <span class="cap" id="tdCount"></span>
+    </div>
+    <div id="todoList"></div>
+  </section>
+
+  <!-- ── 標籤 ── -->
+  <section id="p-tags" hidden>
+    <form id="tagForm" class="card">
+      <div class="grid4">
+        <label class="field"><span>標籤名稱</span><input id="tgName" required placeholder="例：會議" /></label>
+        <label class="field"><span>顏色</span><input id="tgColor" type="color" value="#646262" /></label>
+      </div>
+      <div class="actions"><button type="submit" class="btn-primary">新增標籤</button></div>
+    </form>
+    <div id="tagList"></div>
+  </section>
+
+  <!-- ── 紀錄 ── -->
+  <section id="p-entries" hidden>
+    <div class="toolbar">
+      <button id="addEntry">手動補登</button>
+      <button id="copyToday">複製今日總結</button>
+      <button id="copyRange">複製區間總結</button>
+      <div class="grow"></div>
+      <span class="cap" id="entryCount"></span>
+    </div>
+    <div id="entryList"></div>
+  </section>
+
+  <!-- ── 設定 ── -->
+  <section id="p-settings" hidden>
+    <div class="card">
+      <div class="grid4">
+        <label class="field">
+          <span>閒置提醒（分）</span>
+          <input id="stIdle" type="number" min="1" step="1" />
+          <span class="hint">計時中這麼久沒碰鍵盤滑鼠（或鎖螢幕），回來時會問你這段要不要扣掉。防止忘記按停止導致時數灌水。</span>
+        </label>
+        <label class="field">
+          <span>每筆進位（分）</span>
+          <select id="stRound">
+            <option value="0">不進位</option><option value="5">5</option>
+            <option value="6">6</option><option value="15">15</option><option value="30">30</option>
+          </select>
+          <span class="hint">每筆紀錄長度往上湊到這個倍數。設 15 的話，8 分鐘會記成 15 分鐘。想要精確時數就留「不進位」。</span>
+        </label>
+      </div>
+      <div class="actions"><button id="saveSettings" class="btn-primary">儲存設定</button></div>
+    </div>
+
+    <h2 class="sec" data-collapse="set-data"><span class="mark">[-]</span> 資料</h2>
+    <div class="card" data-collapse-body="set-data">
+      <p class="cap">資料只存在這台瀏覽器。換機器或重裝前記得備份。</p>
+      <div class="actions">
+        <button id="backup">↓ 匯出備份 JSON</button>
+        <button id="restoreBtn">↑ 匯入備份</button>
+        <input id="restoreFile" type="file" accept="application/json" hidden />
+        <button id="wipe" class="btn-danger">[x] 清空所有資料</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 紀錄編輯 dialog -->
+<dialog id="entryDlg">
+  <form method="dialog" id="entryForm">
+    <h2 class="h" id="dlgTitle">編輯紀錄</h2>
+    <input type="hidden" id="enId" />
+    <label class="field"><span>描述</span><input id="enDesc" /></label>
+    <div class="grid2">
+      <label class="field"><span>專案</span><select id="enProject"></select></label>
+      <label class="field"><span>Todo</span><select id="enTask"></select></label>
+    </div>
+    <div class="grid2">
+      <label class="field"><span>開始</span><input id="enStart" type="datetime-local" /></label>
+      <label class="field"><span>結束</span><input id="enEnd" type="datetime-local" /></label>
+    </div>
+    <label class="field"><span>工作紀錄</span>
+      <textarea id="enNotes" placeholder="這段時間做了什麼？"></textarea></label>
+    <div class="actions">
+      <button value="cancel">取消</button>
+      <button value="save" class="btn-primary">儲存</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="options.js"></script>
+</body>
+</html>

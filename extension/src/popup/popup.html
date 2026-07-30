@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="../styles/tokens.css" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header id="top">
+    <span class="h">TodoTracker</span>
+    <span class="grow"></span>
+    <button id="copyToday" class="btn-ghost btn-sm" title="複製今日總結（Markdown）">[複製今日]</button>
+    <button id="openOptions" class="btn-ghost btn-sm" title="管理與報表">[管理]</button>
+  </header>
+
+  <!-- 全系統唯一的深色面板 -->
+  <section id="panel">
+    <div id="clock" class="num">00:00:00</div>
+    <div id="ctx" class="ctx">未計時</div>
+    <button id="toggle" class="btn-primary" data-state="idle">[&gt;] 開始計時</button>
+  </section>
+
+  <!-- 停止計時後補寫工作紀錄 -->
+  <div id="logBox" hidden>
+    <div class="logtitle">工作紀錄 · <span id="logMeta"></span></div>
+    <textarea id="logText" placeholder="這段時間做了什麼？留給之後的自己看"></textarea>
+    <div class="logacts">
+      <button id="logSkip" class="btn-sm">略過</button>
+      <button id="logSave" class="btn-sm btn-primary">儲存紀錄</button>
+    </div>
+  </div>
+
+  <div id="idleBar" hidden>
+    <span class="mark">[!]</span>
+    <span class="grow" id="idleText"></span>
+    <button id="idleKeep" class="btn-sm">保留</button>
+    <button id="idleDrop" class="btn-sm btn-danger">扣掉</button>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="track">計時</button>
+    <button class="tab" data-tab="todo">Todo</button>
+  </nav>
+
+  <!-- ── 計時分頁 ── -->
+  <main id="tab-track">
+    <div class="fields">
+      <input id="desc" placeholder="在做什麼？" autocomplete="off" />
+      <div class="two">
+        <select id="project"></select>
+        <select id="task"></select>
+      </div>
+      <div id="tagRow" class="tagrow"></div>
+
+      <!-- 計時中隨手記；停止時會跟著存進那筆紀錄 -->
+      <div id="liveLog" hidden>
+        <div class="logtitle">
+          <span class="sec-btn" data-collapse="pop-live"><span class="mark">[-]</span> 工作紀錄</span>
+          <button id="stampBtn" class="btn-sm" title="插入現在時間">[時間]</button>
+          <span id="liveSaved" class="cap"></span>
+        </div>
+        <textarea id="liveText" data-collapse-body="pop-live"
+          placeholder="隨時寫，停止計時時一起存進這筆"></textarea>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div id="stats" class="stats">
+      <div><span class="cap">今日</span><span id="stToday" class="num">0m</span></div>
+      <div><span class="cap">本週</span><span id="stWeek" class="num">0m</span></div>
+      <div><span class="cap">今日筆數</span><span id="stCount" class="num">0</span></div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="sec-title sec-btn" data-collapse="pop-recent"><span class="mark">[-]</span> 最近</div>
+    <div id="recent" data-collapse-body="pop-recent"></div>
+  </main>
+
+  <!-- ── Todo 分頁 ── -->
+  <main id="tab-todo" hidden>
+    <div class="fields">
+      <input id="newTodo" placeholder="新增 todo，Enter 送出" autocomplete="off" />
+      <select id="todoProject"></select>
+    </div>
+    <div class="hr"></div>
+    <div id="todoList"></div>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "TodoTracker",
+  "version": "0.2.0",
+  "description": "一鍵計時的專案時間追蹤：專案、標籤、Todo、計費統計與 CSV 匯出。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzL6ld+WdaegeEkMyYIbpm0Ja0Y0zrtm4pEtQb9VBUd27XSgG2C+nfhf/Xnnu7eOldmUtgTmjKvUSlrxQCsTBeqLFfbMjgzCCNMMJexVY0sLcHJZmSmYm/upUgvmJzbeqeGRWPxoDK1tgVa1jCyCUPiblm8LmKiw59BtBgWOrlS/jdtjrrVFsl/KyNmaD7XPgYfLVV3FfRRtumwquZ+A0dYd0uNkf4MoAF0HxJIS+hvP1vYaZeWn6WK+kdJfbijm99NIvOR01ZusNdS1K7NEp85EGNqZSNYQUm5vzW7yc89YakCv5xRgo7T7UtCd7rqFKNt0HGaXsVpZ2x3JJN7AM5wIDAQAB",
+  "permissions": ["storage", "alarms", "idle"],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://127.0.0.1/*"
+    ]
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "TodoTracker"
+  },
+  "options_page": "src/options/options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

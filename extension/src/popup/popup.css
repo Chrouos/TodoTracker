@@ -1,0 +1,120 @@
+body { width: 380px; max-height: 600px; overflow-y: auto; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--md) var(--lg);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* ── 唯一的深色面板（對應 DESIGN.md 的 hero TUI mockup） ── */
+#panel {
+  background: var(--surface-dark);
+  color: var(--canvas);
+  padding: var(--xl) var(--lg);
+  display: flex; flex-direction: column; align-items: center; gap: var(--md);
+}
+#clock {
+  font-size: 38px; font-weight: 700; line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+#panel .ctx {
+  font-size: 12px; color: var(--text-ash);
+  max-width: 100%; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#panel .btn-primary {
+  background: var(--canvas); color: var(--ink); border-color: var(--canvas);
+  width: 100%;
+}
+#panel .btn-primary:hover { background: var(--surface-card); border-color: var(--surface-card); }
+#panel .btn-primary[data-state="running"] {
+  background: var(--surface-dark-2); color: var(--canvas); border-color: var(--hairline-strong);
+}
+#panel .btn-primary[data-state="running"]:hover { background: #3c3737; }
+
+/* ── 計時中的即時紀錄 ── */
+#liveLog[hidden] { display: none; }
+#liveLog .logtitle {
+  display: flex; align-items: center; gap: var(--sm);
+  font-size: 12px; color: var(--text-mute); margin: var(--xs) 0;
+}
+#liveLog .logtitle .btn-sm { height: 22px; font-size: 11px; }
+/* 高度由 autogrow.js 控制 */
+#liveSaved { line-height: 1; margin-left: auto; color: var(--text-ash); }
+
+/* ── 停止後補寫的工作紀錄 ── */
+#logBox {
+  padding: var(--md) var(--lg);
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--hairline);
+}
+#logBox[hidden] { display: none; }
+#logBox .logtitle { font-size: 12px; color: var(--text-mute); margin-bottom: var(--sm); }
+#logBox textarea { background: var(--canvas); }
+#logBox .logacts { display: flex; justify-content: flex-end; gap: var(--sm); margin-top: var(--sm); }
+#logBox .btn-primary { height: 26px; padding: 0 var(--md); }
+
+/* ── 閒置提示 ── */
+#idleBar {
+  display: flex; align-items: center; gap: var(--sm);
+  padding: var(--sm) var(--lg);
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+}
+#idleBar[hidden] { display: none; }
+
+.tabs { padding: 0 var(--lg); }
+
+main { padding: var(--md) var(--lg) var(--lg); }
+main[hidden] { display: none; }
+
+.fields { display: flex; flex-direction: column; gap: var(--sm); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sm); }
+
+.tagrow { display: flex; flex-wrap: wrap; gap: var(--xs); }
+.tagchip {
+  height: 24px; font-size: 11px; padding: 0 var(--sm);
+  border: 1px solid var(--hairline); border-radius: var(--r);
+  background: var(--surface-soft); color: var(--text-mute);
+}
+.tagchip.on { background: var(--ink); color: var(--canvas); border-color: var(--ink); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sm); padding: var(--md) 0; }
+.stats > div { display: flex; flex-direction: column; }
+.stats .cap { line-height: 1.2; }
+.stats .num { font-size: 16px; font-weight: 700; }
+
+.sec-title { font-size: 12px; color: var(--text-mute); padding: var(--sm) 0; }
+
+/* 可收合的小標題 */
+.sec-btn { cursor: pointer; user-select: none; }
+.sec-btn:hover .mark { color: var(--text-ink); }
+.sec-btn:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+
+/* ── 紀錄列 / todo 列 ── */
+.item {
+  display: flex; align-items: center; gap: var(--sm);
+  padding: var(--sm) 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+}
+.item:last-child { border-bottom: 0; }
+.item .main { flex: 1; min-width: 0; }
+.item .t1 { color: var(--text-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .t2 { color: var(--text-ash); font-size: 11px; }
+.item .dur { font-variant-numeric: tabular-nums; color: var(--text-body); }
+.item .act { opacity: 0; }
+.item:hover .act { opacity: 1; }
+
+.check {
+  border: 0; background: transparent; padding: 0; height: auto;
+  color: var(--text-mute); font-size: 12px; width: 22px; flex: 0 0 22px;
+}
+.check:hover { background: transparent; color: var(--ink); }
+.done .t1 { color: var(--text-ash); text-decoration: line-through; }
+
+.footer-link {
+  display: block; text-align: center; padding: var(--md) 0 0;
+  font-size: 12px; color: var(--text-mute);
+}

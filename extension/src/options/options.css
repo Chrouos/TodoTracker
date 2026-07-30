@@ -1,0 +1,113 @@
+.wrap { max-width: 960px; margin: 0 auto; padding: 48px var(--xl) 96px; }
+
+header { margin-bottom: var(--xxl); }
+h1 { font-size: 38px; font-weight: 700; line-height: 1.5; letter-spacing: -1px; }
+h2.sec { font-size: 16px; font-weight: 700; margin: var(--xxl) 0 var(--md); }
+h2.sec.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: var(--sm); }
+h2.sec.collapsible:hover .mark { color: var(--text-ink); }
+h2.sec.collapsible:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
+
+label.field > span.hint {
+  display: block; margin: var(--xs) 0 0;
+  font-size: 11px; line-height: 1.6; color: var(--text-ash);
+}
+
+section { padding-top: var(--xl); }
+section[hidden] { display: none; }
+
+.toolbar { display: flex; align-items: center; gap: var(--sm); margin-bottom: var(--lg); }
+
+/* 分段控制：沿用 tab 的視覺語彙但收在框裡 */
+.seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: var(--r); overflow: hidden; }
+.seg-btn { border: 0; border-right: 1px solid var(--hairline); border-radius: 0; height: 30px; color: var(--text-mute); }
+.seg-btn:last-child { border-right: 0; }
+.seg-btn.active { background: var(--ink); color: var(--canvas); }
+.seg-btn.active:hover { background: var(--ink-deep); }
+
+/* KPI：hairline 分隔，零陰影 */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--hairline); }
+.kpi { padding: var(--lg); border-right: 1px solid var(--hairline); display: flex; flex-direction: column; gap: var(--xs); }
+.kpi:last-child { border-right: 0; }
+.kpi .num { font-size: 24px; font-weight: 700; }
+.kpi .cap { line-height: 1; }
+
+.card { border: 1px solid var(--hairline); padding: var(--lg); margin-bottom: var(--lg); }
+.grid4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--md); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
+.actions { display: flex; gap: var(--sm); margin-top: var(--md); flex-wrap: wrap; }
+
+/* 列表 */
+.row-item {
+  display: flex; align-items: center; gap: var(--md);
+  padding: var(--md) 0; border-bottom: 1px solid var(--hairline); font-size: 13px;
+}
+.row-item .main { flex: 1; min-width: 0; }
+.row-item .sub { font-size: 12px; color: var(--text-ash); }
+.row-item .num { font-variant-numeric: tabular-nums; }
+.row-item .notes {
+  margin-top: var(--xs); padding-left: var(--sm);
+  border-left: 2px solid var(--hairline);
+  font-size: 12px; color: var(--text-body); white-space: pre-wrap;
+}
+.row-item.done .main > div:first-child { color: var(--text-ash); text-decoration: line-through; }
+.badge.overdue { color: var(--danger); border-color: var(--danger); }
+.row-item .act { display: flex; gap: var(--xs); opacity: 0; }
+.row-item:hover .act { opacity: 1; }
+
+/* 圖表 */
+.chart-box { border: 1px solid var(--hairline); padding: var(--lg) var(--md); }
+.scroll-x { overflow-x: auto; }
+
+.chart-split {
+  display: flex; align-items: center; gap: var(--xxl);
+  border: 1px solid var(--hairline); padding: var(--lg);
+}
+.chart-split > svg { flex: 0 0 auto; }
+
+.legend { flex: 1; min-width: 0; }
+.legend-row {
+  display: flex; align-items: center; gap: var(--md);
+  padding: var(--sm) 0; border-bottom: 1px solid var(--hairline);
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.legend-row:last-child { border-bottom: 0; }
+.legend-row.drillable { cursor: pointer; }
+.legend-row.drillable:hover { background: var(--surface-soft); }
+
+/* 麵包屑：往下鑽之後回上層用 */
+.crumbs { display: flex; align-items: center; gap: var(--sm); font-size: 12px; margin-bottom: var(--sm); }
+.crumb { cursor: pointer; color: var(--text-mute); }
+.crumb:hover { color: var(--text-ink); text-decoration: underline; }
+.crumbs .crumb:last-child { color: var(--text-ink); font-weight: 700; }
+
+.tree-branch { flex: 0 0 auto; }
+
+/* 條狀圖：純填色矩形，radius 0 */
+.bar-wrap { display: flex; align-items: center; gap: var(--md); padding: var(--sm) 0; border-bottom: 1px solid var(--hairline); }
+.bar-label { width: 160px; flex: 0 0 160px; display: flex; align-items: center; gap: var(--sm); font-size: 13px; }
+.bar-track { flex: 1; height: 12px; background: var(--surface-card); }
+.bar-fill { height: 100%; background: var(--ink); }
+.bar-val { width: 110px; flex: 0 0 110px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+dialog {
+  /* tokens.css 的 `* { margin: 0 }` 會蓋掉 dialog 預設的 margin:auto，導致貼在左上角 */
+  margin: auto;
+  border: 1px solid var(--hairline-strong); border-radius: var(--r);
+  padding: var(--xl); width: 520px; max-width: 92vw;
+  max-height: 88vh; overflow-y: auto;
+  background: var(--canvas); color: var(--text-ink);
+}
+dialog::backdrop { background: rgba(15, 0, 0, 0.35); }
+dialog h2 { margin-bottom: var(--lg); }
+dialog .field { margin-bottom: var(--md); }
+
+@media (max-width: 850px) {
+  .wrap { padding: var(--xxl) var(--lg) 64px; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi:nth-child(2) { border-right: 0; }
+  .grid4, .grid2 { grid-template-columns: 1fr; }
+  .chart-split { flex-direction: column; gap: var(--lg); }
+  .chart-split > svg { align-self: center; }
+  .legend { width: 100%; }
+  .bar-label { width: 110px; flex: 0 0 110px; }
+}

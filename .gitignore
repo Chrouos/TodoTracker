@@ -1,0 +1,6 @@
+node_modules/
+.next/
+*.tsbuildinfo
+
+# 擴充的簽章私鑰 —— 決定 extension ID，不要外流也不要弄丟
+extension-key.pem

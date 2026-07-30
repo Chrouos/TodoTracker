@@ -1,0 +1,178 @@
+/* tokens.css — 直接對應專案根目錄的 DESIGN.md */
+
+:root {
+  /* Brand */
+  --ink: #201d1d;
+  --ink-deep: #0f0000;
+  --canvas: #fdfcfc;
+
+  /* Surface */
+  --surface-soft: #f8f7f7;
+  --surface-card: #f1eeee;
+  --surface-dark: #201d1d;
+  --surface-dark-2: #302c2c;
+  --hairline: rgba(15, 0, 0, 0.12);
+  --hairline-strong: #646262;
+
+  /* Text */
+  --text-ink: #201d1d;
+  --text-charcoal: #302c2c;
+  --text-body: #424245;
+  --text-mute: #646262;
+  --text-stone: #6e6e73;
+  --text-ash: #9a9898;
+
+  /* Semantic */
+  --accent: #007aff;
+  --accent-hover: #0056b3;
+  --danger: #ff3b30;
+  --danger-hover: #d70015;
+  --warning: #ff9f0a;
+  --success: #30d158;
+
+  /* Type */
+  --font: "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+          Consolas, "Liberation Mono", "Noto Sans Mono CJK TC", monospace;
+
+  /* Spacing */
+  --xxs: 1px; --xs: 4px; --sm: 8px; --md: 12px;
+  --lg: 16px; --xl: 24px; --xxl: 32px;
+
+  /* Radius：只有兩個值在做事 */
+  --r: 4px;
+  --r-full: 9999px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 排版 ---------- */
+.h { font-size: 16px; font-weight: 700; line-height: 1.5; }
+.cap { font-size: 12px; line-height: 2; color: var(--text-mute); }
+.mute { color: var(--text-mute); }
+.ash { color: var(--text-ash); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- 按鈕：4px 圓角，零陰影 ---------- */
+button, .btn {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  height: 32px;
+  padding: 0 var(--md);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r);
+  background: var(--canvas);
+  color: var(--text-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sm);
+  white-space: nowrap;
+}
+button:hover, .btn:hover { background: var(--surface-soft); }
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--canvas);
+  border-color: var(--ink);
+  height: 36px;
+  padding: 0 20px;
+}
+.btn-primary:hover { background: var(--ink-deep); border-color: var(--ink-deep); }
+.btn-primary:active { background: var(--ink-deep); }
+
+.btn-danger { color: var(--danger); border-color: var(--hairline); }
+.btn-danger:hover { background: var(--surface-soft); color: var(--danger-hover); }
+
+.btn-ghost { border-color: transparent; background: transparent; padding: 0 var(--sm); }
+.btn-ghost:hover { background: var(--surface-soft); }
+
+button:disabled, .btn-disabled {
+  background: var(--surface-card);
+  color: var(--text-ash);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+
+.btn-sm { height: 26px; font-size: 12px; padding: 0 var(--sm); }
+
+/* ---------- 表單 ---------- */
+input, select, textarea {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text-ink);
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  height: 34px;
+  padding: 0 var(--sm);
+  width: 100%;
+}
+textarea { height: auto; min-height: 64px; padding: var(--sm); line-height: 1.5; resize: vertical; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  background: var(--canvas);
+  border-color: var(--ink);
+}
+input::placeholder, textarea::placeholder { color: var(--text-ash); }
+select { appearance: none; padding-right: var(--xl); cursor: pointer; }
+
+label.field { display: block; }
+label.field > span { display: block; font-size: 12px; color: var(--text-mute); margin-bottom: var(--xs); }
+
+/* ---------- 分隔線 / 列 ---------- */
+.hr { height: 1px; background: var(--hairline); border: 0; }
+.row {
+  display: flex; align-items: center; gap: var(--sm);
+  padding: var(--sm) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.row:last-child { border-bottom: 0; }
+.grow { flex: 1; min-width: 0; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- 標記 / badge ---------- */
+.mark { color: var(--text-mute); user-select: none; }
+.badge {
+  font-size: 11px; line-height: 1;
+  padding: 3px var(--sm);
+  border-radius: var(--r);
+  background: var(--surface-card);
+  color: var(--text-mute);
+  border: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+.badge-dark { background: var(--surface-dark); color: var(--canvas); border-color: var(--surface-dark); }
+
+/* 專案色塊：8px 方形，radius 0 */
+.swatch { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 0; background: var(--text-ash); }
+
+/* ---------- tab ---------- */
+.tabs { display: flex; gap: var(--lg); border-bottom: 1px solid var(--hairline-strong); }
+.tab {
+  height: 36px; border: 0; background: transparent; border-radius: 0;
+  color: var(--text-mute); padding: 0 var(--xs);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { background: transparent; color: var(--text-ink); }
+.tab.active { color: var(--text-ink); border-bottom-color: var(--ink); font-weight: 700; }
+
+/* ---------- 空狀態 ---------- */
+.empty { padding: var(--xl) 0; color: var(--text-ash); font-size: 13px; text-align: center; }
+
+/* ---------- 捲軸 ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-ash); }
+::-webkit-scrollbar-track { background: transparent; }
