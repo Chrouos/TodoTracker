@@ -122,15 +122,29 @@ export async function listTasks({ projectId = null, includeDone = true } = {}) {
 export async function upsertTask(t) {
   const all = await read(K.tasks, []);
   const i = all.findIndex((x) => x.id === t.id);
+  const prev = i >= 0 ? all[i] : null;
+  const status = t.status || 'todo';   // todo | doing | done | archived
+  const isDone = status === 'done';
+  const wasDone = prev?.status === 'done';
+
   const row = {
     id: t.id || uid(),
     projectId: t.projectId || null,
     title: (t.title || '').trim(),
     notes: t.notes || '',
-    status: t.status || 'todo',      // todo | doing | done | archived
+    status,
+
+    // 開單時間：建立當下決定，之後一律沿用舊值，不接受外部覆蓋
+    openedAt: prev?.openedAt || nowISO(),
+    // 截止日：唯一可以手改的日期，只到日期精度
     dueDate: t.dueDate || null,
+    // 結案時間：按下完成的當下；重新打開就清掉
+    completedAt: isDone ? (prev?.completedAt || nowISO()) : null,
+    // 被重新打開過幾次 —— 一直回來的事情值得注意
+    reopenCount: (prev?.reopenCount || 0) + (wasDone && !isDone ? 1 : 0),
+
     sortOrder: t.sortOrder ?? Date.now(),
-    createdAt: t.createdAt || nowISO(),
+    createdAt: t.createdAt || prev?.createdAt || nowISO(),
     updatedAt: nowISO(),
   };
   if (i >= 0) all[i] = { ...all[i], ...row }; else all.push(row);

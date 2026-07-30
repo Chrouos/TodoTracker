@@ -116,7 +116,19 @@ create table tasks (
   notes       text,
   status      task_status not null default 'todo',
   assignee_id uuid references auth.users(id) on delete set null,
-  due_date    date,
+  -- 開單時間：建立當下決定，不可改
+  opened_at     timestamptz not null default now(),
+  -- 截止日：唯一可以手改的，只到日期精度
+  due_date      date,
+  -- 結案時間：按下完成的當下；重新打開時設回 null
+  completed_at  timestamptz,
+  -- 被重新打開過幾次
+  reopen_count  integer not null default 0,
+  constraint completed_after_opened
+    check (completed_at is null or completed_at >= opened_at),
+  -- 狀態與結案時間必須一致，避免兩邊各說各話
+  constraint completed_matches_status
+    check ((status = 'done') = (completed_at is not null)),
   sort_order  double precision not null default 0,
   created_by  uuid references auth.users(id),
   created_at  timestamptz not null default now(),

@@ -60,6 +60,13 @@ export function durationSec(e: Entry): number {
   return Math.max(0, Math.round((+new Date(e.endedAt) - +new Date(e.startedAt)) / 1000));
 }
 
+/** 兩個 YYYY-MM-DD 相差幾天（b - a）。用 UTC 算避免日光節約時間誤差 */
+export function daysBetween(a: string | null, b: string | null): number | null {
+  if (!a || !b) return null;
+  const d = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  return Math.round((d(b) - d(a)) / 864e5);
+}
+
 /* ---------------- 時間軸 ---------------- */
 
 export type Block = { s: number; e: number; lane: number; lanes: number; entry: Entry };

@@ -82,15 +82,33 @@
     <form id="todoForm" class="card">
       <input type="hidden" id="tdId" />
       <div class="grid4">
-        <label class="field"><span>項目</span><input id="tdTitle" required placeholder="要做什麼？" /></label>
+        <label class="field" style="grid-column: span 2"><span>項目</span>
+          <input id="tdTitle" required placeholder="要做什麼？" /></label>
         <label class="field"><span>專案</span><select id="tdProject"></select></label>
-        <label class="field"><span>到期日</span><input id="tdDue" type="date" /></label>
         <label class="field"><span>狀態</span>
           <select id="tdStatus">
             <option value="todo">待辦</option>
             <option value="doing">進行中</option>
             <option value="done">已完成</option>
           </select>
+        </label>
+      </div>
+      <div class="grid4" style="margin-top:12px">
+        <label class="field"><span>截止日</span>
+          <input id="tdDue" type="date" />
+          <span class="hint">唯一可以改的日期。</span>
+        </label>
+        <label class="field"><span>開單時間</span>
+          <input id="tdOpened" disabled />
+          <span class="hint">建立當下自動記錄，不可修改。</span>
+        </label>
+        <label class="field"><span>結案時間</span>
+          <input id="tdDone" disabled />
+          <span class="hint">按下完成的當下自動記錄；重新打開就清掉。</span>
+        </label>
+        <label class="field"><span>累積工時</span>
+          <input id="tdWorked" disabled />
+          <span class="hint">由綁在這個 todo 上的計時紀錄累加。</span>
         </label>
       </div>
       <label class="field" style="margin-top:12px"><span>備註</span>

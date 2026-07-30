@@ -8,6 +8,7 @@ import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
+import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -303,29 +304,36 @@ function renderTodos() {
   const open = list.filter((t) => t.status !== 'done').length;
   $('tdCount').textContent = `${open} 個未完成 / 共 ${list.length}`;
 
-  const todayStr = fmtDate(new Date().toISOString());
-
   $('todoList').innerHTML = list.length
     ? list.map((t) => {
         const p = S.projects.find((x) => x.id === t.projectId);
         const done = t.status === 'done';
-        const spent = S.entries
-          .filter((e) => e.taskId === t.id && e.endedAt)
-          .reduce((s, e) => s + db.durationSec(e), 0);
-        const overdue = !done && t.dueDate && t.dueDate < todayStr;
+        const m = taskMetrics(t, S.entries);
+        const dl = dueLabel(m, done);
+
+        // 三個時間排成一行，缺的用 — 佔位
+        const dates = [
+          `開單 ${stampLabel(t.openedAt)}`,
+          `截止 ${t.dueDate || '—'}`,
+          `結案 ${stampLabel(t.completedAt)}`,
+        ].join(' · ');
+
         return `<div class="row-item${done ? ' done' : ''}">
-          <button class="btn-sm btn-ghost" data-check="${t.id}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
+          <button class="btn-sm btn-ghost" data-check="${t.id}"
+            title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
-              ${overdue ? '<span class="badge overdue">逾期</span>' : ''}</div>
-            <div class="sub">
-              ${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}${t.dueDate ? ` · 到期 ${t.dueDate}` : ''}
+              ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
+              ${m.leadMs !== null ? `<span class="badge">歷時 ${leadLabel(m.leadMs)}</span>` : ''}
+              ${t.reopenCount ? `<span class="badge">重開 ${t.reopenCount} 次</span>` : ''}
             </div>
+            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
+            <div class="sub num">${dates}</div>
             ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ''}
           </div>
-          <span class="num ash">${spent ? fmtHM(spent) : ''}</span>
+          <span class="num" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
             ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="對這個 todo 開始計時">[&gt;]</button>`}
             <button class="btn-sm" data-edit-t="${t.id}">[編輯]</button>
@@ -337,8 +345,12 @@ function renderTodos() {
 }
 
 function resetTodoForm() {
-  $('tdId').value = ''; $('tdTitle').value = ''; $('tdDue').value = '';
-  $('tdNotes').value = ''; $('tdStatus').value = 'todo'; $('tdCancel').hidden = true;
+  $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
+  $('tdStatus').value = 'todo'; $('tdDue').value = '';
+  $('tdOpened').value = '建立後自動記錄';
+  $('tdDone').value = '—';
+  $('tdWorked').value = '—';
+  $('tdCancel').hidden = true;
 }
 
 $('todoForm').addEventListener('submit', async (e) => {
@@ -350,8 +362,8 @@ $('todoForm').addEventListener('submit', async (e) => {
     id: $('tdId').value || undefined,
     title: $('tdTitle').value,
     projectId: $('tdProject').value || null,
-    dueDate: $('tdDue').value || null,
     status: $('tdStatus').value,
+    dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
     notes: $('tdNotes').value,
   });
   resetTodoForm();
@@ -378,9 +390,15 @@ $('todoList').addEventListener('click', async (e) => {
   } else if (ed) {
     const t = S.tasks.find((x) => x.id === ed);
     $('tdId').value = t.id; $('tdTitle').value = t.title;
-    $('tdProject').value = t.projectId || ''; $('tdDue').value = t.dueDate || '';
+    $('tdProject').value = t.projectId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
+    $('tdDue').value = t.dueDate || '';
+    $('tdOpened').value = stampLabel(t.openedAt);
+    $('tdDone').value = stampLabel(t.completedAt);
+    const m = taskMetrics(t, S.entries);
+    $('tdWorked').value = m.worked ? fmtHM(m.worked) : '—';
     $('tdCancel').hidden = false; $('tdTitle').focus();
+    $('tdNotes').dispatchEvent(new Event('input')); // 讓備註重算高度
     return;
   } else if (del) {
     if (!confirm('刪除這個 todo？綁在它上面的時間紀錄會保留，只是解除關聯。')) return;
@@ -598,4 +616,5 @@ $('range').addEventListener('click', (e) => {
 range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
 initCollapse();
+resetTodoForm();
 load();

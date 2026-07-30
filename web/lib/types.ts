@@ -20,7 +20,14 @@ export type Task = {
   title: string;
   notes: string;
   status: TaskStatus;
+  /** 開單時間戳，建立當下決定，不可改 */
+  openedAt: string | null;
+  /** 截止日 YYYY-MM-DD，唯一可以手改的日期 */
   dueDate: string | null;
+  /** 結案時間戳，按下完成的當下；重新打開就清掉 */
+  completedAt: string | null;
+  /** 被重新打開過幾次 */
+  reopenCount: number;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

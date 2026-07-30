@@ -5,6 +5,7 @@
 
 import { fmtHM, fmtClock, fmtDate, durationOfEntry } from './time.js';
 import { pathOf } from './tree.js';
+import { taskMetrics, leadLabel } from './tasks.js';
 
 /**
  * @param {object} o
@@ -72,7 +73,13 @@ export function buildSummary({ dates, entries, projects, tasks = [], includeTodo
       out.push('');
       for (const t of finishedTodos) {
         const p = t.projectId ? pathOf(projects, t.projectId).join(' / ') : null;
-        out.push(`- [x] ${t.title}${p ? ` _(${p})_` : ''}`);
+        const m = taskMetrics(t, entries);
+        const bits = [];
+        if (t.openedAt) bits.push(`開單 ${fmtDate(t.openedAt)}`);
+        if (t.dueDate) bits.push(`截止 ${t.dueDate}`);
+        if (m.leadMs !== null) bits.push(`歷時 ${leadLabel(m.leadMs)}`);
+        if (m.worked) bits.push(`工時 ${fmtHM(m.worked)}`);
+        out.push(`- [x] ${t.title}${p ? ` _(${p})_` : ''}${bits.length ? ` — ${bits.join(' · ')}` : ''}`);
       }
       out.push('');
     }

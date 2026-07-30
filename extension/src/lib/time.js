@@ -66,6 +66,13 @@ export function dailySeries(entries, from, to, durationOf) {
   return [...bucket.entries()].map(([date, seconds]) => ({ date, seconds }));
 }
 
+/** 兩個 YYYY-MM-DD 之間相差幾天（b - a）。用 UTC 算避免日光節約時間誤差 */
+export function daysBetween(a, b) {
+  if (!a || !b) return null;
+  const d = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  return Math.round((d(b) - d(a)) / 864e5);
+}
+
 /** 一筆紀錄的長度（秒）。db.js 也有一份，這裡避免循環相依 */
 export function durationOfEntry(e) {
   if (!e.endedAt) return 0;

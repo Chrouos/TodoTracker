@@ -1,5 +1,6 @@
 import { fmtHM, fmtClock, fmtDate, durationSec } from './time';
 import { pathOf } from './tree';
+import { taskMetrics, leadLabel } from './tasks';
 import type { Entry, Project, Task } from './types';
 
 /**
@@ -65,7 +66,13 @@ export function buildSummary({
       out.push('### 完成的 Todo', '');
       for (const t of finishedTodos) {
         const p = t.projectId ? pathOf(projects, t.projectId).join(' / ') : null;
-        out.push(`- [x] ${t.title}${p ? ` _(${p})_` : ''}`);
+        const m = taskMetrics(t, entries);
+        const bits: string[] = [];
+        if (t.openedAt) bits.push(`開單 ${fmtDate(t.openedAt)}`);
+        if (t.dueDate) bits.push(`截止 ${t.dueDate}`);
+        if (m.leadMs !== null) bits.push(`歷時 ${leadLabel(m.leadMs)}`);
+        if (m.worked) bits.push(`工時 ${fmtHM(m.worked)}`);
+        out.push(`- [x] ${t.title}${p ? ` _(${p})_` : ''}${bits.length ? ` — ${bits.join(' · ')}` : ''}`);
       }
       out.push('');
     }
