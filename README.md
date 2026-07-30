@@ -16,7 +16,7 @@ Chrome 擴充負責計時，Next.js 網頁負責管理與報表<br/>
 ![Zero Deps](https://img.shields.io/badge/圖表相依-0_套件-30d158?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-646262?style=flat-square)
 
-<!-- 截圖補上後把這行換成：<img src="docs/images/hero.png" alt="TodoTracker 總覽" width="820" /> -->
+<!-- 截圖補上後把這行換成 <img src="docs/images/hero.png" width="820" /> -->
 
 </div>
 
@@ -28,18 +28,27 @@ Chrome 擴充負責計時，Next.js 網頁負責管理與報表<br/>
 
 所以做了這個：**計時器住在 Chrome 工具列，按一下就開始**。做事的時候隨手記下發生什麼，收工按一顆按鈕，就得到一份可以直接貼進日報的 Markdown。
 
-```
-┌──────────────────────────────┐         ┌────────────────────────────────┐
-│  🧩 Chrome Extension (MV3)   │         │  🌐 Next.js 16 (App Router)    │
-│                              │ bridge  │                                │
-│  ▸ popup    計時 + Todo      │◄───────►│  ▸ /         總覽              │
-│  ▸ options  管理 + 報表      │         │  ▸ /log      工作日誌          │
-│  ▸ storage  ★ 唯一資料來源   │         │  ▸ /projects 專案樹            │
-│                              │         │  ▸ /todos    Todo              │
-│  chrome.storage.local        │         │  ▸ /reports  報表              │
-└──────────────────────────────┘         └────────────────────────────────┘
-                  ▲                                      │
-                  └──────── 同一份資料，兩個介面 ─────────┘
+```mermaid
+flowchart LR
+    subgraph EXT["Chrome Extension · MV3"]
+        direction TB
+        POPUP["popup<br/>計時 + Todo"]
+        OPT["options<br/>管理 + 報表"]
+        STORE[("chrome.storage.local<br/><b>唯一資料來源</b>")]
+        POPUP --- STORE
+        OPT --- STORE
+    end
+
+    subgraph WEB["Next.js 16 · App Router"]
+        direction TB
+        R1["/ 總覽"]
+        R2["/log 工作日誌"]
+        R3["/projects 專案樹"]
+        R4["/todos"]
+        R5["/reports 報表"]
+    end
+
+    WEB <==>|"sendMessage 橋接"| EXT
 ```
 
 網頁**沒有自己的資料庫**。它透過 `chrome.runtime.sendMessage` 打進擴充讀寫，所以在網頁建的專案，popup 的下拉會立刻出現；在 popup 按下的計時，網頁 5 秒內同步顯示。
@@ -63,105 +72,20 @@ Chrome 擴充負責計時，Next.js 網頁負責管理與報表<br/>
 
 ## 📸 畫面
 
-<!--
-  截圖規格與檔名寫在 docs/images/README.md。
-  圖補上後把下面的 ASCII 示意換成 <img> 表格即可。
--->
+> [!NOTE]
+> 截圖還沒補上。規格與檔名寫在 [`docs/images/README.md`](docs/images/README.md)。
 
-<details open>
-<summary><b>擴充 popup</b> · 計時中的即時工作紀錄</summary>
-
-<br/>
-
-```
-┌────────────────────────────────────┐
-│ TodoTracker      [複製今日] [管理] │
-├────────────────────────────────────┤
-│ ███████████ 深色面板 ███████████   │
-│                                    │
-│            01:23:45                │
-│      稅則 / 土地稅 · 處理 c2q      │
-│                                    │
-│           [ [x] 停止 ]             │
-├────────────────────────────────────┤
-│  計時  │  Todo                     │
-├────────────────────────────────────┤
-│ ┌────────────────────────────────┐ │
-│ │ 處理土地稅的 c2q 狀況          │ │
-│ └────────────────────────────────┘ │
-│ ┌───────────────┐ ┌──────────────┐ │
-│ │ 稅則 / 土地稅 │ │ 不綁 todo    │ │
-│ └───────────────┘ └──────────────┘ │
-│                                    │
-│ [-] 工作紀錄  [時間]        已存   │
-│ ┌────────────────────────────────┐ │
-│ │ 09:12 API 回傳格式不一致       │ │
-│ │ 09:40 改用批次查詢             │ │
-│ └────────────────────────────────┘ │
-├────────────────────────────────────┤
-│  今日        本週       今日筆數   │
-│  3h 20m      12h 05m    5          │
-├────────────────────────────────────┤
-│ [-] 最近                           │
-│ ▪ 補文件       15:30–16:00    30m  │
-│ ▪ 測 embedding 13:40–15:20  1h 40m │
-└────────────────────────────────────┘
-```
-
-</details>
+| 畫面 | 你會看到 |
+|---|---|
+| **擴充 popup** | 深色計時面板顯示 `01:23:45`，底下是專案／Todo 下拉與可自動長高的工作紀錄框，最下面今日／本週統計與最近紀錄 |
+| **報表** | 甜甜圈中央是總時數，右側圖例列出各專案時數與佔比；有子專案的列標 `[+]`，點進去換成看那一層 |
+| **時間軸** | 橫軸日期、縱軸時刻，每筆紀錄是一個色塊，位置就是實際幾點到幾點，像日曆週檢視 |
+| **工作日誌** | 按日期分組，每筆下面一個輸入框，移開游標就存。上方顯示「今天還有 N 筆沒寫」 |
+| **專案樹** | 縮排的樹狀清單，右邊兩個數字：含子專案的總時數、只算這一層的時數 |
+| **Todo** | 每列帶「歷時 5 天」「逾期 3 天」「重開 2 次」等 badge，底下一行是開單／截止／結案三個時間 |
 
 <details>
-<summary><b>報表</b> · 甜甜圈可以一層一層鑽進子專案</summary>
-
-<br/>
-
-```
-全部 / 客戶A / 官網改版
-┌──────────────────────────────────────────────────────────┐
-│                                                          │
-│            ╭───────╮        ▪ 前端         6h 30m   54%  │
-│          ╱           ╲      ▪ 後端         4h 00m   33%  │
-│         │   12h 05m   │     ▪ 測試 [+]     1h 35m   13%  │
-│          ╲   總時數  ╱                                   │
-│            ╰───────╯                                     │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-
-每日趨勢 · 本月
- 8h ┤                              ●
- 6h ┤            ●─────●         ╱   ╲
- 4h ┤      ●───╱         ╲─────●       ●
- 2h ┤  ●──╱                              ╲──○
- 0h ┼──┴────┴────┴────┴────┴────┴────┴────┴──
-     07-23  07-25  07-27  07-29  07-31
-```
-
-</details>
-
-<details>
-<summary><b>時間軸</b> · 幾點到幾點，像日曆週檢視</summary>
-
-<br/>
-
-```
-        07-28   07-29   07-30
- 08:00 ┼───────┼───────┼───────┤
-       │ ▓▓▓▓  │       │ ▓▓▓   │  ▓ 稅則
- 10:00 ┼─▓▓▓▓──┼─░░░░──┼─▓▓▓───┤  ░ LLM 實驗
-       │       │ ░░░░  │ ░░░   │  ▒ 文件整理
- 12:00 ┼───────┼───────┼───────┤
-       │ ▒▒▒▒  │       │       │
- 14:00 ┼─▒▒▒▒──┼─▓▓▓▓──┼─░░░░──┤
-       │       │ ▓▓▓▓  │ ░░░░  │
- 16:00 ┼───────┼─▓▓▓▓──┼───────┤
-       │       │       │       │
- 18:00 ┴───────┴───────┴───────┘
-```
-
-</details>
-
-<details>
-<summary><b>📋 複製出來的 Markdown 長這樣</b></summary>
+<summary><b>複製出來的 Markdown 長這樣</b></summary>
 
 <br/>
 
@@ -195,9 +119,7 @@ Chrome 擴充負責計時，Next.js 網頁負責管理與報表<br/>
 
 ### 1️⃣ 載入擴充
 
-```
-chrome://extensions  →  開啟「開發人員模式」  →  載入未封裝項目  →  選 extension/
-```
+`chrome://extensions` → 開啟「開發人員模式」→ 載入未封裝項目 → 選 `extension/`
 
 > [!TIP]
 > 記得把圖示釘選到工具列。這樣就能用了 —— 擴充本身不需要網頁也能跑。
@@ -210,7 +132,7 @@ npm install
 npm run dev
 ```
 
-打開 <http://localhost:3000>，右上角顯示 **● 已連線擴充** 就成功了。
+打開 <http://localhost:3000>，右上角顯示 **已連線擴充** 就成功了。
 
 > [!IMPORTANT]
 > 網址必須是 `localhost` 或 `127.0.0.1`。擴充的 `externally_connectable` 只信任這兩個來源，這是刻意的安全邊界。
@@ -220,23 +142,64 @@ npm run dev
 ## 🗂️ 專案結構
 
 ```
-TodoTracker/
-├── 📄 DESIGN.md              設計系統（改編 getdesign.md 的 OpenCode 分析）
-├── 📁 docs/
-│   └── ARCHITECTURE.md       架構規劃、資料流、風險
-├── 📁 extension/             Chrome 擴充 · 零 build step
+TodoTracker
+├── DESIGN.md          設計系統（改編 getdesign.md 的 OpenCode 分析）
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── images/        截圖
+├── extension/         Chrome 擴充 · 零 build step
 │   ├── manifest.json
 │   └── src/
-│       ├── background.js     MV3 SW：badge、alarm、閒置、網頁橋接
-│       ├── lib/              db · time · tree · tasks · charts · summary …
-│       ├── popup/            計時 + Todo
-│       └── options/          報表 / 專案 / Todo / 標籤 / 紀錄 / 設定
-├── 📁 web/                   Next.js 16 App Router
-│   ├── app/                  6 個路由，全部 client component
-│   ├── components/           TimerPanel · Charts · Section · CopyButton …
-│   └── lib/                  bridge · store · time · tree · tasks · summary
-└── 📁 supabase/
-    └── schema.sql            多人 team 的 Postgres schema + RLS（尚未接上）
+│       ├── background.js   MV3 SW：badge、alarm、閒置、網頁橋接
+│       ├── lib/            db · time · tree · tasks · charts · summary · collapse · autogrow
+│       ├── popup/          計時 + Todo
+│       └── options/        報表 / 專案 / Todo / 標籤 / 紀錄 / 設定
+├── web/               Next.js 16 App Router
+│   ├── app/           6 個路由，全部 client component
+│   ├── components/    TimerPanel · Charts · Section · CopyButton · AutoTextarea
+│   └── lib/           bridge · store · time · tree · tasks · summary · types
+└── supabase/
+    └── schema.sql     多人 team 的 Postgres schema + RLS（尚未接上）
+```
+
+---
+
+## 🧩 資料模型
+
+```mermaid
+erDiagram
+    PROJECT ||--o{ PROJECT : "parentId 無限巢狀"
+    PROJECT ||--o{ TASK : "掛在專案下"
+    PROJECT ||--o{ ENTRY : "計時歸屬"
+    TASK    ||--o{ ENTRY : "可對 todo 計時"
+    ENTRY   }o--o{ TAG : "多對多"
+
+    PROJECT {
+        string id
+        string parentId "null = 最上層"
+        string name
+        string color
+        string archivedAt "封存後不出現在下拉"
+    }
+    TASK {
+        string title
+        string status "todo/doing/done/archived"
+        string openedAt "開單時間戳 · 不可改"
+        string dueDate "截止日 · 唯一可手改"
+        string completedAt "結案時間戳 · 重開清空"
+        int reopenCount
+    }
+    ENTRY {
+        string startedAt
+        string endedAt "null = 計時中"
+        string description "一句話"
+        string notes "工作紀錄"
+        string clientEntryId "冪等鍵，給之後的離線佇列"
+    }
+    TAG {
+        string name
+        string color
+    }
 ```
 
 ---
@@ -261,17 +224,25 @@ MV3 的 background 是 service worker，**閒置約 30 秒就被系統回收**�
 
 <br/>
 
-`manifest.json` 裡設 `externally_connectable`，只允許 `localhost` 與 `127.0.0.1` 對擴充發訊息。`background.js` 收到 `onMessageExternal` 後再檢查一次 `sender.origin`，然後把訊息轉成 `db.js` 的函式呼叫。
+```mermaid
+sequenceDiagram
+    participant W as 網頁 localhost
+    participant B as background.js
+    participant D as db.js
+    participant S as chrome.storage.local
+
+    W->>B: sendMessage(EXT_ID, {type, payload})
+    B->>B: 檢查 sender.origin
+    B->>D: RPC 對應的函式
+    D->>S: 讀寫
+    S-->>D: 資料
+    D-->>B: 結果
+    B-->>W: {ok: true, data}
+```
+
+`manifest.json` 裡設 `externally_connectable`，只允許 `localhost` 與 `127.0.0.1` 對擴充發訊息。`background.js` 收到後再檢查一次 `sender.origin`，才轉成 `db.js` 的函式呼叫。
 
 擴充 ID 由 manifest 裡的固定 `key`（RSA 公鑰）決定，所以重新載入也不會變，網頁可以寫死不用猜。
-
-```
-web  ──chrome.runtime.sendMessage(EXT_ID, {type, payload})──►  background.js
-                                                                    │
-                                                              RPC → db.js
-                                                                    │
-web  ◄────────────── {ok: true, data} ──────────────────────────────┘
-```
 
 </details>
 
@@ -308,6 +279,7 @@ web  ◄────────────── {ok: true, data} ────
 - [x] 專案無限巢狀 + 統計向上累加
 - [x] 甜甜圈 / 折線 / 時間軸三種圖表
 - [x] Todo 開單 → 截止 → 結案全程記錄
+- [ ] 補上截圖
 - [ ] 接上 Supabase，多裝置同步
 - [ ] 多人 team 與邀請流程
 - [ ] 自動偵測網站 → 對應專案
