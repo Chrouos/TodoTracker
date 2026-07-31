@@ -430,32 +430,133 @@ $('tagList').addEventListener('click', async (e) => {
 });
 
 /* ---------------- 紀錄 ---------------- */
-function renderEntries() {
-  const rows = S.entries.filter((e) => e.endedAt).slice(0, 200);
-  $('entryCount').textContent = `${S.entries.length} 筆（顯示最新 200）`;
-  $('entryList').innerHTML = rows.length
-    ? rows.map((e) => {
-        const p = S.projects.find((x) => x.id === e.projectId);
-        const tags = (e.tagIds || []).map((id) => S.tags.find((t) => t.id === id)?.name).filter(Boolean);
-        return `<div class="row-item">
-          <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
-          <div class="main">
-            <div class="ellipsis">${esc(e.description || '（無描述）')}
-              ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
-            <div class="sub">${p ? esc(p.name) : '未分類'} · ${fmtDate(e.startedAt)} ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</div>
-            ${e.notes ? `<div class="notes">${esc(e.notes)}</div>` : ''}
-          </div>
-          <span class="num">${fmtHM(db.durationSec(e))}</span>
-          <div class="act">
-            <button class="btn-sm" data-edit-e="${e.id}">[編輯]</button>
-            <button class="btn-sm btn-danger" data-del-e="${e.id}">[x]</button>
-          </div>
-        </div>`;
-      }).join('')
-    : '<div class="empty">還沒有紀錄</div>';
+/* 紀錄分頁的篩選狀態 */
+const enUI = { q: '', projectId: '', range: 'all', limit: 50, expanded: new Set(), allOpen: false };
+
+/** 套用搜尋 / 專案 / 區間之後的紀錄，新的在前 */
+function filteredEntries() {
+  const from = enUI.range === 'today' ? startOfDay()
+    : enUI.range === 'week' ? startOfWeek(new Date(), S.settings.weekStartsOn)
+      : enUI.range === 'month' ? startOfMonth()
+        : null;
+
+  // 選了父專案時，子專案的紀錄也一起算進來
+  const scope = enUI.projectId
+    ? new Set([enUI.projectId, ...descendantSet(enUI.projectId)])
+    : null;
+
+  const kw = enUI.q.trim().toLowerCase();
+
+  return S.entries
+    .filter((e) => e.endedAt && !e.deletedAt)
+    .filter((e) => !from || new Date(e.startedAt) >= from)
+    .filter((e) => !scope || (e.projectId && scope.has(e.projectId)))
+    .filter((e) => !kw || `${e.description} ${e.notes || ''}`.toLowerCase().includes(kw))
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
+function renderEntries() {
+  // 專案下拉
+  const keep = $('enFilter').value;
+  $('enFilter').innerHTML = '<option value="">— 全部專案 —</option>' +
+    flattenTree(S.projects).map((p) =>
+      `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+  $('enFilter').value = keep;
+
+  const rows = filteredEntries();
+  const shown = rows.slice(0, enUI.limit);
+  const totalSec = rows.reduce((s, e) => s + db.durationSec(e), 0);
+  $('entryCount').textContent = `${rows.length} 筆 · ${fmtHM(totalSec)}`;
+  $('enExpandAll').textContent = enUI.allOpen ? '[-] 全部收合' : '[+] 全部展開';
+
+  // 依日期分組
+  const byDay = new Map();
+  for (const e of shown) {
+    const d = fmtDate(e.startedAt);
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(e);
+  }
+
+  $('entryList').innerHTML = shown.length
+    ? [...byDay.entries()].map(([date, list]) => {
+        const daySec = list.reduce((s, e) => s + db.durationSec(e), 0);
+        return `<div class="day-group">
+          <div class="day-head">
+            <span class="num">${date}</span>
+            <span class="grow"></span>
+            <span class="num mute">${fmtHM(daySec)} · ${list.length} 筆</span>
+          </div>
+          ${list.map((e) => {
+            const p = S.projects.find((x) => x.id === e.projectId);
+            const task = S.tasks.find((x) => x.id === e.taskId);
+            const tags = (e.tagIds || []).map((id) => S.tags.find((t) => t.id === id)?.name).filter(Boolean);
+            const notes = e.notes || '';
+            // 太長的工作紀錄預設收起來，不然一筆就吃掉整個畫面
+            const long = notes.length > 120 || notes.split('\n').length > 3;
+            const open = enUI.allOpen || enUI.expanded.has(e.id);
+            return `<div class="row-item">
+              <span class="num mute" style="width:104px;flex:0 0 104px">
+                ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</span>
+              <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
+              <div class="main">
+                <div class="ellipsis">${esc(e.description || '（無描述）')}
+                  ${task ? `<span class="badge">${esc(task.title)}</span>` : ''}
+                  ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
+                <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
+                ${notes ? `
+                  <div class="notes${long && !open ? ' clamp' : ''}">${esc(notes)}</div>
+                  ${long ? `<button class="btn-sm btn-ghost notes-toggle" data-toggle-notes="${e.id}">
+                    ${open ? '[-] 收合' : '[+] 展開全文'}</button>` : ''}
+                ` : ''}
+              </div>
+              <span class="num">${fmtHM(db.durationSec(e))}</span>
+              <div class="act">
+                <button class="btn-sm" data-edit-e="${e.id}">[編輯]</button>
+                <button class="btn-sm btn-danger" data-del-e="${e.id}">[x]</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('')
+    : `<div class="empty">${S.entries.length ? '這個條件下沒有紀錄' : '還沒有紀錄'}</div>`;
+
+  $('entryMore').innerHTML = rows.length > enUI.limit
+    ? `<button id="enMore">載入更多（還有 ${rows.length - enUI.limit} 筆）</button>`
+    : '';
+}
+
+/* 篩選事件 */
+$('enSearch').addEventListener('input', (e) => {
+  enUI.q = e.target.value; enUI.limit = 50; renderEntries();
+});
+$('enFilter').addEventListener('change', (e) => {
+  enUI.projectId = e.target.value; enUI.limit = 50; renderEntries();
+});
+$('enRange').addEventListener('click', (e) => {
+  const r = e.target.dataset.erange;
+  if (!r) return;
+  enUI.range = r; enUI.limit = 50;
+  $('enRange').querySelectorAll('.seg-btn')
+    .forEach((b) => b.classList.toggle('active', b.dataset.erange === r));
+  renderEntries();
+});
+$('enExpandAll').addEventListener('click', () => {
+  enUI.allOpen = !enUI.allOpen;
+  enUI.expanded.clear();
+  renderEntries();
+});
+$('entryMore').addEventListener('click', (e) => {
+  if (e.target.id === 'enMore') { enUI.limit += 50; renderEntries(); }
+});
+
 $('entryList').addEventListener('click', async (e) => {
+  const toggle = e.target.closest('[data-toggle-notes]')?.dataset.toggleNotes;
+  if (toggle) {
+    if (enUI.expanded.has(toggle)) enUI.expanded.delete(toggle);
+    else enUI.expanded.add(toggle);
+    renderEntries();
+    return;
+  }
   const ed = e.target.dataset.editE, dl = e.target.dataset.delE;
   if (ed) openEntryDialog(S.entries.find((x) => x.id === ed));
   else if (dl) { await db.deleteEntry(dl); await load(); }
@@ -548,9 +649,14 @@ function download(name, content, type) {
   URL.revokeObjectURL(url);
 }
 
-$('exportCsv').addEventListener('click', () => {
-  const rows = inRange();
-  const head = ['date', 'start', 'end', 'seconds', 'hours', 'project', 'task', 'description', 'tags'];
+// 紀錄分頁的 CSV：跟著目前的搜尋與篩選走
+$('exportFiltered').addEventListener('click', () => exportCsvOf(filteredEntries(), 'filtered'));
+
+// 報表分頁的 CSV：跟著區間走
+$('exportCsv').addEventListener('click', () => exportCsvOf(inRange(), range));
+
+function exportCsvOf(rows, tag) {
+  const head = ['date', 'start', 'end', 'seconds', 'hours', 'project', 'task', 'description', 'notes', 'tags'];
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = rows.map((e) => {
     const p = S.projects.find((x) => x.id === e.projectId);
@@ -559,14 +665,15 @@ $('exportCsv').addEventListener('click', () => {
     return [
       fmtDate(e.startedAt), fmtClock(e.startedAt), fmtClock(e.endedAt),
       sec, (sec / 3600).toFixed(2),
-      p?.name || '', t?.title || '', e.description || '',
+      p ? pathOf(S.projects, p.id).join(' / ') : '', t?.title || '',
+      e.description || '', e.notes || '',
       (e.tagIds || []).map((id) => S.tags.find((x) => x.id === id)?.name).filter(Boolean).join('|'),
     ].map(q).join(',');
   });
   // BOM 讓 Excel 正確辨識 UTF-8
-  download(`todotracker-${range}-${fmtDate(new Date().toISOString())}.csv`,
+  download(`todotracker-${tag}-${fmtDate(new Date().toISOString())}.csv`,
     '﻿' + [head.join(','), ...lines].join('\n'), 'text/csv;charset=utf-8');
-});
+}
 
 $('backup').addEventListener('click', async () => {
   const data = await db.exportAll();

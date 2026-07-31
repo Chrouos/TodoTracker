@@ -49,6 +49,24 @@ section[hidden] { display: none; }
   border-left: 2px solid var(--hairline);
   font-size: 12px; color: var(--text-body); white-space: pre-wrap;
 }
+/* 太長的工作紀錄先收起來，不然一筆就吃掉整個畫面 */
+.row-item .notes.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.notes-toggle { margin-top: var(--xs); height: 22px; font-size: 11px; color: var(--text-mute); }
+
+/* 依日期分組 */
+.day-group { margin-bottom: var(--xl); }
+.day-head {
+  display: flex; align-items: center; gap: var(--sm);
+  padding-bottom: var(--xs); margin-bottom: var(--xs);
+  border-bottom: 1px solid var(--hairline-strong);
+  font-size: 13px; font-weight: 700;
+}
+.day-head .mute { font-weight: 400; }
 .row-item.done .main > div:first-child { color: var(--text-ash); text-decoration: line-through; }
 .badge.overdue { color: var(--danger); border-color: var(--danger); }
 .row-item .act { display: flex; gap: var(--xs); opacity: 0; }

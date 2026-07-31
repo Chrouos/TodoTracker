@@ -143,13 +143,28 @@
   <!-- ── 紀錄 ── -->
   <section id="p-entries" hidden>
     <div class="toolbar">
+      <input id="enSearch" placeholder="搜尋描述與工作紀錄…" style="width:260px" />
+      <select id="enFilter" style="width:240px"></select>
+      <div class="seg" id="enRange">
+        <button class="seg-btn active" data-erange="all">全部</button>
+        <button class="seg-btn" data-erange="month">本月</button>
+        <button class="seg-btn" data-erange="week">本週</button>
+        <button class="seg-btn" data-erange="today">今日</button>
+      </div>
+      <button id="enExpandAll" title="展開／收合所有工作紀錄">[+] 全部展開</button>
+    </div>
+
+    <div class="toolbar">
       <button id="addEntry">手動補登</button>
       <button id="copyToday">複製今日總結</button>
       <button id="copyRange">複製區間總結</button>
+      <button id="exportFiltered">↓ CSV</button>
       <div class="grow"></div>
       <span class="cap" id="entryCount"></span>
     </div>
+
     <div id="entryList"></div>
+    <div id="entryMore" style="text-align:center; padding-top:8px"></div>
   </section>
 
   <!-- ── 設定 ── -->
