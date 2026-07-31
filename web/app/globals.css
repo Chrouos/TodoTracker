@@ -173,6 +173,11 @@ main.page { padding: var(--xxl) 0 var(--section); }
   font-size: 12px; color: var(--text-body); white-space: pre-wrap;
 }
 .badge.overdue { color: var(--danger); border-color: var(--danger); }
+.badge.ok { color: var(--success); border-color: var(--success); }
+
+/* 專案名稱點進詳情頁 */
+.proj-link { border-bottom: 1px solid var(--hairline); }
+.proj-link:hover { border-bottom-color: var(--ink); }
 .item .act { display: flex; gap: var(--xs); opacity: 0; }
 .item:hover .act { opacity: 1; }
 
