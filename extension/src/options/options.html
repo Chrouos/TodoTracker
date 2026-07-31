@@ -17,6 +17,7 @@
     <button class="tab active" data-tab="report">報表</button>
     <button class="tab" data-tab="projects">專案</button>
     <button class="tab" data-tab="todos">Todo</button>
+    <button class="tab" data-tab="schedules">排程</button>
     <button class="tab" data-tab="tags">標籤</button>
     <button class="tab" data-tab="entries">紀錄</button>
     <button class="tab" data-tab="settings">設定</button>
@@ -74,6 +75,20 @@
         <button type="button" id="pjCancel" hidden>取消編輯</button>
       </div>
     </form>
+
+    <!-- 編輯某個專案時才出現：目標／筆記時間軸 -->
+    <div id="pjNotesBox" class="card" hidden>
+      <div class="row" style="margin-bottom:8px">
+        <span class="h" id="pjNotesTitle">目標與筆記</span>
+      </div>
+      <textarea id="pjNoteDraft" placeholder="這個專案要達成什麼？有什麼決定或轉折？Ctrl+Enter 送出"></textarea>
+      <div class="actions">
+        <button type="button" id="pjNoteAdd" class="btn-primary">新增一則</button>
+        <span class="cap" style="align-self:center">會記下寫入當下的時間，之後還能修改</span>
+      </div>
+      <div id="pjNoteList"></div>
+    </div>
+
     <div id="projList"></div>
   </section>
 
@@ -126,6 +141,70 @@
       <span class="cap" id="tdCount"></span>
     </div>
     <div id="todoList"></div>
+  </section>
+
+  <!-- ── 排程 ── -->
+  <section id="p-schedules" hidden>
+    <p class="cap">
+      設定固定週期的工作，到指定時間會自動開一張 Todo，並在快到截止時間時通知你。
+      例：每個平日 09:00 開一張「填寫工作日誌」，當天 17:30 截止，提前 10 分鐘提醒。
+    </p>
+
+    <form id="schForm" class="card">
+      <input type="hidden" id="scId" />
+      <div class="grid4">
+        <label class="field" style="grid-column: span 2"><span>要做什麼</span>
+          <input id="scTitle" required placeholder="例：填寫工作日誌" /></label>
+        <label class="field"><span>專案</span><select id="scProject"></select></label>
+        <label class="field"><span>啟用</span>
+          <select id="scEnabled">
+            <option value="1">開啟</option>
+            <option value="0">關閉</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="field" style="margin-top:12px"><span>重複於</span>
+        <div class="dow" id="scDow">
+          <button type="button" data-dow="1">一</button>
+          <button type="button" data-dow="2">二</button>
+          <button type="button" data-dow="3">三</button>
+          <button type="button" data-dow="4">四</button>
+          <button type="button" data-dow="5">五</button>
+          <button type="button" data-dow="6">六</button>
+          <button type="button" data-dow="0">日</button>
+          <span class="grow"></span>
+          <button type="button" id="scWeekdays" class="btn-sm">平日</button>
+          <button type="button" id="scEveryday" class="btn-sm">每天</button>
+        </div>
+      </label>
+
+      <div class="grid4" style="margin-top:12px">
+        <label class="field"><span>幾點開單</span>
+          <input id="scCreate" type="time" value="09:00" />
+          <span class="hint">到這個時間自動新增到 Todo。</span>
+        </label>
+        <label class="field"><span>當天截止時間</span>
+          <input id="scDue" type="time" />
+          <span class="hint">留空就不設截止。</span>
+        </label>
+        <label class="field"><span>提前幾分鐘提醒</span>
+          <input id="scRemind" type="number" min="0" step="5" placeholder="留空不提醒" />
+          <span class="hint">用 Chrome 通知，需要允許通知權限。</span>
+        </label>
+      </div>
+
+      <label class="field" style="margin-top:12px"><span>備註</span>
+        <textarea id="scNotes" placeholder="會一併寫進產生的 Todo"></textarea></label>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">儲存排程</button>
+        <button type="button" id="scCancel" hidden>取消編輯</button>
+        <button type="button" id="scRunNow">立刻檢查一次</button>
+      </div>
+    </form>
+
+    <div id="schList"></div>
   </section>
 
   <!-- ── 標籤 ── -->

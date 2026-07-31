@@ -58,6 +58,26 @@ section[hidden] { display: none; }
 }
 .notes-toggle { margin-top: var(--xs); height: 22px; font-size: 11px; color: var(--text-mute); }
 
+/* 星期選擇器 */
+.dow { display: flex; align-items: center; gap: var(--xs); flex-wrap: wrap; }
+.dow button[data-dow] {
+  width: 34px; height: 30px; padding: 0;
+  border: 1px solid var(--hairline); background: var(--surface-soft); color: var(--text-mute);
+}
+.dow button[data-dow].on {
+  background: var(--ink); color: var(--canvas); border-color: var(--ink); font-weight: 700;
+}
+
+/* 專案目標／筆記的一則 */
+.note-entry { padding: var(--md) 0; border-bottom: 1px solid var(--hairline); }
+.note-entry:last-child { border-bottom: 0; }
+.note-entry .act { display: flex; gap: var(--xs); opacity: 0; }
+.note-entry:hover .act { opacity: 1; }
+.note-body {
+  white-space: pre-wrap; padding-left: var(--md);
+  border-left: 2px solid var(--hairline); color: var(--text-body); font-size: 13px;
+}
+
 /* 依日期分組 */
 .day-group { margin-bottom: var(--xl); }
 .day-head {

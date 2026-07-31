@@ -155,6 +155,7 @@ export default function TodosPage() {
                   textDecoration: done ? 'line-through' : undefined,
                 }}>
                   {t.title}{' '}
+                  {t.scheduleId && <span className="badge" title="由排程自動產生">排程</span>}{' '}
                   {t.status === 'doing' && <span className="badge">進行中</span>}{' '}
                   {dl && <span className={`badge${m.isLate ? ' overdue' : ''}`}>{dl}</span>}{' '}
                   {m.leadMs !== null && <span className="badge">歷時 {leadLabel(m.leadMs)}</span>}{' '}
@@ -162,7 +163,7 @@ export default function TodosPage() {
                 </div>
                 <div className="sub">{p ? pathOf(projects, p.id).join(' / ') : '未分類'}</div>
                 <div className="sub num">
-                  開單 {stampLabel(t.openedAt)} · 截止 {t.dueDate ?? '—'} · 結案 {stampLabel(t.completedAt)}
+                  開單 {stampLabel(t.openedAt)} · 截止 {t.dueDate ? `${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}` : '—'} · 結案 {stampLabel(t.completedAt)}
                 </div>
                 {t.notes && <div className="notes">{t.notes}</div>}
               </div>

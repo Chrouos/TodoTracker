@@ -8,6 +8,7 @@ import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
 import CopyButton from '@/components/CopyButton';
 import EntryDialog, { type EntryDraft } from '@/components/EntryDialog';
+import ProjectNotes from '@/components/ProjectNotes';
 import { LineChart, DonutChart } from '@/components/Charts';
 import { buildSummary } from '@/lib/summary';
 import {
@@ -220,6 +221,13 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
+
+      <Section
+        id={`pd-notes-${project.id}`}
+        title={`目標與筆記${project.notes?.length ? `（${project.notes.length}）` : ''}`}
+      >
+        <ProjectNotes project={project} />
+      </Section>
 
       {kids.length > 0 && (
         <Section id={`pd-kids-${project.id}`} title={`子專案（${kids.length}）`}>

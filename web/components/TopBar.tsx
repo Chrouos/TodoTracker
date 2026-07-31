@@ -9,6 +9,7 @@ const LINKS = [
   { href: '/log', label: '工作日誌' },
   { href: '/projects', label: '專案' },
   { href: '/todos', label: 'Todo' },
+  { href: '/schedules', label: '排程' },
   { href: '/reports', label: '報表' },
   { href: '/settings', label: '設定' },
 ];

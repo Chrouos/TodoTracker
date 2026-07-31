@@ -12,20 +12,22 @@ import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
+autoGrow(document.getElementById('pjNoteDraft'), { min: 72, max: 320 });
+autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-let S = { projects: [], tags: [], tasks: [], entries: [], settings: db.DEFAULT_SETTINGS };
+let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], settings: db.DEFAULT_SETTINGS };
 let range = 'week';
 
 async function load() {
-  const [projects, tags, tasks, entries, settings] = await Promise.all([
+  const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
     db.listProjects({ includeArchived: true }), db.listTags(),
-    db.listTasks(), db.listEntries(), db.getSettings(),
+    db.listTasks(), db.listEntries(), db.listSchedules(), db.getSettings(),
   ]);
-  S = { projects, tags, tasks, entries, settings };
+  S = { projects, tags, tasks, entries, schedules, settings };
   renderAll();
 }
 
@@ -41,7 +43,8 @@ const inRange = () => {
 };
 
 function renderAll() {
-  renderReport(); renderProjects(); renderTodos(); renderTags(); renderEntries(); renderSettings();
+  renderReport(); renderProjects(); renderTodos(); renderSchedules();
+  renderTags(); renderEntries(); renderSettings();
 }
 
 /* ---------------- 報表 ---------------- */
@@ -215,6 +218,94 @@ function renderProjects() {
     : '<div class="empty">還沒有專案，用上面的表單新增一個</div>';
 }
 
+/* ---------------- 專案目標／筆記 ---------------- */
+
+let noteEditingId = null;   // 正在編輯的那則
+
+function renderProjectNotes() {
+  const pid = $('pjId').value;
+  const box = $('pjNotesBox');
+  if (!pid) { box.hidden = true; return; }
+
+  const p = S.projects.find((x) => x.id === pid);
+  if (!p) { box.hidden = true; return; }
+
+  box.hidden = false;
+  const notes = [...(p.notes || [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  $('pjNotesTitle').textContent = `「${p.name}」的目標與筆記${notes.length ? `（${notes.length}）` : ''}`;
+
+  $('pjNoteList').innerHTML = notes.length
+    ? notes.map((n) => {
+        const editing = noteEditingId === n.id;
+        return `<div class="note-entry">
+          <div class="row cap" style="margin-bottom:4px">
+            <span class="num">${fmtDate(n.createdAt)} ${fmtClock(n.createdAt)}</span>
+            ${n.updatedAt ? `<span class="ash" title="最後修改 ${fmtDate(n.updatedAt)} ${fmtClock(n.updatedAt)}">· 已編輯</span>` : ''}
+            <span class="grow"></span>
+            ${editing
+              ? `<button class="btn-sm" data-note-cancel="1">取消</button>
+                 <button class="btn-sm btn-primary" style="height:26px" data-note-save="${n.id}">儲存</button>`
+              : `<span class="act">
+                   <button class="btn-sm" data-note-edit="${n.id}">[編輯]</button>
+                   <button class="btn-sm btn-danger" data-note-del="${n.id}">[x]</button>
+                 </span>`}
+          </div>
+          ${editing
+            ? `<textarea data-note-input="${n.id}">${esc(n.text)}</textarea>`
+            : `<div class="note-body">${esc(n.text)}</div>`}
+        </div>`;
+      }).join('')
+    : '<div class="empty">還沒有目標或筆記</div>';
+
+  if (noteEditingId) {
+    const ta = $('pjNoteList').querySelector(`[data-note-input="${noteEditingId}"]`);
+    if (ta) { autoGrow(ta, { min: 72, max: 400 }); ta.focus(); }
+  }
+}
+
+$('pjNoteAdd').addEventListener('click', async () => {
+  const pid = $('pjId').value;
+  const text = $('pjNoteDraft').value;
+  if (!pid || !text.trim()) return;
+  await db.addProjectNote(pid, text);
+  $('pjNoteDraft').value = '';
+  $('pjNoteDraft').dispatchEvent(new Event('input'));
+  await load();
+  renderProjectNotes();
+});
+
+$('pjNoteDraft').addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') $('pjNoteAdd').click();
+});
+
+$('pjNoteList').addEventListener('click', async (e) => {
+  const pid = $('pjId').value;
+  const ed = e.target.closest('[data-note-edit]')?.dataset.noteEdit;
+  const save = e.target.closest('[data-note-save]')?.dataset.noteSave;
+  const del = e.target.closest('[data-note-del]')?.dataset.noteDel;
+
+  if (ed) { noteEditingId = ed; renderProjectNotes(); return; }
+  if (e.target.closest('[data-note-cancel]')) { noteEditingId = null; renderProjectNotes(); return; }
+
+  if (save) {
+    const ta = $('pjNoteList').querySelector(`[data-note-input="${save}"]`);
+    await db.updateProjectNote(pid, save, ta.value);
+    noteEditingId = null;
+  } else if (del) {
+    if (!confirm('刪除這則筆記？')) return;
+    await db.deleteProjectNote(pid, del);
+  } else return;
+
+  await load();
+  renderProjectNotes();
+});
+
+$('pjNoteList').addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.target.dataset.noteInput) {
+    $('pjNoteList').querySelector(`[data-note-save="${e.target.dataset.noteInput}"]`)?.click();
+  }
+});
+
 function descendantSet(id) {
   const out = new Set();
   const walk = (pid) => {
@@ -246,7 +337,9 @@ $('projForm').addEventListener('submit', async (e) => {
 function resetProjForm() {
   $('pjId').value = ''; $('pjName').value = ''; $('pjColor').value = '#201d1d';
   $('pjParent').value = ''; $('pjCancel').hidden = true;
+  noteEditingId = null;
   renderProjects();
+  renderProjectNotes();
 }
 $('pjCancel').addEventListener('click', resetProjForm);
 
@@ -258,6 +351,8 @@ $('projList').addEventListener('click', async (e) => {
     $('pjCancel').hidden = false;
     renderProjects();                      // 重建下拉，排除自己與後代
     $('pjParent').value = p.parentId || '';
+    noteEditingId = null;
+    renderProjectNotes();
     $('pjName').focus();
   } else if (ar) {
     const p = S.projects.find((x) => x.id === ar);
@@ -314,7 +409,7 @@ function renderTodos() {
         // 三個時間排成一行，缺的用 — 佔位
         const dates = [
           `開單 ${stampLabel(t.openedAt)}`,
-          `截止 ${t.dueDate || '—'}`,
+          `截止 ${t.dueDate ? t.dueDate + (t.dueTime ? ` ${t.dueTime}` : '') : '—'}`,
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
@@ -324,6 +419,7 @@ function renderTodos() {
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
+              ${t.scheduleId ? '<span class="badge" title="由排程自動產生">排程</span>' : ''}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
               ${m.leadMs !== null ? `<span class="badge">歷時 ${leadLabel(m.leadMs)}</span>` : ''}
@@ -403,6 +499,142 @@ $('todoList').addEventListener('click', async (e) => {
   } else if (del) {
     if (!confirm('刪除這個 todo？綁在它上面的時間紀錄會保留，只是解除關聯。')) return;
     await db.deleteTask(del);
+  } else return;
+
+  await load();
+});
+
+/* ---------------- 排程 ---------------- */
+
+const DOW_NAME = ['日', '一', '二', '三', '四', '五', '六'];
+let scDays = new Set([1, 2, 3, 4, 5]);   // 預設平日
+
+function paintDow() {
+  $('scDow').querySelectorAll('[data-dow]').forEach((b) => {
+    b.classList.toggle('on', scDays.has(Number(b.dataset.dow)));
+  });
+}
+
+function dowLabel(days) {
+  const s = [...days].sort();
+  if (s.length === 7) return '每天';
+  if (s.join() === '1,2,3,4,5') return '每個平日';
+  if (s.join() === '0,6') return '每個週末';
+  return s.map((d) => DOW_NAME[d]).join('、');
+}
+
+function renderSchedules() {
+  const keep = $('scProject').value;
+  $('scProject').innerHTML = '<option value="">— 未分類 —</option>' +
+    flattenTree(S.projects).map((p) =>
+      `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+  $('scProject').value = keep;
+
+  const list = S.schedules || [];
+  $('schList').innerHTML = list.length
+    ? list.map((s) => {
+        const p = S.projects.find((x) => x.id === s.projectId);
+        const bits = [
+          dowLabel(s.weekdays),
+          `${s.createTime} 開單`,
+          s.dueTime ? `${s.dueTime} 截止` : null,
+          s.remindMinutes ? `提前 ${s.remindMinutes} 分提醒` : null,
+        ].filter(Boolean).join(' · ');
+        return `<div class="row-item${s.enabled ? '' : ' done'}">
+          <button class="btn-sm btn-ghost" data-sc-toggle="${s.id}" style="width:34px"
+            title="${s.enabled ? '停用' : '啟用'}">${s.enabled ? '[x]' : '[ ]'}</button>
+          <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
+          <div class="main">
+            <div class="ellipsis">${esc(s.title)}
+              ${s.enabled ? '' : '<span class="badge">已停用</span>'}</div>
+            <div class="sub num">${bits}</div>
+            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}${
+              s.lastRunDate ? ` · 上次開單 ${s.lastRunDate}` : ' · 尚未執行過'}</div>
+            ${s.notes ? `<div class="notes">${esc(s.notes)}</div>` : ''}
+          </div>
+          <div class="act">
+            <button class="btn-sm" data-sc-edit="${s.id}">[編輯]</button>
+            <button class="btn-sm btn-danger" data-sc-del="${s.id}">[x]</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty">還沒有排程</div>';
+}
+
+function resetSchForm() {
+  $('scId').value = ''; $('scTitle').value = ''; $('scNotes').value = '';
+  $('scCreate').value = '09:00'; $('scDue').value = ''; $('scRemind').value = '';
+  $('scEnabled').value = '1'; $('scCancel').hidden = true;
+  scDays = new Set([1, 2, 3, 4, 5]);
+  paintDow();
+  $('scNotes').dispatchEvent(new Event('input'));
+}
+
+$('scDow').addEventListener('click', (e) => {
+  const d = e.target.dataset.dow;
+  if (d === undefined) return;
+  const n = Number(d);
+  if (scDays.has(n)) scDays.delete(n); else scDays.add(n);
+  paintDow();
+});
+$('scWeekdays').addEventListener('click', () => { scDays = new Set([1, 2, 3, 4, 5]); paintDow(); });
+$('scEveryday').addEventListener('click', () => { scDays = new Set([0, 1, 2, 3, 4, 5, 6]); paintDow(); });
+
+$('schForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!$('scTitle').value.trim()) return;
+  if (!scDays.size) { alert('至少要選一天'); return; }
+  const remind = $('scRemind').value;
+  await db.upsertSchedule({
+    id: $('scId').value || undefined,
+    title: $('scTitle').value,
+    projectId: $('scProject').value || null,
+    notes: $('scNotes').value,
+    weekdays: [...scDays],
+    createTime: $('scCreate').value || '09:00',
+    dueTime: $('scDue').value || null,
+    remindMinutes: remind === '' ? null : Number(remind),
+    enabled: $('scEnabled').value === '1',
+  });
+  resetSchForm();
+  await load();
+});
+
+$('scCancel').addEventListener('click', resetSchForm);
+
+$('scRunNow').addEventListener('click', async (e) => {
+  const created = await db.runDueSchedules();
+  const btn = e.currentTarget;
+  btn.textContent = created.length ? `已新增 ${created.length} 張` : '目前沒有到點的';
+  setTimeout(() => { btn.textContent = '立刻檢查一次'; }, 1800);
+  await load();
+});
+
+$('schList').addEventListener('click', async (e) => {
+  const tg = e.target.closest('[data-sc-toggle]')?.dataset.scToggle;
+  const ed = e.target.closest('[data-sc-edit]')?.dataset.scEdit;
+  const del = e.target.closest('[data-sc-del]')?.dataset.scDel;
+
+  if (tg) {
+    const s = S.schedules.find((x) => x.id === tg);
+    await db.upsertSchedule({ ...s, enabled: !s.enabled });
+  } else if (ed) {
+    const s = S.schedules.find((x) => x.id === ed);
+    $('scId').value = s.id; $('scTitle').value = s.title;
+    $('scProject').value = s.projectId || '';
+    $('scNotes').value = s.notes || '';
+    $('scCreate').value = s.createTime; $('scDue').value = s.dueTime || '';
+    $('scRemind').value = s.remindMinutes ?? '';
+    $('scEnabled').value = s.enabled ? '1' : '0';
+    scDays = new Set(s.weekdays);
+    paintDow();
+    $('scCancel').hidden = false;
+    $('scNotes').dispatchEvent(new Event('input'));
+    $('scTitle').focus();
+    return;
+  } else if (del) {
+    if (!confirm('刪除這條排程？已經產生的 Todo 會保留。')) return;
+    await db.deleteSchedule(del);
   } else return;
 
   await load();
@@ -707,7 +939,7 @@ $('tabs').addEventListener('click', (e) => {
   const name = e.target.dataset.tab;
   if (!name) return;
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-  ['report', 'projects', 'todos', 'tags', 'entries', 'settings']
+  ['report', 'projects', 'todos', 'schedules', 'tags', 'entries', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
 });
 
@@ -724,4 +956,5 @@ range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
 initCollapse();
 resetTodoForm();
+resetSchForm();
 load();

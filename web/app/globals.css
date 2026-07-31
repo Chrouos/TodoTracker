@@ -175,6 +175,28 @@ main.page { padding: var(--xxl) 0 var(--section); }
 .badge.overdue { color: var(--danger); border-color: var(--danger); }
 .badge.ok { color: var(--success); border-color: var(--success); }
 
+/* 星期選擇器 */
+.dow { display: flex; align-items: center; gap: var(--xs); flex-wrap: wrap; }
+.dow button:not(.btn-sm) {
+  width: 34px; height: 30px; padding: 0;
+  border: 1px solid var(--hairline); background: var(--surface-soft); color: var(--text-mute);
+}
+.dow button.on {
+  background: var(--ink); color: var(--canvas); border-color: var(--ink); font-weight: 700;
+}
+
+/* 專案目標／筆記的一則 */
+.note-entry { padding: var(--md) 0; border-bottom: 1px solid var(--hairline); }
+.note-entry:last-child { border-bottom: 0; }
+.note-entry .act { display: flex; gap: var(--xs); opacity: 0; }
+.note-entry:hover .act { opacity: 1; }
+.note-body {
+  white-space: pre-wrap;
+  padding-left: var(--md);
+  border-left: 2px solid var(--hairline);
+  color: var(--text-body);
+}
+
 /* 專案名稱點進詳情頁 */
 .proj-link { border-bottom: 1px solid var(--hairline); }
 .proj-link:hover { border-bottom-color: var(--ink); }

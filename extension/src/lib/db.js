@@ -17,6 +17,7 @@ const K = {
   entries: 'entries',
   timer: 'timer',
   settings: 'settings',
+  schedules: 'schedules',
 };
 
 import { wouldCycle } from './tree.js';
@@ -55,11 +56,14 @@ export async function listProjects({ includeArchived = false } = {}) {
 export async function upsertProject(p) {
   const all = await read(K.projects, []);
   const i = all.findIndex((x) => x.id === p.id);
+  const prev = i >= 0 ? all[i] : null;
   const row = {
     id: p.id || uid(),
     parentId: p.parentId || null,   // 專案可以無限往下掛
     name: (p.name || '').trim(),
     color: p.color || '#201d1d',
+    // 目標／筆記是 append 式的時間軸，只能透過下面三個函式動
+    notes: prev?.notes || p.notes || [],
     archivedAt: p.archivedAt || null,
     createdAt: p.createdAt || nowISO(),
   };
@@ -89,6 +93,39 @@ export async function deleteProject(id) {
   await write(K.entries, entries.map((e) => (e.projectId === id ? { ...e, projectId: null } : e)));
   const tasks = await read(K.tasks, []);
   await write(K.tasks, tasks.filter((t) => t.projectId !== id));
+}
+
+/* ---------------- 專案目標／筆記（append 式，每則帶時間戳） ---------------- */
+
+async function withProject(id, fn) {
+  const all = await read(K.projects, []);
+  const i = all.findIndex((p) => p.id === id);
+  if (i < 0) throw new Error('找不到專案');
+  all[i] = { ...all[i], notes: fn(all[i].notes || []) };
+  await write(K.projects, all);
+  return all[i];
+}
+
+/** 新增一則，記下寫入當下的時間 */
+export async function addProjectNote(projectId, text) {
+  const t = (text || '').trim();
+  if (!t) return null;
+  return withProject(projectId, (notes) => [
+    ...notes,
+    { id: uid(), text: t, createdAt: nowISO(), updatedAt: null },
+  ]);
+}
+
+/** 修改既有的一則；createdAt 保留，另外記 updatedAt */
+export async function updateProjectNote(projectId, noteId, text) {
+  return withProject(projectId, (notes) =>
+    notes.map((n) => (n.id === noteId
+      ? { ...n, text: (text || '').trim(), updatedAt: nowISO() }
+      : n)));
+}
+
+export async function deleteProjectNote(projectId, noteId) {
+  return withProject(projectId, (notes) => notes.filter((n) => n.id !== noteId));
 }
 
 /* ---------------- tags ---------------- */
@@ -138,6 +175,10 @@ export async function upsertTask(t) {
     openedAt: prev?.openedAt || nowISO(),
     // 截止日：唯一可以手改的日期，只到日期精度
     dueDate: t.dueDate || null,
+    // 截止時間 HH:MM，排程產生的才會有；用來算提醒
+    dueTime: t.dueTime || null,
+    // 由哪一條排程產生的
+    scheduleId: t.scheduleId || prev?.scheduleId || null,
     // 結案時間：按下完成的當下；重新打開就清掉
     completedAt: isDone ? (prev?.completedAt || nowISO()) : null,
     // 被重新打開過幾次 —— 一直回來的事情值得注意
@@ -156,6 +197,118 @@ export async function deleteTask(id) {
   await write(K.tasks, (await read(K.tasks, [])).filter((t) => t.id !== id));
   const entries = await read(K.entries, []);
   await write(K.entries, entries.map((e) => (e.taskId === id ? { ...e, taskId: null } : e)));
+}
+
+/* ---------------- schedules（週期排程） ----------------
+ * 例：每個平日 09:00 自動開一張「填寫工作日誌」，截止 17:30，提前 10 分鐘提醒。
+ * weekdays 用 0=週日 … 6=週六。
+ */
+
+export async function listSchedules() {
+  return (await read(K.schedules, [])).sort((a, b) =>
+    (a.createTime || '').localeCompare(b.createTime || '') || a.title.localeCompare(b.title));
+}
+
+export async function upsertSchedule(s) {
+  const all = await read(K.schedules, []);
+  const i = all.findIndex((x) => x.id === s.id);
+  const prev = i >= 0 ? all[i] : null;
+  const row = {
+    id: s.id || uid(),
+    title: (s.title || '').trim(),
+    projectId: s.projectId || null,
+    notes: s.notes || '',
+    weekdays: Array.isArray(s.weekdays) ? [...s.weekdays].sort() : [1, 2, 3, 4, 5],
+    createTime: s.createTime || '09:00',        // 幾點自動開單
+    dueTime: s.dueTime || null,                 // 當天幾點截止
+    remindMinutes: s.remindMinutes === null || s.remindMinutes === undefined
+      ? null : Number(s.remindMinutes),         // 截止前幾分鐘提醒
+    enabled: s.enabled !== false,
+    lastRunDate: prev?.lastRunDate || null,     // 防止同一天重複開單
+    createdAt: prev?.createdAt || nowISO(),
+    updatedAt: nowISO(),
+  };
+  if (i >= 0) all[i] = { ...all[i], ...row }; else all.push(row);
+  await write(K.schedules, all);
+  return row;
+}
+
+export async function deleteSchedule(id) {
+  await write(K.schedules, (await read(K.schedules, [])).filter((s) => s.id !== id));
+}
+
+const hhmmToMin = (s) => {
+  if (!s) return null;
+  const [h, m] = s.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * 檢查有哪些排程該執行了，執行的就建立對應的 Todo。
+ * 由 background 的 alarm 每分鐘叫一次；用 lastRunDate 擋重複。
+ * @returns {Promise<Array>} 這次新建的 task
+ */
+export async function runDueSchedules(now = new Date()) {
+  const all = await read(K.schedules, []);
+  if (!all.length) return [];
+
+  const today = fmtDateLocal(now);
+  const dow = now.getDay();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const created = [];
+  let dirty = false;
+
+  for (const s of all) {
+    if (!s.enabled) continue;
+    if (!s.weekdays.includes(dow)) continue;
+    if (s.lastRunDate === today) continue;
+    if (nowMin < hhmmToMin(s.createTime)) continue;
+
+    const task = await upsertTask({
+      title: s.title,
+      projectId: s.projectId,
+      notes: s.notes,
+      status: 'todo',
+      dueDate: today,
+      dueTime: s.dueTime,
+      scheduleId: s.id,
+    });
+    created.push(task);
+    s.lastRunDate = today;
+    dirty = true;
+  }
+
+  if (dirty) await write(K.schedules, all);
+  return created;
+}
+
+/** 找出接下來需要提醒的 todo（今天、有截止時間、還沒完成、還沒提醒過） */
+export async function pendingReminders(now = new Date()) {
+  const [tasks, schedules] = await Promise.all([
+    read(K.tasks, []), read(K.schedules, []),
+  ]);
+  const today = fmtDateLocal(now);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  return tasks.filter((t) => {
+    if (t.status === 'done' || t.status === 'archived') return false;
+    if (t.dueDate !== today || !t.dueTime) return false;
+    if (t.remindedAt) return false;
+    const s = schedules.find((x) => x.id === t.scheduleId);
+    const lead = s?.remindMinutes ?? 0;
+    return nowMin >= hhmmToMin(t.dueTime) - lead;
+  });
+}
+
+export async function markReminded(taskId) {
+  const all = await read(K.tasks, []);
+  await write(K.tasks, all.map((t) => (t.id === taskId ? { ...t, remindedAt: nowISO() } : t)));
+}
+
+/** 本地時區的 YYYY-MM-DD（time.js 的 fmtDate 同義，這裡避免循環相依） */
+function fmtDateLocal(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 /* ---------------- entries ---------------- */
@@ -299,11 +452,11 @@ export function groupByProject(entries, projects) {
 /* ---------------- 匯出 / 匯入 ---------------- */
 
 export async function exportAll() {
-  const [projects, tags, tasks, entries, settings] = await Promise.all([
+  const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
     read(K.projects, []), read(K.tags, []), read(K.tasks, []),
-    read(K.entries, []), getSettings(),
+    read(K.entries, []), read(K.schedules, []), getSettings(),
   ]);
-  return { version: 1, exportedAt: nowISO(), projects, tags, tasks, entries, settings };
+  return { version: 1, exportedAt: nowISO(), projects, tags, tasks, entries, schedules, settings };
 }
 
 export async function importAll(data) {
@@ -313,6 +466,7 @@ export async function importAll(data) {
     [K.tags]: data.tags || [],
     [K.tasks]: data.tasks || [],
     [K.entries]: data.entries || [],
+    [K.schedules]: data.schedules || [],
     [K.settings]: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   });
 }
