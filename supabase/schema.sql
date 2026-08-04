@@ -84,6 +84,7 @@ create table projects (
   -- 上層專案；null = 最上層。刪父層時子層往上接（在應用層處理）
   parent_id   uuid references projects(id) on delete set null,
   name        text not null,
+  notes       text not null default '',
   color       text not null default '#64748b',
   archived_at timestamptz,
   created_by  uuid references auth.users(id),
@@ -178,6 +179,77 @@ create table time_entry_tags (
   primary key (entry_id, tag_id)
 );
 
+create table note_attachments (
+  id            uuid primary key default gen_random_uuid(),
+  project_id    uuid references projects(id) on delete cascade,
+  task_id       uuid references tasks(id) on delete cascade,
+  time_entry_id uuid references time_entries(id) on delete cascade,
+  storage_path  text not null unique,
+  file_name     text not null,
+  mime_type     text not null,
+  size_bytes    bigint not null check (size_bytes >= 0),
+  created_at    timestamptz not null default now(),
+  constraint note_attachments_one_target
+    check (num_nonnulls(project_id, task_id, time_entry_id) = 1)
+);
+create index on note_attachments (project_id, created_at desc)
+  where project_id is not null;
+create index on note_attachments (task_id, created_at desc)
+  where task_id is not null;
+create index on note_attachments (time_entry_id, created_at desc)
+  where time_entry_id is not null;
+
+create table note_shares (
+  id            uuid primary key default gen_random_uuid(),
+  project_id    uuid references projects(id) on delete cascade,
+  task_id       uuid references tasks(id) on delete cascade,
+  time_entry_id uuid references time_entries(id) on delete cascade,
+  token         text not null unique default gen_random_uuid()::text,
+  created_by    uuid not null references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  revoked_at    timestamptz,
+  constraint note_shares_one_target
+    check (num_nonnulls(project_id, task_id, time_entry_id) = 1)
+);
+create unique index note_shares_one_active_project
+  on note_shares (project_id)
+  where project_id is not null and revoked_at is null;
+create unique index note_shares_one_active_task
+  on note_shares (task_id)
+  where task_id is not null and revoked_at is null;
+create unique index note_shares_one_active_entry
+  on note_shares (time_entry_id)
+  where time_entry_id is not null and revoked_at is null;
+create index on note_shares (created_by, created_at desc);
+
+create or replace function guard_note_share_revocation()
+returns trigger language plpgsql as $$
+begin
+  if old.revoked_at is not null then
+    raise exception 'note_share_already_revoked';
+  end if;
+
+  if new.id <> old.id
+     or new.project_id is distinct from old.project_id
+     or new.task_id is distinct from old.task_id
+     or new.time_entry_id is distinct from old.time_entry_id
+     or new.token is distinct from old.token
+     or new.created_by is distinct from old.created_by
+     or new.created_at is distinct from old.created_at then
+    raise exception 'note_share_immutable';
+  end if;
+
+  if new.revoked_at is null then
+    raise exception 'note_share_revoked_at_required';
+  end if;
+
+  return new;
+end $$;
+
+create trigger t_note_shares_revoke_guard
+  before update on note_shares
+  for each row execute function guard_note_share_revocation();
+
 -- updated_at 自動維護
 create or replace function touch_updated_at()
 returns trigger language plpgsql as $$
@@ -219,6 +291,46 @@ alter table tags            enable row level security;
 alter table tasks           enable row level security;
 alter table time_entries    enable row level security;
 alter table time_entry_tags enable row level security;
+alter table note_attachments enable row level security;
+alter table note_shares      enable row level security;
+
+create or replace function note_target_team(
+  p_project_id uuid default null,
+  p_task_id uuid default null,
+  p_time_entry_id uuid default null
+)
+returns uuid language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select team_id from projects where id = p_project_id),
+    (select team_id from tasks where id = p_task_id),
+    (select team_id from time_entries where id = p_time_entry_id)
+  );
+$$;
+
+create policy note_attachments_member_read on note_attachments
+  for select using (is_team_member(note_target_team(project_id, task_id, time_entry_id)));
+create policy note_attachments_member_write on note_attachments
+  for insert with check (is_team_member(note_target_team(project_id, task_id, time_entry_id)));
+create policy note_attachments_member_delete on note_attachments
+  for delete using (is_team_member(note_target_team(project_id, task_id, time_entry_id)));
+create policy note_shares_member_read on note_shares
+  for select using (is_team_member(note_target_team(project_id, task_id, time_entry_id)));
+create policy note_shares_member_insert on note_shares
+  for insert with check (created_by = auth.uid() and is_team_member(note_target_team(project_id, task_id, time_entry_id)));
+create policy note_shares_member_revoke on note_shares
+  for update using (created_by = auth.uid() and is_team_member(note_target_team(project_id, task_id, time_entry_id)))
+  with check (revoked_at is not null);
+
+insert into storage.buckets (id, name, public)
+values ('note-attachments', 'note-attachments', false)
+on conflict (id) do update set public = false;
+
+create policy note_attachment_storage_read on storage.objects
+  for select using (bucket_id = 'note-attachments' and auth.uid() is not null);
+create policy note_attachment_storage_insert on storage.objects
+  for insert with check (bucket_id = 'note-attachments' and auth.uid() is not null);
+create policy note_attachment_storage_delete on storage.objects
+  for delete using (bucket_id = 'note-attachments' and owner_id = auth.uid()::text);
 
 -- profiles：自己可改；同 team 的人可讀
 create policy profiles_self_write on profiles
@@ -370,6 +482,50 @@ create trigger on_team_created
 -- ============================================================
 -- 報表 view
 -- ============================================================
+create or replace function create_note_share(p_kind text, p_target_id uuid)
+returns note_shares language plpgsql security invoker set search_path = public as $$
+declare v_share note_shares;
+begin
+  if p_kind = 'project' then
+    insert into note_shares (project_id, created_by) values (p_target_id, auth.uid())
+    on conflict (project_id) where project_id is not null and revoked_at is null
+    do update set revoked_at = null returning * into v_share;
+  elsif p_kind = 'task' then
+    insert into note_shares (task_id, created_by) values (p_target_id, auth.uid())
+    on conflict (task_id) where task_id is not null and revoked_at is null
+    do update set revoked_at = null returning * into v_share;
+  elsif p_kind = 'entry' then
+    insert into note_shares (time_entry_id, created_by) values (p_target_id, auth.uid())
+    on conflict (time_entry_id) where time_entry_id is not null and revoked_at is null
+    do update set revoked_at = null returning * into v_share;
+  else raise exception 'invalid_note_target';
+  end if;
+  return v_share;
+end $$;
+
+create or replace function revoke_note_share(p_share_id uuid)
+returns boolean language sql security invoker set search_path = public as $$
+  update note_shares set revoked_at = now()
+   where id = p_share_id and created_by = auth.uid() and revoked_at is null
+  returning true;
+$$;
+
+create or replace function get_shared_note(p_token text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_share note_shares; v_result jsonb;
+begin
+  select * into v_share from note_shares where token = p_token and revoked_at is null;
+  if v_share.id is null then return null; end if;
+  if v_share.project_id is not null then
+    select jsonb_build_object('kind','project','id',p.id,'title',p.name,'notes','', 'attachments',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'fileName',a.file_name,'mimeType',a.mime_type,'storagePath',a.storage_path)) from note_attachments a where a.project_id=p.id),'[]'::jsonb)) into v_result from projects p where p.id=v_share.project_id;
+  elsif v_share.task_id is not null then
+    select jsonb_build_object('kind','task','id',t.id,'title',t.title,'notes',coalesce(t.notes,''), 'attachments',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'fileName',a.file_name,'mimeType',a.mime_type,'storagePath',a.storage_path)) from note_attachments a where a.task_id=t.id),'[]'::jsonb)) into v_result from tasks t where t.id=v_share.task_id;
+  else
+    select jsonb_build_object('kind','entry','id',e.id,'title',e.description,'notes',coalesce(e.notes,''),'startedAt',e.started_at,'endedAt',e.ended_at, 'attachments',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'fileName',a.file_name,'mimeType',a.mime_type,'storagePath',a.storage_path)) from note_attachments a where a.time_entry_id=e.id),'[]'::jsonb)) into v_result from time_entries e where e.id=v_share.time_entry_id and e.deleted_at is null;
+  end if;
+  return v_result;
+end $$;
+
 create view v_entry_daily as
 select
   e.team_id,
