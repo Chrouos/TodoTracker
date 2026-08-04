@@ -11,6 +11,7 @@ import {
 import type { Project } from '@/lib/types';
 import AttachmentPicker from '@/components/AttachmentPicker';
 import ShareControls from '@/components/ShareControls';
+import { FEATURES } from '@/lib/features';
 
 const BLANK = { id: '', parentId: '', name: '', color: '#201d1d', notes: '' };
 
@@ -76,7 +77,7 @@ export default function ProjectsPage() {
           <textarea value={form.notes} rows={4} placeholder="記錄專案背景、規則或交接資訊"
             onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </label>
-      {form.id && <>
+      {FEATURES.workNoteImagesAndSharing && form.id && <>
         <AttachmentPicker target={{ kind: 'project', id: form.id }} attachments={[]} />
         <ShareControls target={{ kind: 'project', id: form.id }} share={null} />
       </>}

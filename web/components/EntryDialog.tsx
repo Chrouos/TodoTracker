@@ -7,6 +7,7 @@ import { flattenTree, indentLabel } from '@/lib/tree';
 import AutoTextarea from '@/components/AutoTextarea';
 import AttachmentPicker from '@/components/AttachmentPicker';
 import ShareControls from '@/components/ShareControls';
+import { FEATURES } from '@/lib/features';
 
 export type EntryDraft = {
   id: string;
@@ -97,7 +98,7 @@ export default function EntryDialog({ draft, onClose }: { draft: EntryDraft; onC
           onChange={(v) => setForm({ ...form, notes: v })} />
       </label>
 
-      {form.id && <>
+      {FEATURES.workNoteImagesAndSharing && form.id && <>
         <AttachmentPicker target={{ kind: 'entry', id: form.id }} attachments={[]} />
         <ShareControls target={{ kind: 'entry', id: form.id }} share={null} />
       </>}

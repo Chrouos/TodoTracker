@@ -11,6 +11,7 @@ import { flattenTree, indentLabel, descendantIds, pathOf } from '@/lib/tree';
 import type { Task, TaskStatus } from '@/lib/types';
 import AttachmentPicker from '@/components/AttachmentPicker';
 import ShareControls from '@/components/ShareControls';
+import { FEATURES } from '@/lib/features';
 
 const blank = () => ({
   id: '', title: '', projectId: '', status: 'todo' as TaskStatus,
@@ -121,7 +122,7 @@ export default function TodosPage() {
           <button type="submit" className="btn-primary">{form.id ? '儲存變更' : '新增 Todo'}</button>
           {form.id && <button type="button" onClick={() => setForm(blank())}>取消編輯</button>}
         </div>
-        {form.id && <>
+        {FEATURES.workNoteImagesAndSharing && form.id && <>
           <AttachmentPicker target={{ kind: 'task', id: form.id }} attachments={[]} />
           <ShareControls target={{ kind: 'task', id: form.id }} share={null} />
         </>}
