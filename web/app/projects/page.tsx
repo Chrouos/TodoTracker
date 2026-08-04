@@ -9,8 +9,10 @@ import {
   flattenTree, childrenOf, descendantIds, rollup, secondsByProject, indentLabel,
 } from '@/lib/tree';
 import type { Project } from '@/lib/types';
+import AttachmentPicker from '@/components/AttachmentPicker';
+import ShareControls from '@/components/ShareControls';
 
-const BLANK = { id: '', parentId: '', name: '', color: '#201d1d' };
+const BLANK = { id: '', parentId: '', name: '', color: '#201d1d', notes: '' };
 
 export default function ProjectsPage() {
   const { status, data, act } = useStore();
@@ -33,12 +35,13 @@ export default function ProjectsPage() {
       parentId: form.parentId || null,
       name: form.name,
       color: form.color,
+      notes: form.notes,
     });
     setForm({ ...BLANK });
   };
 
   const edit = (p: Project) => setForm({
-    id: p.id, parentId: p.parentId ?? '', name: p.name, color: p.color,
+    id: p.id, parentId: p.parentId ?? '', name: p.name, color: p.color, notes: p.notes ?? '',
   });
 
   return (
@@ -69,7 +72,16 @@ export default function ProjectsPage() {
             <span className="hint">留空就是最上層。自己與自己的子孫不會出現在這裡，避免掛成迴圈。</span>
           </label>
         </div>
-        <div className="actions">
+        <label className="field" style={{ marginTop: 12 }}><span>專案筆記</span>
+          <textarea value={form.notes} rows={4} placeholder="記錄專案背景、規則或交接資訊"
+            onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </label>
+      {form.id && <>
+        <AttachmentPicker target={{ kind: 'project', id: form.id }} attachments={[]} />
+        <ShareControls target={{ kind: 'project', id: form.id }} share={null} />
+      </>}
+
+      <div className="actions">
           <button type="submit" className="btn-primary">{form.id ? '儲存變更' : '建立專案'}</button>
           {form.id && <button type="button" onClick={() => setForm({ ...BLANK })}>取消編輯</button>}
         </div>

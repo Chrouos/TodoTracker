@@ -30,6 +30,13 @@
   --r: 4px;
 }
 
+.attachments { margin-top: var(--md); }
+.attachment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--sm); margin-top: var(--sm); }
+.attachment { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.attachment img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: 1px solid var(--hairline); border-radius: var(--r); background: var(--surface-card); }
+.shared-note { max-width: 760px; margin: 0 auto; padding: 48px 20px; }
+.shared-notes { white-space: pre-wrap; line-height: 1.7; margin: 24px 0; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body { background: var(--canvas); }

@@ -59,6 +59,7 @@ export async function upsertProject(p) {
     id: p.id || uid(),
     parentId: p.parentId || null,   // 專案可以無限往下掛
     name: (p.name || '').trim(),
+    notes: p.notes || '',
     color: p.color || '#201d1d',
     archivedAt: p.archivedAt || null,
     createdAt: p.createdAt || nowISO(),
