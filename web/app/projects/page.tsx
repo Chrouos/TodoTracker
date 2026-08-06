@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
-import { fmtHM } from '@/lib/time';
+import { fmtHM, fmtClock, fmtDate } from '@/lib/time';
 import {
   flattenTree, childrenOf, descendantIds, rollup, secondsByProject, indentLabel,
 } from '@/lib/tree';
@@ -12,6 +12,7 @@ import type { Project } from '@/lib/types';
 import AttachmentPicker from '@/components/AttachmentPicker';
 import ShareControls from '@/components/ShareControls';
 import { FEATURES } from '@/lib/features';
+import { collectProjectWorkLog } from '@/lib/projectWorkLog';
 
 const BLANK = { id: '', parentId: '', name: '', color: '#201d1d', notes: '' };
 
@@ -24,6 +25,7 @@ export default function ProjectsPage() {
 
   const roll = rollup(projects, secondsByProject(entries.filter((e) => e.endedAt)));
   const tree = flattenTree(projects);
+  const projectLog = form.id ? collectProjectWorkLog(form.id, projects, tasks, entries) : null;
 
   // 編輯中的專案與它的後代不能當自己的上層，否則會形成迴圈
   const banned = form.id ? new Set([form.id, ...descendantIds(projects, form.id)]) : new Set<string>();
@@ -81,6 +83,23 @@ export default function ProjectsPage() {
         <AttachmentPicker target={{ kind: 'project', id: form.id }} attachments={[]} />
         <ShareControls target={{ kind: 'project', id: form.id }} share={null} />
       </>}
+
+      {projectLog && <div className="project-work-log">
+        <h3>專案工作日誌</h3>
+        {projectLog.tasks.map((task) => <div className="project-log-task" key={task.id}>
+          <div className="row"><strong>{task.title}</strong><span className="grow" /><span className="badge">Todo</span></div>
+          {task.notes && <div className="notes">{task.notes}</div>}
+          {projectLog.entries.filter((entry) => entry.taskId === task.id).map((entry) => <div className="project-log-entry" key={entry.id}>
+            <span className="num mute">{fmtDate(entry.startedAt)} {fmtClock(entry.startedAt)}{entry.endedAt ? `–${fmtClock(entry.endedAt)}` : ''}</span>
+            <span>{entry.notes || entry.description || '（無工作日誌）'}</span>
+          </div>)}
+        </div>)}
+        {projectLog.entries.filter((entry) => !entry.taskId).map((entry) => <div className="project-log-entry" key={entry.id}>
+          <span className="num mute">{fmtDate(entry.startedAt)} {fmtClock(entry.startedAt)}</span>
+          <span>{entry.notes || entry.description || '（無工作日誌）'}</span>
+        </div>)}
+        {!projectLog.tasks.length && !projectLog.entries.length && <div className="empty">這個專案目前沒有 Todo 或工作日誌</div>}
+      </div>}
 
       <div className="actions">
           <button type="submit" className="btn-primary">{form.id ? '儲存變更' : '建立專案'}</button>
