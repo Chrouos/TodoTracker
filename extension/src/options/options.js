@@ -194,7 +194,7 @@ function renderProjects() {
         const open = S.tasks.filter((x) => x.projectId === p.id && x.status !== 'done' && x.status !== 'archived').length;
         const r = roll.get(p.id) || { own: 0, total: 0 };
         const kids = childrenOf(S.projects, p.id).length;
-        return `<div class="row-item" style="padding-left:${p.depth * 20}px">
+        return `<div class="row-item" data-workspace-p="${p.id}" style="padding-left:${p.depth * 20}px">
           ${p.depth ? '<span class="mark tree-branch">└</span>' : ''}
           <span class="swatch" style="background:${p.color}"></span>
           <div class="main">
@@ -215,6 +215,31 @@ function renderProjects() {
       }).join('')
     : '<div class="empty">還沒有專案，用上面的表單新增一個</div>';
 }
+
+function renderProjectWorkspace(id) {
+  const project = S.projects.find((item) => item.id === id);
+  if (!project) return;
+  const ids = new Set([id, ...descendantSet(id)]);
+  const tasks = S.tasks.filter((task) => task.projectId && ids.has(task.projectId));
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const entries = S.entries.filter((entry) => !entry.deletedAt && ((entry.projectId && ids.has(entry.projectId)) || (entry.taskId && taskIds.has(entry.taskId))))
+    .filter((entry) => entry.endedAt).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const seconds = entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
+  const done = tasks.filter((task) => task.status === 'done').length;
+  $('projectWorkspace').hidden = false;
+  $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} 工作區</h2><button class="btn-sm" data-close-workspace>關閉</button></div>
+    <div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} 總工時</span><span class="badge">${done}/${tasks.length} Todo 完成</span><span class="badge">${entries.length} 筆工作日誌</span></div>
+    <h3>Todo 與筆記</h3>${tasks.length ? tasks.map((task) => `<div class="workspace-row"><div><strong>${esc(task.title)}</strong> <span class="badge">${esc(task.status)}</span>${task.notes ? `<div class="markdown-preview">${markdownToHTML(task.notes)}</div>` : ''}</div><span class="num">${task.dueDate || '無期限'}</span></div>`).join('') : '<div class="empty">這個專案沒有 Todo</div>'}
+    <h3>完整工作日誌</h3>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-row"><div class="num mute">${fmtDate(entry.startedAt)} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}<br /><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? `<div class="markdown-preview">${markdownToHTML(entry.notes)}</div>` : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}`;
+}
+
+document.getElementById('projList').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-workspace-p]');
+  if (row && !event.target.closest('button')) renderProjectWorkspace(row.dataset.workspaceP);
+});
+document.getElementById('projectWorkspace').addEventListener('click', (event) => {
+  if (event.target.closest('[data-close-workspace]')) document.getElementById('projectWorkspace').hidden = true;
+});
 
 function descendantSet(id) {
   const out = new Set();
