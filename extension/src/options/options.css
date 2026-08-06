@@ -53,7 +53,7 @@ section[hidden] { display: none; }
 .badge.overdue { color: var(--danger); border-color: var(--danger); }
 .row-item .act { display: flex; gap: var(--xs); opacity: 0; }
 .row-item:hover .act { opacity: 1; }
-.workspace-open { opacity: 1; }
+.row-item[data-workspace-p] .act { opacity: 1; }
 .row-item[data-workspace-p] { cursor: pointer; }
 
 /* 圖表 */
