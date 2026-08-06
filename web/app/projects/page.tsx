@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
@@ -120,6 +121,7 @@ export default function ProjectsPage() {
               <span className="swatch" style={{ background: p.color }} />
               <div className="grow">
                 <div className="ellipsis">
+                  <Link href={`/projects/${p.id}`}>{p.name}</Link>
                   {p.name} {p.archivedAt && <span className="badge">已封存</span>}
                 </div>
                 <div className="sub">
