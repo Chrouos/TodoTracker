@@ -120,5 +120,16 @@ dialog .field { margin-bottom: var(--md); }
 .markdown-preview code { padding: 1px 4px; background: var(--surface-card, #f4f4f4); }
 .markdown-preview pre code { padding: 0; background: transparent; }
 .markdown-preview a { text-decoration: underline; }
+.row-item .markdown-preview {
+  white-space: normal;
+  font-family: var(--font, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-body);
+}
+.row-item .markdown-preview p { margin: 0 0 8px; }
+.row-item .markdown-preview pre,
+.row-item .markdown-preview pre code { font-family: var(--font-mono, ui-monospace, monospace); }
+.row-item .markdown-preview pre { white-space: pre; }
 .workspace-kpis { display: flex; gap: var(--sm); margin: 12px 0; }
 .workspace-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hairline, #ddd); }
