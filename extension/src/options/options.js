@@ -207,6 +207,7 @@ function renderProjects() {
           <span class="num ash" style="width:80px;text-align:right"
                 title="只算直接記在這一層的">${kids ? fmtHM(r.own) : ''}</span>
           <div class="act">
+            <button class="btn-sm workspace-open" data-open-workspace="${p.id}">查看工作區</button>
             <button class="btn-sm" data-edit-p="${p.id}">[編輯]</button>
             <button class="btn-sm" data-arch-p="${p.id}">${p.archivedAt ? '[復原]' : '[封存]'}</button>
             <button class="btn-sm btn-danger" data-del-p="${p.id}">[x]</button>
@@ -235,7 +236,9 @@ function renderProjectWorkspace(id) {
 
 document.getElementById('projList').addEventListener('click', (event) => {
   const row = event.target.closest('[data-workspace-p]');
-  if (row && !event.target.closest('button')) renderProjectWorkspace(row.dataset.workspaceP);
+  const open = event.target.closest('[data-open-workspace]')?.dataset.openWorkspace;
+  if (open) renderProjectWorkspace(open);
+  else if (row && !event.target.closest('button')) renderProjectWorkspace(row.dataset.workspaceP);
 });
 document.getElementById('projectWorkspace').addEventListener('click', (event) => {
   if (event.target.closest('[data-close-workspace]')) document.getElementById('projectWorkspace').hidden = true;
