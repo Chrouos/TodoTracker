@@ -111,3 +111,12 @@ dialog .field { margin-bottom: var(--md); }
   .legend { width: 100%; }
   .bar-label { width: 110px; flex: 0 0 110px; }
 }
+.markdown-preview { line-height: 1.65; overflow-wrap: anywhere; }
+.markdown-preview p { margin: 0 0 8px; }
+.markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { margin: 10px 0 5px; }
+.markdown-preview ul, .markdown-preview ol { margin: 5px 0 8px 22px; }
+.markdown-preview blockquote { border-left: 3px solid var(--hairline, #ddd); margin: 8px 0; padding-left: 10px; color: var(--text-ash, #777); }
+.markdown-preview pre { overflow-x: auto; padding: 9px; background: var(--surface-card, #f4f4f4); border: 1px solid var(--hairline, #ddd); }
+.markdown-preview code { padding: 1px 4px; background: var(--surface-card, #f4f4f4); }
+.markdown-preview pre code { padding: 0; background: transparent; }
+.markdown-preview a { text-decoration: underline; }

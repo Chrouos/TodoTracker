@@ -9,6 +9,7 @@ import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tre
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { markdownToHTML } from '../lib/markdown.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -331,7 +332,7 @@ function renderTodos() {
             </div>
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
             <div class="sub num">${dates}</div>
-            ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ''}
+            ${t.notes ? `<div class="notes markdown-preview">${markdownToHTML(t.notes)}</div>` : ''}
           </div>
           <span class="num" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
@@ -443,7 +444,7 @@ function renderEntries() {
             <div class="ellipsis">${esc(e.description || '（無描述）')}
               ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
             <div class="sub">${p ? esc(p.name) : '未分類'} · ${fmtDate(e.startedAt)} ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</div>
-            ${e.notes ? `<div class="notes">${esc(e.notes)}</div>` : ''}
+            ${e.notes ? `<div class="notes markdown-preview">${markdownToHTML(e.notes)}</div>` : ''}
           </div>
           <span class="num">${fmtHM(db.durationSec(e))}</span>
           <div class="act">
