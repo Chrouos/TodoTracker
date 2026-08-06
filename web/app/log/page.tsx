@@ -9,6 +9,7 @@ import AutoTextarea from '@/components/AutoTextarea';
 import { buildSummary } from '@/lib/summary';
 import { durationSec, fmtHM, fmtDate, fmtClock, startOfDay } from '@/lib/time';
 import type { Entry } from '@/lib/types';
+import MarkdownPreview from '@/components/MarkdownPreview';
 
 /** 工作結束後補紀錄的地方：按日期分組，每筆直接就地寫。 */
 export default function LogPage() {
@@ -127,6 +128,7 @@ function LogRow({ entry, projectName, color }: {
         onBlur={save}
         onKeyDown={(ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') save(); }}
       />
+      <MarkdownPreview value={text} className="log-note-preview" />
     </div>
   );
 }

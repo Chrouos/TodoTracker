@@ -54,6 +54,16 @@
 .workspace-report > span:last-child { width: 70px; flex: 0 0 70px; text-align: right; }
 .bar { flex: 1; height: 8px; background: var(--surface-card); border-radius: 99px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--text-ink); }
+.markdown-preview { color: var(--text-body); line-height: 1.65; margin-top: 8px; overflow-wrap: anywhere; }
+.markdown-preview p { margin: 0 0 8px; }
+.markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { margin: 12px 0 6px; font-family: var(--font); }
+.markdown-preview ul, .markdown-preview ol { margin: 6px 0 8px 22px; }
+.markdown-preview blockquote { border-left: 3px solid var(--hairline-strong); margin: 8px 0; padding-left: 12px; color: var(--text-ash); }
+.markdown-preview pre { background: var(--surface-card); border: 1px solid var(--hairline); padding: 10px; overflow-x: auto; }
+.markdown-preview code { font-family: var(--font-mono); background: var(--surface-card); padding: 1px 4px; }
+.markdown-preview pre code { background: transparent; padding: 0; }
+.markdown-preview a { text-decoration: underline; }
+.markdown-empty { color: var(--text-ash); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 

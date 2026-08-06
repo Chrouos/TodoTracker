@@ -12,6 +12,7 @@ import type { Task, TaskStatus } from '@/lib/types';
 import AttachmentPicker from '@/components/AttachmentPicker';
 import ShareControls from '@/components/ShareControls';
 import { FEATURES } from '@/lib/features';
+import MarkdownPreview from '@/components/MarkdownPreview';
 
 const blank = () => ({
   id: '', title: '', projectId: '', status: 'todo' as TaskStatus,
@@ -171,7 +172,7 @@ export default function TodosPage() {
                 <div className="sub num">
                   開單 {stampLabel(t.openedAt)} · 截止 {t.dueDate ?? '—'} · 結案 {stampLabel(t.completedAt)}
                 </div>
-                {t.notes && <div className="notes">{t.notes}</div>}
+                {t.notes && <MarkdownPreview value={t.notes} />}
               </div>
               <span className="num" title="累積工時">{m.worked ? fmtHM(m.worked) : '—'}</span>
               <div className="act">
