@@ -24,7 +24,6 @@ function renderMarkdownPreview(markdown, className = '') {
   return `<div class="${className} markdown-preview" data-markdown-preview>
     <button type="button" class="btn-sm markdown-toggle markdown-toggle-top" data-markdown-toggle hidden aria-expanded="false">[+] 展開全文</button>
     <div data-markdown-content>${markdownToHTML(markdown)}</div>
-    <button type="button" class="btn-sm markdown-toggle markdown-toggle-bottom" data-markdown-toggle hidden aria-expanded="false">[+] 展開全文</button>
   </div>`;
 }
 
