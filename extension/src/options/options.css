@@ -173,6 +173,7 @@ dialog .field { margin-bottom: var(--md); }
   color: var(--text-mute);
 }
 .markdown-toggle:hover {
+  background: transparent;
   color: var(--text-ink);
   text-decoration: underline;
 }
