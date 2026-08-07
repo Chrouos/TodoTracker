@@ -21,6 +21,7 @@ const K = {
 };
 
 import { wouldCycle } from './tree.js';
+import { removeProjectData } from './relations.js';
 
 export const uid = () => crypto.randomUUID();
 export const nowISO = () => new Date().toISOString();
@@ -84,16 +85,12 @@ export async function upsertProject(p) {
  */
 export async function deleteProject(id) {
   const all = await read(K.projects, []);
-  const target = all.find((p) => p.id === id);
-  const grandparent = target ? target.parentId || null : null;
-  await write(K.projects, all
-    .filter((p) => p.id !== id)
-    .map((p) => (p.parentId === id ? { ...p, parentId: grandparent } : p)));
-  // 紀錄不刪，只解除關聯，避免統計突然少一塊
-  const entries = await read(K.entries, []);
-  await write(K.entries, entries.map((e) => (e.projectId === id ? { ...e, projectId: null } : e)));
   const tasks = await read(K.tasks, []);
-  await write(K.tasks, tasks.filter((t) => t.projectId !== id));
+  const entries = await read(K.entries, []);
+  const next = removeProjectData(id, { projects: all, tasks, entries });
+  await write(K.projects, next.projects);
+  await write(K.tasks, next.tasks);
+  await write(K.entries, next.entries);
 }
 
 /* ---------------- 專案目標／筆記（append 式，每則帶時間戳） ---------------- */
