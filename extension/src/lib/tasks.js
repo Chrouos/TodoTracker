@@ -10,6 +10,12 @@
 
 import { daysBetween, durationOfEntry, fmtDate, fmtClock } from './time.js';
 
+export function entriesForTask(task, entries) {
+  return entries
+    .filter((entry) => entry.taskId === task.id && entry.endedAt && !entry.deletedAt)
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
+}
+
 export function taskMetrics(task, entries) {
   const worked = entries
     .filter((e) => e.taskId === task.id && e.endedAt && !e.deletedAt)

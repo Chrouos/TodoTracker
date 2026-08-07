@@ -3,7 +3,7 @@
   "name": "TodoTracker",
   "version": "0.3.1",
   "description": "TodoTracker - 任務、工作紀錄與工時追蹤",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzL6ld+WdaegeEkMyYIbpm0Ja0Y0zrtm4pEtQb9VBUd27XSgG2C+nfhf/Xnnu7eOldmUtgTmjKvUSlrxQCsTBeqLFfbMjgzCCNMMJexVY0sLcHJZmSmYm/upUgvmJzbeqeGRWPxoDK1tgVa1jCyCUPiblm8LmKiw59BtBgWOrlS/jdtjrrVFsl/KyNmaD7XPgYfLV3VfRRtumwquZ+A0dYd0uNkf4MoAF0HxJIS+hvP1vYaZeWn6WK+kdJfbijm99NIvOR01ZusNdS1K7NEp85EGNqZSNYQUm5vzW7yc89YakCv5xRgo7T7UtCd7rqFKNt0HGaXsVpZ2x3JJN7AM5wIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzL6ld+WdaegeEkMyYIbpm0Ja0Y0zrtm4pEtQb9VBUd27XSgG2C+nfhf/Xnnu7eOldmUtgTmjKvUSlrxQCsTBeqLFfbMjgzCCNMMJexVY0sLcHJZmSmYm/upUgvmJzbeqeGRWPxoDK1tgVa1jCyCUPiblm8LmKiw59BtBgWOrlS/jdtjrrVFsl/KyNmaD7XPgYfLVV3FfRRtumwquZ+A0dYd0uNkf4MoAF0HxJIS+hvP1vYaZeWn6WK+kdJfbijm99NIvOR01ZusNdS1K7NEp85EGNqZSNYQUm5vzW7yc89YakCv5xRgo7T7UtCd7rqFKNt0HGaXsVpZ2x3JJN7AM5wIDAQAB",
   "permissions": ["storage", "alarms", "idle", "notifications"],
   "externally_connectable": {
     "matches": [

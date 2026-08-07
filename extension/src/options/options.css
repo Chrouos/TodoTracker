@@ -57,6 +57,12 @@ section[hidden] { display: none; }
   overflow: hidden;
 }
 .notes-toggle { margin-top: var(--xs); height: 22px; font-size: 11px; color: var(--text-mute); }
+.todo-worklog { margin-top: var(--sm); border-left: 2px solid var(--hairline); padding-left: var(--sm); }
+.todo-worklog summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
+.todo-worklog-list { margin-top: var(--xs); }
+.todo-worklog-row { display: flex; align-items: flex-start; gap: var(--sm); padding: var(--xs) 0; border-top: 1px solid var(--hairline); font-size: 12px; }
+.todo-worklog-row .num:first-child { width: 112px; flex: 0 0 112px; }
+.todo-worklog-row .markdown-preview { margin-top: var(--xs); }
 
 /* 星期選擇器 */
 .dow { display: flex; align-items: center; gap: var(--xs); flex-wrap: wrap; }

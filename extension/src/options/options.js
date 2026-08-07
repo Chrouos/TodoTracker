@@ -8,7 +8,7 @@ import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
-import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { taskMetrics, entriesForTask, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
@@ -504,6 +504,7 @@ function renderTodos() {
         const p = S.projects.find((x) => x.id === t.projectId);
         const done = t.status === 'done';
         const m = taskMetrics(t, S.entries);
+        const workEntries = entriesForTask(t, S.entries);
         const dl = dueLabel(m, done);
 
         // 三個時間排成一行，缺的用 — 佔位
@@ -528,6 +529,12 @@ function renderTodos() {
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
             <div class="sub num">${dates}</div>
             ${t.notes ? renderMarkdownPreview(t.notes, 'notes') : ''}
+            ${workEntries.length ? `<details class="todo-worklog"><summary>工作紀錄 ${workEntries.length} 筆 · ${fmtHM(m.worked)}</summary>
+              <div class="todo-worklog-list">${workEntries.map((entry) => `<div class="todo-worklog-row">
+                <span class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
+                <span class="grow">${esc(entry.description || '（無描述）')}${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</span>
+                <span class="num">${fmtHM(db.durationSec(entry))}</span>
+              </div>`).join('')}</div></details>` : ''}
           </div>
           <span class="num" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
@@ -538,6 +545,7 @@ function renderTodos() {
         </div>`;
       }).join('')
     : '<div class="empty">沒有符合的 todo</div>';
+  initializeMarkdownPreviews($('todoList'));
 }
 
 function resetTodoForm() {
