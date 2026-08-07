@@ -18,6 +18,46 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+function renderMarkdownPreview(markdown, className = '') {
+  return `<div class="${className} markdown-preview" data-markdown-preview>
+    <button type="button" class="btn-sm markdown-toggle markdown-toggle-top" data-markdown-toggle hidden aria-expanded="false">[+] 展開全文</button>
+    <div data-markdown-content>${markdownToHTML(markdown)}</div>
+    <button type="button" class="btn-sm markdown-toggle markdown-toggle-bottom" data-markdown-toggle hidden aria-expanded="false">[+] 展開全文</button>
+  </div>`;
+}
+
+function setMarkdownPreviewExpanded(preview, expanded) {
+  preview.classList.toggle('is-expanded', expanded);
+  preview.querySelectorAll('[data-markdown-toggle]').forEach((button) => {
+    button.textContent = expanded ? '[-] 收合全文' : '[+] 展開全文';
+    button.setAttribute('aria-expanded', String(expanded));
+  });
+}
+
+function initializeMarkdownPreviews(container) {
+  container.querySelectorAll('[data-markdown-preview]').forEach((preview) => {
+    const content = preview.querySelector('[data-markdown-content]');
+    const collapsedHeight = Number.parseFloat(
+      getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
+    );
+    const isLong = content.scrollHeight > collapsedHeight;
+
+    preview.classList.toggle('is-collapsible', isLong);
+    setMarkdownPreviewExpanded(preview, false);
+    preview.querySelectorAll('[data-markdown-toggle]').forEach((button) => {
+      button.hidden = !isLong;
+    });
+  });
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-markdown-toggle]');
+  if (!button) return;
+  const preview = button.closest('[data-markdown-preview]');
+  if (!preview?.classList.contains('is-collapsible')) return;
+  setMarkdownPreviewExpanded(preview, !preview.classList.contains('is-expanded'));
+});
+
 let S = { projects: [], tags: [], tasks: [], entries: [], settings: db.DEFAULT_SETTINGS };
 let range = 'week';
 
@@ -230,8 +270,9 @@ function renderProjectWorkspace(id) {
   $('projectWorkspace').hidden = false;
   $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} 工作區</h2><button class="btn-sm" data-close-workspace>關閉</button></div>
     <div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} 總工時</span><span class="badge">${done}/${tasks.length} Todo 完成</span><span class="badge">${entries.length} 筆工作日誌</span></div>
-    <h3>Todo 與筆記</h3>${tasks.length ? tasks.map((task) => `<div class="workspace-row"><div><strong>${esc(task.title)}</strong> <span class="badge">${esc(task.status)}</span>${task.notes ? `<div class="markdown-preview">${markdownToHTML(task.notes)}</div>` : ''}</div><span class="num">${task.dueDate || '無期限'}</span></div>`).join('') : '<div class="empty">這個專案沒有 Todo</div>'}
-    <h3>完整工作日誌</h3>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-row"><div class="num mute">${fmtDate(entry.startedAt)} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}<br /><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? `<div class="markdown-preview">${markdownToHTML(entry.notes)}</div>` : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}`;
+    <h3>Todo 與筆記</h3>${tasks.length ? tasks.map((task) => `<div class="workspace-row"><div><strong>${esc(task.title)}</strong> <span class="badge">${esc(task.status)}</span>${task.notes ? renderMarkdownPreview(task.notes) : ''}</div><span class="num">${task.dueDate || '無期限'}</span></div>`).join('') : '<div class="empty">這個專案沒有 Todo</div>'}
+    <h3>完整工作日誌</h3>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-row"><div class="num mute">${fmtDate(entry.startedAt)} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}<br /><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}`;
+  initializeMarkdownPreviews($('projectWorkspace'));
 }
 
 document.getElementById('projList').addEventListener('click', (event) => {
@@ -360,7 +401,7 @@ function renderTodos() {
             </div>
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
             <div class="sub num">${dates}</div>
-            ${t.notes ? `<div class="notes markdown-preview">${markdownToHTML(t.notes)}</div>` : ''}
+            ${t.notes ? renderMarkdownPreview(t.notes, 'notes') : ''}
           </div>
           <span class="num" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
@@ -371,6 +412,7 @@ function renderTodos() {
         </div>`;
       }).join('')
     : '<div class="empty">沒有符合的 todo</div>';
+  initializeMarkdownPreviews($('todoList'));
 }
 
 function resetTodoForm() {
@@ -472,7 +514,7 @@ function renderEntries() {
             <div class="ellipsis">${esc(e.description || '（無描述）')}
               ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
             <div class="sub">${p ? esc(p.name) : '未分類'} · ${fmtDate(e.startedAt)} ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</div>
-            ${e.notes ? `<div class="notes markdown-preview">${markdownToHTML(e.notes)}</div>` : ''}
+            ${e.notes ? renderMarkdownPreview(e.notes, 'notes') : ''}
           </div>
           <span class="num">${fmtHM(db.durationSec(e))}</span>
           <div class="act">
@@ -482,6 +524,7 @@ function renderEntries() {
         </div>`;
       }).join('')
     : '<div class="empty">還沒有紀錄</div>';
+  initializeMarkdownPreviews($('entryList'));
 }
 
 $('entryList').addEventListener('click', async (e) => {
