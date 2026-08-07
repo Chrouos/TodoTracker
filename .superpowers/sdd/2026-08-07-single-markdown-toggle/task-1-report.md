@@ -8,7 +8,7 @@ Removed the duplicate bottom Markdown expand button from the shared preview mark
 
 ## Commit
 
-- Commit: pending
+- Commit: `df6177b` (source commit; cherry-picked to `main` as `6ee56d8`)
 - Message: `fix: keep one markdown expand toggle`
 
 ## Command/output
