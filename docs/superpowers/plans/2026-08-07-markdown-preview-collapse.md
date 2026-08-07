@@ -69,7 +69,7 @@ test('escapes raw html in inline and block content', () => {
 
 - [ ] **Step 2: Run the focused tests and verify the new block assertions fail**
 
-Run: `node --experimental-default-type=module --test extension/src/lib/markdown.test.js`
+Run: `node --test --experimental-modules extension/src/lib/markdown.test.js`
 
 Expected: FAIL until the renderer produces the requested list, quote, and fenced-code structure.
 
@@ -100,7 +100,7 @@ Run `inline()` for headings, paragraphs, list items, and quote lines. Run only `
 
 - [ ] **Step 3: Run the focused tests and verify they pass**
 
-Run: `node --experimental-default-type=module --test extension/src/lib/markdown.test.js`
+Run: `node --test --experimental-modules extension/src/lib/markdown.test.js`
 
 Expected: PASS for all Markdown renderer tests.
 
@@ -152,7 +152,7 @@ Add CSS for a bounded `.markdown-preview` with `max-height`, `overflow: hidden`,
 
 - [ ] **Step 5: Run focused tests and inspect the generated diff**
 
-Run: `node --experimental-default-type=module --test extension/src/lib/markdown.test.js`
+Run: `node --test --experimental-modules extension/src/lib/markdown.test.js`
 
 Run: `git diff --check`
 
@@ -176,15 +176,15 @@ git commit -m "feat: add collapsible markdown previews"
 
 - [ ] **Step 1: Run the focused automated test**
 
-Run: `node --experimental-default-type=module --test extension/src/lib/markdown.test.js`
+Run: `node --test --experimental-modules extension/src/lib/markdown.test.js`
 
 Expected: PASS.
 
 - [ ] **Step 2: Validate the extension source syntax**
 
-Run: `node --experimental-default-type=module --check extension/src/lib/markdown.js`
+Run: `node --check extension/src/lib/markdown.js`
 
-Run: `node --experimental-default-type=module --check extension/src/options/options.js`
+Run: `node --check extension/src/options/options.js`
 
 Expected: both commands exit successfully.
 
@@ -197,4 +197,3 @@ Load or reload the unpacked extension in Chrome and inspect records containing h
 Run: `git diff HEAD~3 --check`
 
 Expected: clean diff check and only the Markdown preview feature files changed after the spec/plan commits.
-

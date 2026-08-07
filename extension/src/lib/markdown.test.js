@@ -37,3 +37,17 @@ test('escapes raw HTML in normal content and inline code', () => {
     '<p>&lt;script&gt;alert(1)&lt;/script&gt; and <code>&lt;tag&gt;</code></p>',
   );
 });
+
+test('keeps Markdown syntax literal inside inline code', () => {
+  assert.equal(
+    markdownToHTML('`**literal**`'),
+    '<p><code>**literal**</code></p>',
+  );
+});
+
+test('renders a fenced code block after up to three leading spaces', () => {
+  assert.equal(
+    markdownToHTML('   ```\n<literal>\n   ```'),
+    '<pre><code>&lt;literal&gt;</code></pre>',
+  );
+});

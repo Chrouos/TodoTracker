@@ -34,21 +34,36 @@ function setMarkdownPreviewExpanded(preview, expanded) {
   });
 }
 
-function initializeMarkdownPreviews(container) {
-  container.querySelectorAll('[data-markdown-preview]').forEach((preview) => {
-    const content = preview.querySelector('[data-markdown-content]');
-    const collapsedHeight = Number.parseFloat(
-      getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
-    );
-    const isLong = content.scrollHeight > collapsedHeight;
+function measureMarkdownPreview(preview, preserveExpanded = false) {
+  const content = preview.querySelector('[data-markdown-content]');
+  const wasExpanded = preview.classList.contains('is-expanded');
+  const collapsedHeight = Number.parseFloat(
+    getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
+  );
+  const isLong = content.scrollHeight > collapsedHeight;
 
-    preview.classList.toggle('is-collapsible', isLong);
-    setMarkdownPreviewExpanded(preview, false);
-    preview.querySelectorAll('[data-markdown-toggle]').forEach((button) => {
-      button.hidden = !isLong;
-    });
+  preview.classList.toggle('is-collapsible', isLong);
+  setMarkdownPreviewExpanded(preview, preserveExpanded && wasExpanded && isLong);
+  preview.querySelectorAll('[data-markdown-toggle]').forEach((button) => {
+    button.hidden = !isLong;
   });
 }
+
+function initializeMarkdownPreviews(container, preserveExpanded = false) {
+  container.querySelectorAll('[data-markdown-preview]').forEach((preview) => {
+    measureMarkdownPreview(preview, preserveExpanded);
+  });
+}
+
+let markdownPreviewResizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(markdownPreviewResizeTimer);
+  markdownPreviewResizeTimer = setTimeout(() => {
+    document.querySelectorAll('[data-markdown-preview]').forEach((preview) => {
+      if (preview.offsetParent !== null) measureMarkdownPreview(preview, true);
+    });
+  }, 100);
+});
 
 document.addEventListener('click', (event) => {
   const button = event.target.closest('[data-markdown-toggle]');
