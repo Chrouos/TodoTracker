@@ -9,6 +9,7 @@ import AutoTextarea from '@/components/AutoTextarea';
 import { buildSummary } from '@/lib/summary';
 import { durationSec, fmtHM, fmtDate, fmtClock, startOfDay } from '@/lib/time';
 import type { Entry } from '@/lib/types';
+import MarkdownPreview from '@/components/MarkdownPreview';
 
 /** 工作結束後補紀錄的地方：按日期分組，每筆直接就地寫。 */
 export default function LogPage() {
@@ -96,10 +97,12 @@ function LogRow({ entry, projectName, color }: {
   const { act } = useStore();
   const [text, setText] = useState(entry.notes ?? '');
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const save = async () => {
     if (text === (entry.notes ?? '')) return;
     await act('upsertEntry', { ...entry, notes: text });
+    setEditing(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
@@ -118,7 +121,7 @@ function LogRow({ entry, projectName, color }: {
         <span className="num mute">{fmtHM(durationSec(entry))}</span>
         {saved && <span className="badge">已儲存</span>}
       </div>
-      <AutoTextarea
+      {editing && <AutoTextarea
         value={text}
         min={text ? 64 : 40}
         max={400}
@@ -126,7 +129,10 @@ function LogRow({ entry, projectName, color }: {
         onChange={setText}
         onBlur={save}
         onKeyDown={(ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') save(); }}
-      />
+      />}
+      {!editing && <button className="btn-sm" onClick={() => setEditing(true)}>編輯 Markdown</button>}
+      {editing && <div className="actions"><button className="btn-sm btn-primary" onClick={save}>儲存</button><button className="btn-sm" onClick={() => { setText(entry.notes ?? ''); setEditing(false); }}>取消</button></div>}
+      {!editing && <MarkdownPreview value={text} className="log-note-preview" />}
     </div>
   );
 }

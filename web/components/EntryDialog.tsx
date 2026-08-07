@@ -5,6 +5,9 @@ import { useStore } from '@/lib/store';
 import { toLocalInput, fromLocalInput } from '@/lib/time';
 import { flattenTree, indentLabel } from '@/lib/tree';
 import AutoTextarea from '@/components/AutoTextarea';
+import AttachmentPicker from '@/components/AttachmentPicker';
+import ShareControls from '@/components/ShareControls';
+import { FEATURES } from '@/lib/features';
 
 export type EntryDraft = {
   id: string;
@@ -94,6 +97,11 @@ export default function EntryDialog({ draft, onClose }: { draft: EntryDraft; onC
         <AutoTextarea value={form.notes} min={96} max={360} placeholder="這段時間做了什麼？"
           onChange={(v) => setForm({ ...form, notes: v })} />
       </label>
+
+      {FEATURES.workNoteImagesAndSharing && form.id && <>
+        <AttachmentPicker target={{ kind: 'entry', id: form.id }} attachments={[]} />
+        <ShareControls target={{ kind: 'entry', id: form.id }} share={null} />
+      </>}
 
       <div className="actions">
         <button onClick={() => ref.current?.close()}>取消</button>

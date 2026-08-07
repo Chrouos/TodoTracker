@@ -9,6 +9,10 @@ import { fmtHM } from '@/lib/time';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '@/lib/tasks';
 import { flattenTree, indentLabel, descendantIds, pathOf } from '@/lib/tree';
 import type { Task, TaskStatus } from '@/lib/types';
+import AttachmentPicker from '@/components/AttachmentPicker';
+import ShareControls from '@/components/ShareControls';
+import { FEATURES } from '@/lib/features';
+import MarkdownPreview from '@/components/MarkdownPreview';
 
 const blank = () => ({
   id: '', title: '', projectId: '', status: 'todo' as TaskStatus,
@@ -119,6 +123,10 @@ export default function TodosPage() {
           <button type="submit" className="btn-primary">{form.id ? '儲存變更' : '新增 Todo'}</button>
           {form.id && <button type="button" onClick={() => setForm(blank())}>取消編輯</button>}
         </div>
+        {FEATURES.workNoteImagesAndSharing && form.id && <>
+          <AttachmentPicker target={{ kind: 'task', id: form.id }} attachments={[]} />
+          <ShareControls target={{ kind: 'task', id: form.id }} share={null} />
+        </>}
       </form>
 
       <div className="row" style={{ marginTop: 24 }}>
@@ -165,7 +173,7 @@ export default function TodosPage() {
                 <div className="sub num">
                   開單 {stampLabel(t.openedAt)} · 截止 {t.dueDate ? `${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}` : '—'} · 結案 {stampLabel(t.completedAt)}
                 </div>
-                {t.notes && <div className="notes">{t.notes}</div>}
+                {t.notes && <MarkdownPreview value={t.notes} />}
               </div>
               <span className="num" title="累積工時">{m.worked ? fmtHM(m.worked) : '—'}</span>
               <div className="act">

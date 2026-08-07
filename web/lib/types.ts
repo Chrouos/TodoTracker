@@ -13,12 +13,26 @@ export type Project = {
   /** 上層專案；null = 最上層。可以一直往下掛 */
   parentId: string | null;
   name: string;
+  notes?: string;
   color: string;
   /** 目標／筆記時間軸，舊的在前 */
   notes: ProjectNote[];
   archivedAt: string | null;
   createdAt: string;
 };
+
+export type NoteTarget = { kind: 'project' | 'task' | 'entry'; id: string };
+export type NoteAttachment = {
+  id: string;
+  target: NoteTarget;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url?: string;
+  createdAt: string;
+};
+export type NoteShare = { id: string; token: string; target: NoteTarget; revokedAt: string | null };
 
 export type Tag = { id: string; name: string; color: string };
 

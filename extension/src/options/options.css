@@ -91,6 +91,8 @@ section[hidden] { display: none; }
 .badge.overdue { color: var(--danger); border-color: var(--danger); }
 .row-item .act { display: flex; gap: var(--xs); opacity: 0; }
 .row-item:hover .act { opacity: 1; }
+.row-item[data-workspace-p] .act { opacity: 1; }
+.row-item[data-workspace-p] { cursor: pointer; }
 
 /* 圖表 */
 .chart-box { border: 1px solid var(--hairline); padding: var(--lg) var(--md); }
@@ -149,3 +151,39 @@ dialog .field { margin-bottom: var(--md); }
   .legend { width: 100%; }
   .bar-label { width: 110px; flex: 0 0 110px; }
 }
+.markdown-preview {
+  --markdown-preview-collapsed-height: 180px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.markdown-preview.is-collapsible:not(.is-expanded) [data-markdown-content] {
+  max-height: var(--markdown-preview-collapsed-height);
+  overflow: hidden;
+}
+.markdown-preview.is-expanded [data-markdown-content] {
+  max-height: none;
+  overflow: visible;
+}
+.markdown-toggle { margin: var(--xs) 0; padding: 0; font-size: 12px; color: var(--text-mute); }
+.markdown-toggle:hover { color: var(--text-ink); }
+.markdown-preview p { margin: 0 0 8px; }
+.markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { margin: 10px 0 5px; }
+.markdown-preview ul, .markdown-preview ol { margin: 5px 0 8px 22px; }
+.markdown-preview blockquote { border-left: 3px solid var(--hairline, #ddd); margin: 8px 0; padding-left: 10px; color: var(--text-ash, #777); }
+.markdown-preview pre { max-width: 100%; overflow-x: auto; padding: 9px; background: var(--surface-card, #f4f4f4); border: 1px solid var(--hairline, #ddd); }
+.markdown-preview code { padding: 1px 4px; background: var(--surface-card, #f4f4f4); font-family: var(--font-mono, ui-monospace, monospace); }
+.markdown-preview pre code { padding: 0; background: transparent; }
+.markdown-preview a { text-decoration: underline; }
+.row-item .markdown-preview {
+  white-space: normal;
+  font-family: var(--font, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-body);
+}
+.row-item .markdown-preview p { margin: 0 0 8px; }
+.row-item .markdown-preview pre,
+.row-item .markdown-preview pre code { font-family: var(--font-mono, ui-monospace, monospace); }
+.row-item .markdown-preview pre { white-space: pre; }
+.workspace-kpis { display: flex; gap: var(--sm); margin: 12px 0; }
+.workspace-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hairline, #ddd); }

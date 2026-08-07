@@ -61,6 +61,7 @@ export async function upsertProject(p) {
     id: p.id || uid(),
     parentId: p.parentId || null,   // 專案可以無限往下掛
     name: (p.name || '').trim(),
+    notes: p.notes || '',
     color: p.color || '#201d1d',
     // 目標／筆記是 append 式的時間軸，只能透過下面三個函式動
     notes: prev?.notes || p.notes || [],
