@@ -674,6 +674,7 @@ $('tabs').addEventListener('click', (e) => {
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   ['report', 'projects', 'todos', 'tags', 'entries', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
+  initializeMarkdownPreviews($('p-' + name));
 });
 
 $('range').addEventListener('click', (e) => {
