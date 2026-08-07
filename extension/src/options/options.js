@@ -368,11 +368,25 @@ function renderProjectWorkspace(id) {
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   const seconds = entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
   const done = tasks.filter((task) => task.status === 'done').length;
+  const taskGroups = {
+    doing: tasks.filter((task) => task.status === 'doing'),
+    todo: tasks.filter((task) => task.status === 'todo'),
+    done: tasks.filter((task) => task.status === 'done'),
+  };
+  const daily = new Map();
+  for (const entry of entries) {
+    const date = fmtDate(entry.startedAt);
+    daily.set(date, (daily.get(date) || 0) + db.durationSec(entry));
+  }
+  const dailyRows = [...daily.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  const maxDaily = Math.max(1, ...dailyRows.map(([, value]) => value));
+  const taskGroup = (label, items) => `<div class="workspace-task-group"><div class="workspace-subhead"><span>${label}</span><span class="badge">${items.length}</span></div>${items.length ? items.map((task) => `<div class="workspace-task"><div><strong>${esc(task.title)}</strong>${task.notes ? renderMarkdownPreview(task.notes) : ''}</div><span class="num">${task.dueDate || '無期限'}</span></div>`).join('') : '<div class="empty">目前沒有項目</div>'}</div>`;
   $('projectWorkspace').hidden = false;
   $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} 工作區</h2><button class="btn-sm" data-close-workspace>關閉</button></div>
-    <div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} 總工時</span><span class="badge">${done}/${tasks.length} Todo 完成</span><span class="badge">${entries.length} 筆工作日誌</span></div>
-    <h3>Todo 與筆記</h3>${tasks.length ? tasks.map((task) => `<div class="workspace-row"><div><strong>${esc(task.title)}</strong> <span class="badge">${esc(task.status)}</span>${task.notes ? renderMarkdownPreview(task.notes) : ''}</div><span class="num">${task.dueDate || '無期限'}</span></div>`).join('') : '<div class="empty">這個專案沒有 Todo</div>'}
-    <h3>完整工作日誌</h3>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-row"><div class="num mute">${fmtDate(entry.startedAt)} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}<br /><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}`;
+    <div class="workspace-section"><div class="workspace-section-head"><h3>專案摘要</h3><span class="cap">只顯示此專案與子專案</span></div><div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} 總工時</span><span class="badge">${done}/${tasks.length} Todo 完成</span><span class="badge">${entries.length} 筆工作日誌</span></div></div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${tasks.length} 個項目</span></div>${taskGroup('進行中', taskGroups.doing)}${taskGroup('待辦', taskGroups.todo)}${taskGroup('已完成', taskGroups.done)}</div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>工作日誌</h3><span class="cap">${entries.length} 筆</span></div>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-log"><div class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div><div class="grow"><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}</div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>工時過程</h3><span class="cap">依日期整理</span></div>${dailyRows.length ? dailyRows.map(([date, value]) => `<div class="workspace-day"><span class="num">${date}</span><div class="workspace-day-bar"><i style="width:${Math.round((value / maxDaily) * 100)}%"></i></div><span class="num">${fmtHM(value)}</span></div>`).join('') : '<div class="empty">目前沒有可用的工時資料</div>'}</div>`;
   initializeMarkdownPreviews($('projectWorkspace'));
 }
 
