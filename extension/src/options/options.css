@@ -126,8 +126,22 @@ dialog .field { margin-bottom: var(--md); }
   max-height: none;
   overflow: visible;
 }
-.markdown-toggle { margin: var(--xs) 0; padding: 0; font-size: 12px; color: var(--text-mute); }
-.markdown-toggle:hover { color: var(--text-ink); }
+.markdown-toggle {
+  margin: var(--xs) 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-mute);
+}
+.markdown-toggle:hover {
+  color: var(--text-ink);
+  text-decoration: underline;
+}
+.markdown-toggle:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 3px;
+}
 .markdown-preview p { margin: 0 0 8px; }
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { margin: 10px 0 5px; }
 .markdown-preview ul, .markdown-preview ol { margin: 5px 0 8px 22px; }
