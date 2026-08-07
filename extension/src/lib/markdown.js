@@ -15,6 +15,10 @@ const inline = (value) => String(value ?? '').split(/(`[^`]+`)/g)
   .map((part, index) => (index % 2 ? `<code>${escapeHTML(part.slice(1, -1))}</code>` : inlineText(part)))
   .join('');
 
+export function shouldShowMarkdownToggle(text, scrollHeight, collapsedHeight) {
+  return String(text ?? '').trim().length > 120 && scrollHeight > collapsedHeight + 24;
+}
+
 export function markdownToHTML(markdown) {
   const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
   const result = [];

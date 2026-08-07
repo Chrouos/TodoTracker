@@ -9,7 +9,7 @@ import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tre
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
-import { markdownToHTML } from '../lib/markdown.js';
+import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -22,7 +22,6 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
 
 function renderMarkdownPreview(markdown, className = '') {
   return `<div class="${className} markdown-preview" data-markdown-preview>
-    <button type="button" class="btn-sm markdown-toggle markdown-toggle-top" data-markdown-toggle hidden aria-expanded="false">[+] 展開全文</button>
     <div data-markdown-content>${markdownToHTML(markdown)}</div>
   </div>`;
 }
@@ -41,10 +40,16 @@ function measureMarkdownPreview(preview, preserveExpanded = false) {
   const collapsedHeight = Number.parseFloat(
     getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
   );
-  const isLong = content.scrollHeight > collapsedHeight + 24;
+  const isLong = shouldShowMarkdownToggle(content.textContent, content.scrollHeight, collapsedHeight);
   preview.classList.toggle('is-collapsible', isLong);
+  let button = preview.querySelector('[data-markdown-toggle]');
+  if (isLong && !button) {
+    preview.insertAdjacentHTML('afterbegin', '<button type="button" class="btn-sm markdown-toggle markdown-toggle-top" data-markdown-toggle aria-expanded="false">[+] 展開全文</button>');
+    button = preview.querySelector('[data-markdown-toggle]');
+  } else if (!isLong && button) {
+    button.remove();
+  }
   setMarkdownPreviewExpanded(preview, preserveExpanded && wasExpanded && isLong);
-  preview.querySelectorAll('[data-markdown-toggle]').forEach((button) => { button.hidden = !isLong; });
 }
 
 function initializeMarkdownPreviews(container, preserveExpanded = false) {

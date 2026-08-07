@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownToHTML } from './markdown.js';
+import { markdownToHTML, shouldShowMarkdownToggle } from './markdown.js';
 
 test('renders headings as h1 elements', () => {
   assert.equal(markdownToHTML('# Heading'), '<h1>Heading</h1>');
@@ -50,4 +50,10 @@ test('renders a fenced code block after up to three leading spaces', () => {
     markdownToHTML('   ```\n<literal>\n   ```'),
     '<pre><code>&lt;literal&gt;</code></pre>',
   );
+});
+
+test('only shows the toggle when the note is textually and visually long', () => {
+  assert.equal(shouldShowMarkdownToggle('15:34 等待中', 240, 180), false);
+  assert.equal(shouldShowMarkdownToggle('x'.repeat(121), 240, 180), true);
+  assert.equal(shouldShowMarkdownToggle('x'.repeat(121), 200, 180), false);
 });
