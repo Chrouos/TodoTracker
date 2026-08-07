@@ -39,7 +39,7 @@ function measureMarkdownPreview(preview, preserveExpanded = false) {
   const collapsedHeight = Number.parseFloat(
     getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
   );
-  const isLong = content.scrollHeight > collapsedHeight;
+  const isLong = content.scrollHeight > collapsedHeight + 24;
 
   preview.classList.toggle('is-collapsible', isLong);
   setMarkdownPreviewExpanded(preview, preserveExpanded && wasExpanded && isLong);
