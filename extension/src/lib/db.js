@@ -168,6 +168,7 @@ export async function upsertTask(t) {
     title: (t.title || '').trim(),
     notes: t.notes || '',
     status,
+    priority: ['urgent', 'high', 'normal', 'low'].includes(t.priority) ? t.priority : 'normal',
 
     // 開單時間：建立當下決定，之後一律沿用舊值，不接受外部覆蓋
     openedAt: prev?.openedAt || nowISO(),
@@ -263,7 +264,8 @@ export async function runDueSchedules(now = new Date()) {
     if (nowMin < hhmmToMin(s.createTime)) continue;
 
     const task = await upsertTask({
-      title: s.title,
+      // 每次排程產生的 Todo 都帶上執行日期，避免每天看起來是同一筆工作
+      title: `${s.title} · ${today}`,
       projectId: s.projectId,
       notes: s.notes,
       status: 'todo',

@@ -94,7 +94,7 @@ export default function TodosPage() {
           </label>
         </div>
 
-        <div className="grid4" style={{ marginTop: 12 }}>
+        <div className="todo-form-meta" style={{ marginTop: 12 }}>
           <label className="field"><span>截止日</span>
             <input type="date" value={form.dueDate}
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />

@@ -278,8 +278,10 @@ function renderProjects() {
 
 let noteEditingId = null;   // 正在編輯的那則
 
+let workspaceProjectId = null;
+
 function renderProjectNotes() {
-  const pid = $('pjId').value;
+  const pid = workspaceProjectId || $('pjId').value;
   const box = $('pjNotesBox');
   if (!pid) { box.hidden = true; return; }
 
@@ -308,7 +310,7 @@ function renderProjectNotes() {
           </div>
           ${editing
             ? `<textarea data-note-input="${n.id}">${esc(n.text)}</textarea>`
-            : `<div class="note-body">${esc(n.text)}</div>`}
+            : `<div class="note-body">${renderMarkdownPreview(n.text)}</div>`}
         </div>`;
       }).join('')
     : '<div class="empty">還沒有目標或筆記</div>';
@@ -320,7 +322,7 @@ function renderProjectNotes() {
 }
 
 $('pjNoteAdd').addEventListener('click', async () => {
-  const pid = $('pjId').value;
+  const pid = workspaceProjectId || $('pjId').value;
   const text = $('pjNoteDraft').value;
   if (!pid || !text.trim()) return;
   await db.addProjectNote(pid, text);
@@ -335,7 +337,7 @@ $('pjNoteDraft').addEventListener('keydown', (e) => {
 });
 
 $('pjNoteList').addEventListener('click', async (e) => {
-  const pid = $('pjId').value;
+  const pid = workspaceProjectId || $('pjId').value;
   const ed = e.target.closest('[data-note-edit]')?.dataset.noteEdit;
   const save = e.target.closest('[data-note-save]')?.dataset.noteSave;
   const del = e.target.closest('[data-note-del]')?.dataset.noteDel;
@@ -365,6 +367,7 @@ $('pjNoteList').addEventListener('keydown', (e) => {
 function renderProjectWorkspace(id) {
   const project = S.projects.find((item) => item.id === id);
   if (!project) return;
+  workspaceProjectId = id;
   const ids = new Set([id, ...descendantSet(id)]);
   const tasks = S.tasks.filter((task) => task.projectId && ids.has(task.projectId));
   const taskIds = new Set(tasks.map((task) => task.id));
@@ -393,7 +396,22 @@ function renderProjectWorkspace(id) {
     <div class="workspace-section"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${tasks.length} 個項目</span></div>${taskGroup('進行中', taskGroups.doing)}${taskGroup('待辦', taskGroups.todo)}${taskGroup('已完成', taskGroups.done)}</div>
     <div class="workspace-section"><div class="workspace-section-head"><h3>工作日誌</h3><span class="cap">${entries.length} 筆</span></div>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-log"><div class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div><div class="grow"><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}</div>
     <div class="workspace-section"><div class="workspace-section-head"><h3>工時過程</h3><span class="cap">依日期整理</span></div>${dailyRows.length ? dailyRows.map(([date, value]) => `<div class="workspace-day"><span class="num">${date}</span><div class="workspace-day-bar"><i style="width:${Math.round((value / maxDaily) * 100)}%"></i></div><span class="num">${fmtHM(value)}</span></div>`).join('') : '<div class="empty">目前沒有可用的工時資料</div>'}</div>`;
+  $('projectWorkspace').appendChild($('pjNotesBox'));
+  $('pjNotesBox').hidden = false;
+  $('pjNotesBox').removeAttribute('hidden');
+  renderProjectNotes();
   initializeMarkdownPreviews($('projectWorkspace'));
+  const workspaceSections = $('projectWorkspace').querySelectorAll('.workspace-section');
+  workspaceSections[0]?.classList.add('workspace-section-first');
+  workspaceSections.forEach((section) => {
+    const head = section.querySelector('.workspace-section-head');
+    if (!head) return;
+    head.insertAdjacentHTML('beforeend', '<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>[−]</button>');
+  });
+  const noteHead = $('pjNotesBox').querySelector('.row');
+  if (noteHead && !noteHead.querySelector('[data-workspace-toggle]')) {
+    noteHead.insertAdjacentHTML('beforeend', '<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>[−]</button>');
+  }
 }
 
 document.getElementById('projList').addEventListener('click', (event) => {
@@ -403,7 +421,18 @@ document.getElementById('projList').addEventListener('click', (event) => {
   else if (row && !event.target.closest('button')) renderProjectWorkspace(row.dataset.workspaceP);
 });
 document.getElementById('projectWorkspace').addEventListener('click', (event) => {
-  if (event.target.closest('[data-close-workspace]')) document.getElementById('projectWorkspace').hidden = true;
+  const toggle = event.target.closest('[data-workspace-toggle]');
+  if (toggle) {
+    const section = toggle.closest('.workspace-section, #pjNotesBox');
+    section.classList.toggle('is-collapsed');
+    toggle.textContent = section.classList.contains('is-collapsed') ? '[+]' : '[−]';
+    return;
+  }
+  if (event.target.closest('[data-close-workspace]')) {
+    document.getElementById('projectWorkspace').hidden = true;
+    $('pjNotesBox').hidden = true;
+    workspaceProjectId = null;
+  }
 });
 
 function descendantSet(id) {
@@ -438,6 +467,7 @@ function resetProjForm() {
   $('pjId').value = ''; $('pjName').value = ''; $('pjColor').value = '#201d1d';
   $('pjParent').value = ''; $('pjCancel').hidden = true;
   noteEditingId = null;
+  workspaceProjectId = null;
   renderProjects();
   renderProjectNotes();
 }
@@ -452,7 +482,8 @@ $('projList').addEventListener('click', async (e) => {
     renderProjects();                      // 重建下拉，排除自己與後代
     $('pjParent').value = p.parentId || '';
     noteEditingId = null;
-    renderProjectNotes();
+    workspaceProjectId = null;
+    $('pjNotesBox').hidden = true;
     $('pjName').focus();
   } else if (ar) {
     const p = S.projects.find((x) => x.id === ar);
@@ -493,6 +524,7 @@ function renderTodos() {
     .filter((t) => (scope ? scope.has(t.projectId) : true))
     .sort((a, b) =>
       Number(a.status === 'done') - Number(b.status === 'done')
+      || ({ urgent: 0, high: 1, normal: 2, low: 3 }[a.priority || 'normal'] - { urgent: 0, high: 1, normal: 2, low: 3 }[b.priority || 'normal'])
       || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
       || (a.sortOrder - b.sortOrder));
 
@@ -520,6 +552,7 @@ function renderTodos() {
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
+              ${t.priority && t.priority !== 'normal' ? `<span class="badge priority-${t.priority}">${({ urgent: '緊急', high: '高', low: '低' })[t.priority]}</span>` : ''}
               ${t.scheduleId ? '<span class="badge" title="由排程自動產生">排程</span>' : ''}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
@@ -550,7 +583,7 @@ function renderTodos() {
 
 function resetTodoForm() {
   $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
-  $('tdStatus').value = 'todo'; $('tdDue').value = '';
+  $('tdStatus').value = 'todo'; $('tdPriority').value = 'normal'; $('tdDue').value = ''; $('tdDueTime').value = '';
   $('tdOpened').value = '建立後自動記錄';
   $('tdDone').value = '—';
   $('tdWorked').value = '—';
@@ -567,7 +600,9 @@ $('todoForm').addEventListener('submit', async (e) => {
     title: $('tdTitle').value,
     projectId: $('tdProject').value || null,
     status: $('tdStatus').value,
+    priority: $('tdPriority').value,
     dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
+    dueTime: $('tdDueTime').value || null,
     notes: $('tdNotes').value,
   });
   resetTodoForm();
@@ -596,7 +631,9 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdId').value = t.id; $('tdTitle').value = t.title;
     $('tdProject').value = t.projectId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
+    $('tdPriority').value = t.priority || 'normal';
     $('tdDue').value = t.dueDate || '';
+    $('tdDueTime').value = t.dueTime || '';
     $('tdOpened').value = stampLabel(t.openedAt);
     $('tdDone').value = stampLabel(t.completedAt);
     const m = taskMetrics(t, S.entries);

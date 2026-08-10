@@ -273,6 +273,7 @@ main.page { padding: var(--xxl) 0 var(--section); }
 
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
 .grid4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--md); }
+.todo-form-meta { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--md); }
 .actions { display: flex; gap: var(--sm); margin-top: var(--md); flex-wrap: wrap; }
 
 .seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: var(--r); overflow: hidden; }
@@ -338,7 +339,7 @@ dialog::backdrop { background: rgba(15, 0, 0, 0.35); }
   .wrap { padding: 0 var(--lg); }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .kpi:nth-child(2) { border-right: 0; }
-  .grid2, .grid4 { grid-template-columns: 1fr; }
+  .grid2, .grid4, .todo-form-meta { grid-template-columns: 1fr; }
   .timer-panel { flex-direction: column; align-items: stretch; }
   .chart-split { flex-direction: column; gap: var(--lg); }
   .chart-split > svg { align-self: center; }
