@@ -102,6 +102,24 @@ function renderAll() {
   renderTags(); renderEntries(); renderSettings();
 }
 
+function groupReportPanels() {
+  const report = $('p-report');
+  if (report.querySelector('.report-panel')) return;
+  [
+    ['rep-donut', 'byProject', 'report-panel-donut'],
+    ['rep-time', 'timeline', 'report-panel-time'],
+    ['rep-line', 'byDay', 'report-panel-wide'],
+  ].forEach(([collapseId, bodyId, className]) => {
+    const heading = report.querySelector(`[data-collapse="${collapseId}"]`);
+    const body = $(bodyId);
+    if (!heading || !body) return;
+    const panel = document.createElement('div');
+    panel.className = `report-panel ${className}`;
+    heading.parentNode.insertBefore(panel, heading);
+    panel.append(heading, body);
+  });
+}
+
 /* ---------------- 報表 ---------------- */
 function renderReport() {
   const rows = inRange();
@@ -1096,6 +1114,7 @@ $('range').addEventListener('click', (e) => {
 // 進頁預設本週
 range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
+groupReportPanels();
 initCollapse();
 resetTodoForm();
 resetSchForm();

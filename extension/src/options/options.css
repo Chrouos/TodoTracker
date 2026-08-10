@@ -208,6 +208,23 @@ section[hidden] { display: none; }
 #p-report > #timeline,
 #p-report > #byDay { width: 100%; box-sizing: border-box; }
 
+#p-report > .report-panel { min-width: 0; }
+#p-report > .report-panel-donut { grid-column: 1; }
+#p-report > .report-panel-time { grid-column: 2; }
+#p-report > .report-panel-wide { grid-column: 1 / -1; margin-top: 16px; }
+#p-report > .report-panel > h2.sec { margin: 0 0 10px; }
+#p-report > .report-panel > #byProject,
+#p-report > .report-panel > #timeline,
+#p-report > .report-panel > #byDay {
+  width: 100%;
+  min-height: 210px;
+  box-sizing: border-box;
+}
+#p-report > .report-panel > #byProject { padding: 0; overflow: hidden; }
+#p-report > .report-panel > #byProject .chart-split { border: 0; padding: 22px 24px; }
+#p-report > .report-panel > #timeline,
+#p-report > .report-panel > #byDay { padding: 18px 20px; }
+
 .chart-split {
   display: flex; align-items: center; gap: var(--xxl);
   border: 1px solid var(--hairline); padding: var(--lg);
@@ -261,6 +278,7 @@ dialog .field { margin-bottom: var(--md); }
   .legend { width: 100%; }
   .bar-label { width: 110px; flex: 0 0 110px; }
   #p-report { display: block; }
+  #p-report > .report-panel-wide { margin-top: 0; }
 }
 .markdown-preview {
   --markdown-preview-collapsed-height: 180px;
