@@ -105,6 +105,55 @@ section[hidden] { display: none; }
 .row-item[data-workspace-p] .act { opacity: 1; }
 .row-item[data-workspace-p] { cursor: pointer; }
 
+/* Todo 清單：以卡片呈現，讓優先級、截止日與提醒一眼可見 */
+#todoList { display: grid; gap: 12px; }
+#todoList .todo-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px 8px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--canvas, #fff);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+#todoList .todo-card::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--text-mute);
+}
+#todoList .todo-card.priority-urgent::before { background: var(--danger); }
+#todoList .todo-card.priority-high::before { background: var(--warning); }
+#todoList .todo-card.priority-low::before { background: var(--text-mute); }
+#todoList .todo-card:hover,
+#todoList .todo-card:focus-within {
+  border-color: var(--text-mute);
+  box-shadow: 0 5px 16px rgba(24, 24, 24, .08);
+  transform: translateY(-1px);
+}
+#todoList .todo-card .main { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
+#todoList .todo-card .main > .ellipsis { font-size: 15px; font-weight: 700; line-height: 1.45; }
+#todoList .todo-card .main > .sub:first-of-type { margin-top: 3px; }
+#todoList .todo-card .main > .sub.num { margin-top: 4px; color: var(--text-mute); }
+#todoList .todo-card .num:not(.sub) { min-width: 66px; text-align: right; font-weight: 600; }
+#todoList .todo-card .act { align-self: center; }
+#todoList .todo-card.done { opacity: .68; background: var(--canvas-alt, #fafafa); }
+#todoList .todo-card.done:hover { opacity: 1; }
+
+@media (max-width: 760px) {
+  #todoList .todo-card { grid-template-columns: 34px 8px minmax(0, 1fr); }
+  #todoList .todo-card > .num:not(.sub) { grid-column: 3; text-align: left; margin-top: 4px; }
+  #todoList .todo-card > .act { grid-column: 3; justify-content: flex-start; opacity: 1; }
+}
+
 /* 圖表 */
 .chart-box { border: 1px solid var(--hairline); padding: var(--lg) var(--md); }
 .scroll-x { overflow-x: auto; }

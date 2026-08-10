@@ -546,7 +546,7 @@ function renderTodos() {
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
-        return `<div class="row-item${done ? ' done' : ''}">
+        return `<div class="row-item todo-card priority-${t.priority || 'normal'}${done ? ' done' : ''}">
           <button class="btn-sm btn-ghost" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
