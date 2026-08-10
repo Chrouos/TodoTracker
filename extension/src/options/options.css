@@ -158,6 +158,37 @@ section[hidden] { display: none; }
 .chart-box { border: 1px solid var(--hairline); padding: var(--lg) var(--md); }
 .scroll-x { overflow-x: auto; }
 
+/* 報表：摘要、圖表與明細分成清楚的資訊層級 */
+#p-report { padding-top: 24px; }
+#p-report > .toolbar { margin-bottom: 18px; }
+#p-report > .kpis {
+  border-radius: 12px;
+  background: var(--canvas, #fff);
+  box-shadow: 0 4px 14px rgba(24, 24, 24, .05);
+  overflow: hidden;
+}
+#p-report > .kpis .kpi { min-height: 92px; justify-content: center; padding: 18px 20px; }
+#p-report > .kpis .kpi .num { font-size: 30px; line-height: 1.1; letter-spacing: -.4px; }
+#p-report > h2.sec {
+  margin: 24px 0 10px;
+  padding: 0 2px;
+  border: 0;
+  font-size: 15px;
+}
+#p-report > h2.sec .mark { color: var(--text-mute); font-weight: 400; }
+#p-report > #byProject,
+#p-report > #timeline,
+#p-report > #byDay {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--canvas, #fff);
+  box-shadow: 0 3px 12px rgba(24, 24, 24, .035);
+}
+#p-report > #byProject { padding: 0; overflow: hidden; }
+#p-report > #byProject .chart-split { border: 0; padding: 22px 24px; }
+#p-report > #timeline,
+#p-report > #byDay { padding: 18px 20px; }
+
 .chart-split {
   display: flex; align-items: center; gap: var(--xxl);
   border: 1px solid var(--hairline); padding: var(--lg);
