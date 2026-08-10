@@ -189,6 +189,25 @@ section[hidden] { display: none; }
 #p-report > #timeline,
 #p-report > #byDay { padding: 18px 20px; }
 
+/* 報表主畫面：專案分布與時間軸並排，趨勢圖獨立滿版 */
+#p-report {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  column-gap: 16px;
+  align-items: start;
+}
+#p-report > .toolbar,
+#p-report > .kpis { grid-column: 1 / -1; }
+#p-report > h2.sec:nth-of-type(1),
+#p-report > #byProject { grid-column: 1; }
+#p-report > h2.sec:nth-of-type(2),
+#p-report > #timeline { grid-column: 2; }
+#p-report > h2.sec:nth-of-type(3),
+#p-report > #byDay { grid-column: 1 / -1; }
+#p-report > #byProject,
+#p-report > #timeline,
+#p-report > #byDay { width: 100%; box-sizing: border-box; }
+
 .chart-split {
   display: flex; align-items: center; gap: var(--xxl);
   border: 1px solid var(--hairline); padding: var(--lg);
@@ -241,6 +260,7 @@ dialog .field { margin-bottom: var(--md); }
   .chart-split > svg { align-self: center; }
   .legend { width: 100%; }
   .bar-label { width: 110px; flex: 0 0 110px; }
+  #p-report { display: block; }
 }
 .markdown-preview {
   --markdown-preview-collapsed-height: 180px;
