@@ -385,6 +385,7 @@ $('pjNoteList').addEventListener('keydown', (e) => {
 function renderProjectWorkspace(id) {
   const project = S.projects.find((item) => item.id === id);
   if (!project) return;
+  const notesBox = $('pjNotesBox');
   workspaceProjectId = id;
   const ids = new Set([id, ...descendantSet(id)]);
   const tasks = S.tasks.filter((task) => task.projectId && ids.has(task.projectId));
@@ -414,10 +415,12 @@ function renderProjectWorkspace(id) {
     <div class="workspace-section"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${tasks.length} 個項目</span></div>${taskGroup('進行中', taskGroups.doing)}${taskGroup('待辦', taskGroups.todo)}${taskGroup('已完成', taskGroups.done)}</div>
     <div class="workspace-section"><div class="workspace-section-head"><h3>工作日誌</h3><span class="cap">${entries.length} 筆</span></div>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-log"><div class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div><div class="grow"><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}</div>
     <div class="workspace-section"><div class="workspace-section-head"><h3>工時過程</h3><span class="cap">依日期整理</span></div>${dailyRows.length ? dailyRows.map(([date, value]) => `<div class="workspace-day"><span class="num">${date}</span><div class="workspace-day-bar"><i style="width:${Math.round((value / maxDaily) * 100)}%"></i></div><span class="num">${fmtHM(value)}</span></div>`).join('') : '<div class="empty">目前沒有可用的工時資料</div>'}</div>`;
-  $('projectWorkspace').appendChild($('pjNotesBox'));
-  $('pjNotesBox').hidden = false;
-  $('pjNotesBox').removeAttribute('hidden');
-  renderProjectNotes();
+  if (notesBox) {
+    $('projectWorkspace').appendChild(notesBox);
+    notesBox.hidden = false;
+    notesBox.removeAttribute('hidden');
+    renderProjectNotes();
+  }
   initializeMarkdownPreviews($('projectWorkspace'));
   const workspaceSections = $('projectWorkspace').querySelectorAll('.workspace-section');
   workspaceSections[0]?.classList.add('workspace-section-first');
@@ -426,7 +429,7 @@ function renderProjectWorkspace(id) {
     if (!head) return;
     head.insertAdjacentHTML('beforeend', '<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>[−]</button>');
   });
-  const noteHead = $('pjNotesBox').querySelector('.row');
+  const noteHead = notesBox?.querySelector('.row');
   if (noteHead && !noteHead.querySelector('[data-workspace-toggle]')) {
     noteHead.insertAdjacentHTML('beforeend', '<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>[−]</button>');
   }
