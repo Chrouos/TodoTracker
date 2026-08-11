@@ -282,6 +282,7 @@ function renderProjects() {
           <span class="num ash" style="width:80px;text-align:right"
                 title="只算直接記在這一層的">${kids ? fmtHM(r.own) : ''}</span>
           <div class="act">
+            <button class="btn-sm" data-add-subtask="${t.id}" title="新增子任務">＋子任務</button>
             <button class="btn-sm workspace-open" data-open-workspace="${p.id}">查看工作區</button>
             <button class="btn-sm" data-edit-p="${p.id}">[編輯]</button>
             <button class="btn-sm" data-arch-p="${p.id}">${p.archivedAt ? '[復原]' : '[封存]'}</button>
@@ -661,6 +662,7 @@ $('tdToggleDone').addEventListener('click', () => { showDone = !showDone; render
 $('todoList').addEventListener('click', async (e) => {
   const check = e.target.closest('[data-check]')?.dataset.check;
   const run = e.target.closest('[data-run]')?.dataset.run;
+  const addSubtask = e.target.closest('[data-add-subtask]')?.dataset.addSubtask;
   const ed = e.target.closest('[data-edit-t]')?.dataset.editT;
   const del = e.target.closest('[data-del-t]')?.dataset.delT;
 
@@ -670,6 +672,16 @@ $('todoList').addEventListener('click', async (e) => {
   } else if (run) {
     const t = S.tasks.find((x) => x.id === run);
     await db.startTimer({ projectId: t.projectId, taskId: t.id, description: t.title });
+  } else if (addSubtask) {
+    const parent = S.tasks.find((x) => x.id === addSubtask);
+    if (!parent) return;
+    resetTodoForm();
+    $('tdProject').value = parent.projectId || '';
+    $('tdParent').value = parent.id;
+    $('tdPriority').value = parent.priority || 'normal';
+    $('tdCancel').hidden = false;
+    $('tdTitle').focus();
+    return;
   } else if (ed) {
     const t = S.tasks.find((x) => x.id === ed);
     $('tdId').value = t.id; $('tdTitle').value = t.title;
