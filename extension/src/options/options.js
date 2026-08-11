@@ -527,6 +527,22 @@ function renderTodos() {
   $('tdProject').innerHTML = opts('— 未分類 —');
   $('tdProject').value = keepP;
 
+  const keepParent = $('tdParent').value;
+  const editingId = $('tdId').value;
+  const descendants = new Set();
+  const collectDescendants = (id) => S.tasks.forEach((task) => {
+    if (task.parentId === id && !descendants.has(task.id)) {
+      descendants.add(task.id);
+      collectDescendants(task.id);
+    }
+  });
+  if (editingId) collectDescendants(editingId);
+  $('tdParent').innerHTML = '<option value="">— 最上層任務 —</option>' + S.tasks
+    .filter((task) => task.status !== 'archived' && task.id !== editingId && !descendants.has(task.id))
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .map((task) => `<option value="${task.id}">${esc(task.title)}</option>`).join('');
+  $('tdParent').value = keepParent;
+
   const keepF = $('tdFilter').value;
   $('tdFilter').innerHTML = opts('— 全部專案 —');
   $('tdFilter').value = keepF;
@@ -556,6 +572,14 @@ function renderTodos() {
         const m = taskMetrics(t, S.entries);
         const workEntries = entriesForTask(t, S.entries);
         const dl = dueLabel(m, done);
+        let taskDepth = 0;
+        let parent = t.parentId ? S.tasks.find((item) => item.id === t.parentId) : null;
+        const seenParents = new Set();
+        while (parent && !seenParents.has(parent.id)) {
+          seenParents.add(parent.id);
+          taskDepth += 1;
+          parent = parent.parentId ? S.tasks.find((item) => item.id === parent.parentId) : null;
+        }
 
         // 三個時間排成一行，缺的用 — 佔位
         const dates = [
@@ -564,7 +588,7 @@ function renderTodos() {
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
-        return `<div class="row-item todo-card priority-${t.priority || 'normal'}${done ? ' done' : ''}">
+        return `<div class="row-item todo-card priority-${t.priority || 'normal'}${done ? ' done' : ''}" style="margin-left:${taskDepth * 20}px">
           <button class="btn-sm btn-ghost" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
@@ -601,6 +625,7 @@ function renderTodos() {
 
 function resetTodoForm() {
   $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
+  $('tdParent').value = '';
   $('tdStatus').value = 'todo'; $('tdPriority').value = 'normal'; $('tdDue').value = ''; $('tdDueTime').value = '';
   $('tdOpened').value = '建立後自動記錄';
   $('tdDone').value = '—';
@@ -617,6 +642,7 @@ $('todoForm').addEventListener('submit', async (e) => {
     id: $('tdId').value || undefined,
     title: $('tdTitle').value,
     projectId: $('tdProject').value || null,
+    parentId: $('tdParent').value || null,
     status: $('tdStatus').value,
     priority: $('tdPriority').value,
     dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
@@ -648,6 +674,7 @@ $('todoList').addEventListener('click', async (e) => {
     const t = S.tasks.find((x) => x.id === ed);
     $('tdId').value = t.id; $('tdTitle').value = t.title;
     $('tdProject').value = t.projectId || '';
+    $('tdParent').value = t.parentId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
     $('tdPriority').value = t.priority || 'normal';
     $('tdDue').value = t.dueDate || '';
