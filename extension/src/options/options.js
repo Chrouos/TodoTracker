@@ -267,8 +267,8 @@ function renderProjects() {
   $('projList').innerHTML = tree.length
     ? tree.map((p) => {
         const open = S.tasks.filter((x) => x.projectId === p.id && x.status !== 'done' && x.status !== 'archived').length;
-        const r = roll.get(p.id) || { own: 0, total: 0 };
-        const kids = childrenOf(S.projects, p.id).length;
+      const r = roll.get(p.id) || { own: 0, total: 0 };
+      const kids = childrenOf(S.projects, p.id).length;
         return `<div class="row-item" data-workspace-p="${p.id}" style="padding-left:${p.depth * 20}px">
           ${p.depth ? '<span class="mark tree-branch">└</span>' : ''}
           <span class="swatch" style="background:${p.color}"></span>
@@ -282,7 +282,6 @@ function renderProjects() {
           <span class="num ash" style="width:80px;text-align:right"
                 title="只算直接記在這一層的">${kids ? fmtHM(r.own) : ''}</span>
           <div class="act">
-            <button class="btn-sm" data-add-subtask="${t.id}" title="新增子任務">＋子任務</button>
             <button class="btn-sm workspace-open" data-open-workspace="${p.id}">查看工作區</button>
             <button class="btn-sm" data-edit-p="${p.id}">[編輯]</button>
             <button class="btn-sm" data-arch-p="${p.id}">${p.archivedAt ? '[復原]' : '[封存]'}</button>
@@ -615,6 +614,7 @@ function renderTodos() {
           <span class="num" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
             ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="對這個 todo 開始計時">[&gt;]</button>`}
+            <button class="btn-sm" data-add-subtask="${t.id}" title="新增子任務">＋子任務</button>
             <button class="btn-sm" data-edit-t="${t.id}">[編輯]</button>
             <button class="btn-sm btn-danger" data-del-t="${t.id}">[x]</button>
           </div>
