@@ -75,6 +75,24 @@ section[hidden] { display: none; }
 .todo-worklog-row > .num:last-child { text-align: right; }
 .todo-worklog-row .markdown-preview { margin-top: var(--xs); }
 
+/* 每筆工作紀錄也採上下排列：日期時間、內容、工時依序閱讀 */
+.todo-worklog-row {
+  display: block;
+}
+.todo-worklog-row > .num:first-child {
+  display: block;
+  width: auto;
+}
+.todo-worklog-row > .grow {
+  display: block;
+  margin-top: 6px;
+}
+.todo-worklog-row > .num:last-child {
+  display: block;
+  margin-top: 6px;
+  text-align: left;
+}
+
 /* 星期選擇器 */
 .dow { display: flex; align-items: center; gap: var(--xs); flex-wrap: wrap; }
 .dow button[data-dow] {
