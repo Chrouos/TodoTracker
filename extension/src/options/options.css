@@ -62,8 +62,17 @@ section[hidden] { display: none; }
 .todo-worklog { margin-top: var(--sm); border-left: 2px solid var(--hairline); padding-left: var(--sm); }
 .todo-worklog summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
 .todo-worklog-list { margin-top: var(--xs); }
-.todo-worklog-row { display: flex; align-items: flex-start; gap: var(--sm); padding: var(--xs) 0; border-top: 1px solid var(--hairline); font-size: 12px; }
-.todo-worklog-row .num:first-child { width: 112px; flex: 0 0 112px; }
+.todo-worklog-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 70px;
+  align-items: start;
+  gap: var(--sm);
+  padding: var(--xs) 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 12px;
+}
+.todo-worklog-row > .grow { min-width: 0; overflow-wrap: anywhere; }
+.todo-worklog-row > .num:last-child { text-align: right; }
 .todo-worklog-row .markdown-preview { margin-top: var(--xs); }
 
 /* 星期選擇器 */
@@ -280,6 +289,7 @@ dialog .field { margin-bottom: var(--md); }
   .bar-label { width: 110px; flex: 0 0 110px; }
   #p-report { display: block; }
   #p-report > .report-panel-wide { margin-top: 0; }
+  .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
 }
 .markdown-preview {
   --markdown-preview-collapsed-height: 180px;
