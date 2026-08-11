@@ -157,6 +157,36 @@ section[hidden] { display: none; }
 #todoList .todo-card.done { opacity: .68; background: var(--canvas-alt, #fafafa); }
 #todoList .todo-card.done:hover { opacity: 1; }
 
+/* Todo 內容採上下流式，避免長筆記被右側欄位壓縮 */
+#todoList .todo-card {
+  grid-template-columns: 34px 8px minmax(0, 1fr);
+  align-items: start;
+}
+#todoList .todo-card > .main { grid-column: 3; grid-row: 1; }
+#todoList .todo-card > .num:not(.sub) {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: start;
+  min-width: 0;
+  margin-top: 8px;
+  text-align: left;
+  color: var(--text-ink);
+}
+#todoList .todo-card > .num:not(.sub)::before {
+  content: '總工時 ';
+  margin-right: 4px;
+  color: var(--text-mute);
+  font-size: 11px;
+  font-weight: 400;
+}
+#todoList .todo-card > .act {
+  grid-column: 3;
+  grid-row: 3;
+  justify-content: flex-start;
+  margin-top: 8px;
+  opacity: 1;
+}
+
 @media (max-width: 760px) {
   #todoList .todo-card { grid-template-columns: 34px 8px minmax(0, 1fr); }
   #todoList .todo-card > .num:not(.sub) { grid-column: 3; text-align: left; margin-top: 4px; }
