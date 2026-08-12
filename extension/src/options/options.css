@@ -2,7 +2,9 @@
 
 header { margin-bottom: var(--xxl); }
 h1 { font-size: 38px; font-weight: 700; line-height: 1.5; letter-spacing: -1px; }
-h2.sec { font-size: 16px; font-weight: 700; margin: var(--xxl) 0 var(--md); }
+h2.sec { font-size: 16px; font-weight: 700; margin: var(--xxl) 0 var(--lg); }
+h2.sec { display: block; clear: both; }
+#p-report > [data-collapse-body] { display: block; clear: both; margin-bottom: var(--xxl); }
 h2.sec.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: var(--sm); }
 h2.sec.collapsible:hover .mark { color: var(--text-ink); }
 h2.sec.collapsible:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
@@ -42,6 +44,9 @@ section[hidden] { display: none; }
   padding: var(--md) 0; border-bottom: 1px solid var(--hairline); font-size: 13px;
 }
 .row-item .main { flex: 1; min-width: 0; }
+.task-item { position: relative; padding-left: calc(var(--task-depth, 0) * 28px + var(--md)); background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong)); background-size: 2px 100%; background-position: calc(var(--task-depth, 0) * 28px) 0; background-repeat: no-repeat; }
+.task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
+.task-project-heading { margin-top: var(--lg); padding: var(--sm) var(--md); border-left: 4px solid var(--ink); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-mute); }
 .row-item .sub { font-size: 12px; color: var(--text-ash); }
 .row-item .num { font-variant-numeric: tabular-nums; }
 .row-item .notes {

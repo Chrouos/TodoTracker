@@ -1,6 +1,6 @@
 import * as db from '../lib/db.js';
 import { initCollapse } from '../lib/collapse.js';
-import { flattenTree, indentLabel } from '../lib/tree.js';
+import { flattenTree, flattenTaskTree, indentLabel, incompleteTaskChildCount } from '../lib/tree.js';
 import { autoGrow } from '../lib/autogrow.js';
 
 // popup 空間有限，上限拉到 260px，超過才捲
@@ -192,20 +192,29 @@ function renderTodo() {
       .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   ps.value = keep;
 
+  const parent = $('todoParent');
+  const keepParent = parent.value;
+  const selectedProject = ps.value;
+  const scopedTasks = state.tasks.filter((t) => t.status !== 'archived' && (!selectedProject || t.projectId === selectedProject));
+  parent.innerHTML = '<option value="">— 建立主任務 —</option>' +
+    scopedTasks.filter((t) => !t.parentId)
+      .map((t) => `<option value="${t.id}">↳ ${esc(t.title)}</option>`).join('');
+  parent.value = scopedTasks.some((t) => t.id === keepParent) ? keepParent : '';
+
   const filter = ps.value;
-  const list = state.tasks
-    .filter((t) => t.status !== 'archived' && (!filter || t.projectId === filter))
-    .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
+  const list = flattenTaskTree(scopedTasks);
 
   $('todoList').innerHTML = list.length
     ? list.map((t) => {
         const p = state.projects.find((x) => x.id === t.projectId);
         const done = t.status === 'done';
+        const childCount = incompleteTaskChildCount(state.tasks, t.id);
         return `<div class="item ${done ? 'done' : ''}">
           <button class="check" data-check="${t.id}">${done ? '[x]' : '[ ]'}</button>
-          <div class="main">
+          <div class="main" style="padding-left:${Math.min(t.depth, 2) * 16}px">
             <div class="t1">${esc(t.title)}</div>
-            <div class="t2">${p ? esc(p.name) : '未分類'}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
+            <button class="btn-ghost btn-sm act" data-add-child="${t.id}" title="新增子任務">[+ 子任務]</button>
+            <div class="t2">${p ? esc(p.name) : '未分類'}${t.dueDate ? ' · ' + t.dueDate : ''}${childCount ? ` · ${childCount} 個子任務未完成` : ''}</div>
           </div>
           ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="對這個 todo 計時">[&gt;]</button>`}
           <button class="btn-ghost btn-sm act" data-del-task="${t.id}" title="刪除">[-]</button>
@@ -327,7 +336,13 @@ $('logText').addEventListener('keydown', (ev) => {
 /* Todo 分頁 */
 $('newTodo').addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter' || !e.target.value.trim()) return;
-  await db.upsertTask({ title: e.target.value, projectId: $('todoProject').value || null });
+  const parentId = $('todoParent').value || null;
+  const parent = state.tasks.find((t) => t.id === parentId);
+  await db.upsertTask({
+    title: e.target.value,
+    projectId: $('todoProject').value || parent?.projectId || null,
+    parentId,
+  });
   e.target.value = '';
   await load();
 });
@@ -336,15 +351,26 @@ $('todoProject').addEventListener('change', renderTodo);
 $('todoList').addEventListener('click', async (e) => {
   const check = e.target.closest('[data-check]')?.dataset.check;
   const startId = e.target.closest('[data-start-task]')?.dataset.startTask;
+  const addChild = e.target.closest('[data-add-child]')?.dataset.addChild;
   const delId = e.target.closest('[data-del-task]')?.dataset.delTask;
 
   if (check) {
     const t = state.tasks.find((x) => x.id === check);
+    const childCount = incompleteTaskChildCount(state.tasks, t.id);
+    if (t.status !== 'done' && childCount && !confirm(`這個主任務還有 ${childCount} 個未完成子任務，仍要完成嗎？`)) return;
     await db.upsertTask({ ...t, status: t.status === 'done' ? 'todo' : 'done' });
   } else if (startId) {
     const t = state.tasks.find((x) => x.id === startId);
     await db.startTimer({ projectId: t.projectId, taskId: t.id, description: t.title });
     switchTab('track');
+  } else if (addChild) {
+    const parent = state.tasks.find((t) => t.id === addChild);
+    if (!parent) return;
+    $('todoProject').value = parent.projectId || '';
+    renderTodo();
+    $('todoParent').value = parent.id;
+    $('newTodo').focus();
+    return;
   } else if (delId) {
     await db.deleteTask(delId);
   } else return;

@@ -73,6 +73,57 @@ export function indentLabel(name, depth) {
  * @param {Map<string, number>} ownSec  projectId -> 直接記在該專案的秒數
  * @returns {Map<string, {own:number, total:number}>}
  */
+/** Todo hierarchy helpers. */
+export function taskChildrenOf(tasks, parentId = null) {
+  return tasks
+    .filter((task) => (task.parentId || null) === parentId)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.title.localeCompare(b.title));
+}
+
+export function flattenTaskTree(tasks, { root = null, maxDepth = Infinity } = {}) {
+  const out = [];
+  const walk = (parentId, depth) => {
+    for (const task of taskChildrenOf(tasks, parentId)) {
+      out.push({ ...task, depth });
+      if (depth < maxDepth) walk(task.id, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return out;
+}
+
+export function taskDescendantIds(tasks, id) {
+  const set = new Set();
+  const walk = (parentId) => {
+    for (const child of tasks) {
+      if ((child.parentId || null) === parentId && !set.has(child.id)) {
+        set.add(child.id);
+        walk(child.id);
+      }
+    }
+  };
+  walk(id);
+  return set;
+}
+
+export function taskWouldCycle(tasks, id, newParentId) {
+  if (!newParentId) return false;
+  if (newParentId === id) return true;
+  return taskDescendantIds(tasks, id).has(newParentId);
+}
+
+export function incompleteTaskChildCount(tasks, parentId) {
+  return tasks.filter((task) =>
+    (task.parentId || null) === parentId && task.status !== 'done' && task.status !== 'archived'
+  ).length;
+}
+
+/**
+ * ??蝝臬???
+ * @param {Array} projects
+ * @param {Map<string, number>} ownSec  projectId -> ?湔閮閰脣?獢?蝘
+ * @returns {Map<string, {own:number, total:number}>}
+ */
 export function rollup(projects, ownSec) {
   const result = new Map();
   const memo = new Map();

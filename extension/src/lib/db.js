@@ -19,7 +19,7 @@ const K = {
   settings: 'settings',
 };
 
-import { wouldCycle } from './tree.js';
+import { taskWouldCycle, wouldCycle } from './tree.js';
 
 export const uid = () => crypto.randomUUID();
 export const nowISO = () => new Date().toISOString();
@@ -115,6 +115,7 @@ export async function deleteTag(id) {
 
 export async function listTasks({ projectId = null, includeDone = true } = {}) {
   let all = await read(K.tasks, []);
+  all = all.map((t) => ({ ...t, parentId: t.parentId || null }));
   if (projectId) all = all.filter((t) => t.projectId === projectId);
   if (!includeDone) all = all.filter((t) => t.status !== 'done');
   return all.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
@@ -124,13 +125,16 @@ export async function upsertTask(t) {
   const all = await read(K.tasks, []);
   const i = all.findIndex((x) => x.id === t.id);
   const prev = i >= 0 ? all[i] : null;
+  const parent = t.parentId ? all.find((x) => x.id === t.parentId) : null;
+  const parentId = parent ? parent.id : null;
   const status = t.status || 'todo';   // todo | doing | done | archived
   const isDone = status === 'done';
   const wasDone = prev?.status === 'done';
 
   const row = {
     id: t.id || uid(),
-    projectId: t.projectId || null,
+    projectId: parent ? parent.projectId || null : t.projectId || null,
+    parentId,
     title: (t.title || '').trim(),
     notes: t.notes || '',
     status,
@@ -148,13 +152,21 @@ export async function upsertTask(t) {
     createdAt: t.createdAt || prev?.createdAt || nowISO(),
     updatedAt: nowISO(),
   };
+  if (row.parentId && taskWouldCycle(all, row.id, row.parentId)) {
+    throw new Error('Todo 不可掛到自己或自己的子任務底下');
+  }
   if (i >= 0) all[i] = { ...all[i], ...row }; else all.push(row);
   await write(K.tasks, all);
   return row;
 }
 
 export async function deleteTask(id) {
-  await write(K.tasks, (await read(K.tasks, [])).filter((t) => t.id !== id));
+  const all = await read(K.tasks, []);
+  const target = all.find((t) => t.id === id);
+  const grandparent = target?.parentId || null;
+  await write(K.tasks, all
+    .filter((t) => t.id !== id)
+    .map((t) => (t.parentId === id ? { ...t, parentId: grandparent } : t)));
   const entries = await read(K.entries, []);
   await write(K.entries, entries.map((e) => (e.taskId === id ? { ...e, taskId: null } : e)));
 }
@@ -312,7 +324,7 @@ export async function importAll(data) {
   await chrome.storage.local.set({
     [K.projects]: data.projects || [],
     [K.tags]: data.tags || [],
-    [K.tasks]: data.tasks || [],
+    [K.tasks]: (data.tasks || []).map((t) => ({ ...t, parentId: t.parentId || null })),
     [K.entries]: data.entries || [],
     [K.settings]: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   });

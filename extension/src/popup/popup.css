@@ -70,7 +70,7 @@ main { padding: var(--md) var(--lg) var(--lg); }
 main[hidden] { display: none; }
 
 .fields { display: flex; flex-direction: column; gap: var(--sm); }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sm); }
+.two { display: grid; grid-template-columns: 1fr; gap: var(--sm); }
 
 .tagrow { display: flex; flex-wrap: wrap; gap: var(--xs); }
 .tagchip {

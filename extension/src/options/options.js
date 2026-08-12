@@ -5,7 +5,7 @@ import {
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
-import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
+import { childrenOf, flattenTree, taskDescendantIds, rollup, pathOf, indentLabel, incompleteTaskChildCount } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
@@ -39,7 +39,8 @@ function measureMarkdownPreview(preview, preserveExpanded = false) {
   const collapsedHeight = Number.parseFloat(
     getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
   );
-  const isLong = content.scrollHeight > collapsedHeight + 24;
+  const hasEnoughText = content.textContent.trim().length > 120;
+  const isLong = hasEnoughText && content.scrollHeight > collapsedHeight + 24;
 
   preview.classList.toggle('is-collapsible', isLong);
   setMarkdownPreviewExpanded(preview, preserveExpanded && wasExpanded && isLong);
@@ -367,6 +368,15 @@ function renderTodos() {
   $('tdProject').innerHTML = opts('— 未分類 —');
   $('tdProject').value = keepP;
 
+  const editingId = $('tdId').value;
+  const keepParent = $('tdParent').value;
+  const projectTasks = S.tasks.filter((t) => t.status !== 'archived' && (!keepP || t.projectId === keepP));
+  const excluded = editingId ? new Set([editingId, ...taskDescendantIds(S.tasks, editingId)]) : new Set();
+  $('tdParent').innerHTML = '<option value="">— 主任務 —</option>' +
+    projectTasks.filter((t) => !t.parentId && !excluded.has(t.id))
+      .map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
+  $('tdParent').value = projectTasks.some((t) => t.id === keepParent && !excluded.has(t.id)) ? keepParent : '';
+
   const keepF = $('tdFilter').value;
   $('tdFilter').innerHTML = opts('— 全部專案 —');
   $('tdFilter').value = keepF;
@@ -388,10 +398,14 @@ function renderTodos() {
   const open = list.filter((t) => t.status !== 'done').length;
   $('tdCount').textContent = `${open} 個未完成 / 共 ${list.length}`;
 
+  const orderedTasks = flattenTaskTree(list);
   $('todoList').innerHTML = list.length
-    ? list.map((t) => {
+    ? orderedTasks.map((t, index) => {
         const p = S.projects.find((x) => x.id === t.projectId);
+        const previous = orderedTasks[index - 1];
+        const showProject = (t.projectId || null) !== (previous?.projectId || null);
         const done = t.status === 'done';
+        const childCount = incompleteTaskChildCount(S.tasks, t.id);
         const m = taskMetrics(t, S.entries);
         const dl = dueLabel(m, done);
 
@@ -402,12 +416,14 @@ function renderTodos() {
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
-        return `<div class="row-item${done ? ' done' : ''}">
+        return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>` : ''}
+        <div class="row-item task-item${done ? ' done' : ''}" style="--task-depth:${t.depth}">
+          ${t.depth ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
           <button class="btn-sm btn-ghost" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
-            <div class="ellipsis">${esc(t.title)}
+            <div class="ellipsis">${esc(t.title)}${childCount ? ` <span class="badge">${childCount} 個子任務未完成</span>` : ''}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
               ${m.leadMs !== null ? `<span class="badge">歷時 ${leadLabel(m.leadMs)}</span>` : ''}
@@ -421,6 +437,7 @@ function renderTodos() {
           <div class="act">
             ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="對這個 todo 開始計時">[&gt;]</button>`}
             <button class="btn-sm" data-edit-t="${t.id}">[編輯]</button>
+            <button class="btn-sm" data-add-child="${t.id}" title="新增子任務">[+ 子任務]</button>
             <button class="btn-sm btn-danger" data-del-t="${t.id}">[x]</button>
           </div>
         </div>`;
@@ -431,6 +448,7 @@ function renderTodos() {
 
 function resetTodoForm() {
   $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
+  $('tdParent').value = '';
   $('tdStatus').value = 'todo'; $('tdDue').value = '';
   $('tdOpened').value = '建立後自動記錄';
   $('tdDone').value = '—';
@@ -447,6 +465,7 @@ $('todoForm').addEventListener('submit', async (e) => {
     id: $('tdId').value || undefined,
     title: $('tdTitle').value,
     projectId: $('tdProject').value || null,
+    parentId: $('tdParent').value || null,
     status: $('tdStatus').value,
     dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
     notes: $('tdNotes').value,
@@ -465,9 +484,12 @@ $('todoList').addEventListener('click', async (e) => {
   const run = e.target.closest('[data-run]')?.dataset.run;
   const ed = e.target.closest('[data-edit-t]')?.dataset.editT;
   const del = e.target.closest('[data-del-t]')?.dataset.delT;
+  const addChild = e.target.closest('[data-add-child]')?.dataset.addChild;
 
   if (check) {
     const t = S.tasks.find((x) => x.id === check);
+    const childCount = incompleteTaskChildCount(S.tasks, t.id);
+    if (t.status !== 'done' && childCount && !confirm(`這個主任務還有 ${childCount} 個未完成子任務，仍要完成嗎？`)) return;
     await db.upsertTask({ ...t, status: t.status === 'done' ? 'todo' : 'done' });
   } else if (run) {
     const t = S.tasks.find((x) => x.id === run);
@@ -476,6 +498,7 @@ $('todoList').addEventListener('click', async (e) => {
     const t = S.tasks.find((x) => x.id === ed);
     $('tdId').value = t.id; $('tdTitle').value = t.title;
     $('tdProject').value = t.projectId || '';
+    $('tdParent').value = t.parentId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
     $('tdDue').value = t.dueDate || '';
     $('tdOpened').value = stampLabel(t.openedAt);
@@ -484,6 +507,14 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdWorked').value = m.worked ? fmtHM(m.worked) : '—';
     $('tdCancel').hidden = false; $('tdTitle').focus();
     $('tdNotes').dispatchEvent(new Event('input')); // 讓備註重算高度
+    return;
+  } else if (addChild) {
+    const parent = S.tasks.find((x) => x.id === addChild);
+    if (!parent) return;
+    resetTodoForm();
+    $('tdProject').value = parent.projectId || '';
+    $('tdParent').value = parent.id;
+    $('tdTitle').focus();
     return;
   } else if (del) {
     if (!confirm('刪除這個 todo？綁在它上面的時間紀錄會保留，只是解除關聯。')) return;
