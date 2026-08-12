@@ -74,6 +74,10 @@ export function activeRange(range, customOpen) {
   return customOpen ? 'custom' : range;
 }
 
+export function rangeControlState(customOpen) {
+  return { quick: !customOpen, custom: customOpen, back: customOpen };
+}
+
 export function currentWeekDateRange(d = new Date()) {
   const from = startOfWeek(d, 1);
   const to = new Date(from);

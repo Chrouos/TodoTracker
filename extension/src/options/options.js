@@ -1,6 +1,6 @@
 import * as db from '../lib/db.js';
 import {
-  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, currentWeekDateRange, dailySeries,
+  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
   timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
@@ -109,24 +109,23 @@ const inRange = () => {
 };
 
 function syncRangeControls() {
-  const customActive = range === 'custom' || enUI.range === 'custom';
-  const customMode = customRangeOpen || customActive;
-  $('reportCustomRange').hidden = !customMode;
-  $('entriesCustomRange').hidden = !customMode;
+  const controls = rangeControlState(customRangeOpen);
+  $('reportCustomRange').hidden = !controls.custom;
+  $('entriesCustomRange').hidden = !controls.custom;
   $('reportRangeFrom').value = customRange.from;
   $('reportRangeTo').value = customRange.to;
   $('entriesRangeFrom').value = customRange.from;
   $('entriesRangeTo').value = customRange.to;
-  const reportActiveRange = activeRange(range, customMode);
-  const entriesActiveRange = activeRange(enUI.range, customMode);
+  const reportActiveRange = activeRange(range, customRangeOpen);
+  const entriesActiveRange = activeRange(enUI.range, customRangeOpen);
   document.querySelectorAll('#range .range-quick, #range .range-custom').forEach((button) => {
-    button.hidden = customMode;
+    button.hidden = !controls.quick;
   });
   document.querySelectorAll('#enRange .range-quick, #enRange .range-custom').forEach((button) => {
-    button.hidden = customMode;
+    button.hidden = !controls.quick;
   });
-  document.querySelector('#range .range-back').hidden = !customMode;
-  document.querySelector('#enRange .range-back').hidden = !customMode;
+  document.querySelector('#range .range-back').hidden = !controls.back;
+  document.querySelector('#enRange .range-back').hidden = !controls.back;
   document.querySelectorAll('#range .seg-btn').forEach((button) =>
     button.classList.toggle('active', button.dataset.range === reportActiveRange));
   document.querySelectorAll('#enRange .seg-btn').forEach((button) =>

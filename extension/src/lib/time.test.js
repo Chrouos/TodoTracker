@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeRange, currentWeekDateRange, localDateRange } from './time.js';
+import { activeRange, currentWeekDateRange, localDateRange, rangeControlState } from './time.js';
+
+test('rangeControlState switches between quick ranges and custom controls', () => {
+  assert.deepEqual(rangeControlState(false), { quick: true, custom: false, back: false });
+  assert.deepEqual(rangeControlState(true), { quick: false, custom: true, back: true });
+});
 
 test('activeRange highlights custom while custom controls are open', () => {
   assert.equal(activeRange('all', true), 'custom');
