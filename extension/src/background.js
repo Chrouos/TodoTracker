@@ -11,6 +11,33 @@ import { getTimer, patchTimer, getSettings } from './lib/db.js';
 import { fmtBadge } from './lib/time.js';
 
 const ALARM_TICK = 'tt-tick';
+const ALARM_REMINDER_PREFIX = 'tt-reminder:';
+
+async function syncTodoReminders() {
+  const alarms = await chrome.alarms.getAll();
+  await Promise.all(alarms
+    .filter((a) => a.name.startsWith(ALARM_REMINDER_PREFIX))
+    .map((a) => chrome.alarms.clear(a.name)));
+  const tasks = await db.listTasks();
+  const now = Date.now();
+  await Promise.all(tasks
+    .filter((t) => t.status !== 'done' && t.status !== 'archived' && t.reminderAt)
+    .filter((t) => new Date(t.reminderAt).getTime() > now)
+    .map((t) => chrome.alarms.create(`${ALARM_REMINDER_PREFIX}${t.id}`, {
+      when: new Date(t.reminderAt).getTime(),
+    })));
+}
+
+async function notifyTodoReminder(taskId) {
+  const task = (await db.listTasks()).find((t) => t.id === taskId);
+  if (!task || task.status === 'done' || task.status === 'archived') return;
+  await chrome.notifications.create(`tt-notification:${task.id}`, {
+    type: 'basic',
+    title: 'TodoTracker 提醒',
+    message: task.title || '有一個 Todo 到提醒時間了',
+    priority: 2,
+  });
+}
 
 async function refreshBadge() {
   const t = await getTimer();
@@ -45,17 +72,25 @@ chrome.runtime.onInstalled.addListener(async () => {
   const s = await getSettings();
   chrome.idle.setDetectionInterval(Math.max(15, s.idleThresholdMin * 60));
   await sync();
+  await syncTodoReminders();
 });
 
-chrome.runtime.onStartup.addListener(sync);
+chrome.runtime.onStartup.addListener(async () => {
+  await sync();
+  await syncTodoReminders();
+});
 
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === ALARM_TICK) refreshBadge();
+  if (a.name.startsWith(ALARM_REMINDER_PREFIX)) notifyTodoReminder(a.name.slice(ALARM_REMINDER_PREFIX.length));
 });
+
+chrome.notifications.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
 // popup / options 改了 timer 就重新同步 badge 與 alarm
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && 'timer' in changes) sync();
+  if (area === 'local' && 'tasks' in changes) syncTodoReminders();
   if (area === 'local' && 'settings' in changes) {
     const s = changes.settings.newValue;
     if (s?.idleThresholdMin) {

@@ -8,6 +8,8 @@ import AutoTextarea from '@/components/AutoTextarea';
 import { fmtHM } from '@/lib/time';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '@/lib/tasks';
 import { flattenTree, indentLabel, descendantIds, pathOf } from '@/lib/tree';
+import { descendantTaskIds, flattenTaskTree } from '@/lib/task-tree';
+import { Fragment, type CSSProperties } from 'react';
 import type { Task, TaskStatus } from '@/lib/types';
 import AttachmentPicker from '@/components/AttachmentPicker';
 import ShareControls from '@/components/ShareControls';
@@ -15,7 +17,7 @@ import { FEATURES } from '@/lib/features';
 import MarkdownPreview from '@/components/MarkdownPreview';
 
 const blank = () => ({
-  id: '', title: '', projectId: '', status: 'todo' as TaskStatus,
+  id: '', title: '', projectId: '', parentTaskId: '', status: 'todo' as TaskStatus,
   dueDate: '', notes: '',
 });
 
@@ -29,6 +31,7 @@ export default function TodosPage() {
   if (status === 'disconnected') return <Disconnected />;
 
   const tree = flattenTree(projects);
+  const taskTree = flattenTaskTree(tasks.filter((t) => t.status !== 'archived'));
 
   // 選了父專案時，子專案的 todo 也一起列出來
   const scope = filter ? new Set([filter, ...descendantIds(projects, filter)]) : null;
@@ -51,6 +54,7 @@ export default function TodosPage() {
       id: form.id || undefined,
       title: form.title,
       projectId: form.projectId || null,
+      parentTaskId: form.parentTaskId || null,
       status: form.status,
       dueDate: form.dueDate || null,   // 開單／結案時間由 db.js 自己維護
       notes: form.notes,
@@ -59,7 +63,7 @@ export default function TodosPage() {
   };
 
   const edit = (t: Task) => setForm({
-    id: t.id, title: t.title, projectId: t.projectId ?? '', status: t.status,
+    id: t.id, title: t.title, projectId: t.projectId ?? '', parentTaskId: t.parentTaskId ?? t.parentId ?? '', status: t.status,
     dueDate: t.dueDate ?? '', notes: t.notes ?? '',
   });
 
@@ -144,13 +148,15 @@ export default function TodosPage() {
       </div>
 
       <Section id="todo-list" title="清單">
-        {list.length ? list.map((t) => {
+        {list.length ? flattenTaskTree(list).map((t) => {
           const p = projects.find((x) => x.id === t.projectId);
           const done = t.status === 'done';
           const m = taskMetrics(t, entries);
           const dl = dueLabel(m, done);
           return (
-            <div className="item" key={t.id}>
+            <div className="item task-item" key={t.id}
+              style={{ '--task-depth': t.depth } as CSSProperties}>
+              {t.depth > 0 && <span className="task-branch" aria-hidden="true">↳</span>}
               <button className="btn-ghost btn-sm" style={{ width: 32 }}
                 title={done ? '重新打開' : '標記完成'}
                 onClick={() => act('upsertTask', { ...t, status: done ? 'todo' : 'done' })}>

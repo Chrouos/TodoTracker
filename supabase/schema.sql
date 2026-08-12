@@ -113,6 +113,7 @@ create table tasks (
   id          uuid primary key default gen_random_uuid(),
   team_id     uuid not null references teams(id) on delete cascade,
   project_id  uuid references projects(id) on delete set null,
+  parent_task_id uuid references tasks(id) on delete set null,
   title       text not null,
   notes       text,
   status      task_status not null default 'todo',
@@ -121,6 +122,7 @@ create table tasks (
   opened_at     timestamptz not null default now(),
   -- 截止日：唯一可以手改的，只到日期精度
   due_date      date,
+  reminder_at   timestamptz,
   -- 結案時間：按下完成的當下；重新打開時設回 null
   completed_at  timestamptz,
   -- 被重新打開過幾次
