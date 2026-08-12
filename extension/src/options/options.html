@@ -27,11 +27,12 @@
   <section id="p-report">
     <div class="toolbar">
       <div class="seg" id="range">
-        <button class="seg-btn active" data-range="today">今日</button>
-        <button class="seg-btn" data-range="week">本週</button>
-        <button class="seg-btn" data-range="month">本月</button>
-        <button class="seg-btn" data-range="all">全部</button>
-        <button class="seg-btn" data-range="custom">自訂</button>
+        <button class="seg-btn range-quick active" data-range="today">今日</button>
+        <button class="seg-btn range-quick" data-range="week">本週</button>
+        <button class="seg-btn range-quick" data-range="month">本月</button>
+        <button class="seg-btn range-quick" data-range="all">全部</button>
+        <button class="seg-btn range-custom" data-range="custom">自訂</button>
+        <button class="seg-btn range-back" data-range="back" hidden>返回</button>
       </div>
       <div class="custom-range" id="reportCustomRange" hidden>
         <label>開始 <input id="reportRangeFrom" type="date" /></label>
@@ -258,11 +259,12 @@
       <input id="enSearch" placeholder="搜尋描述與工作紀錄…" style="width:260px" />
       <select id="enFilter" style="width:240px"></select>
       <div class="seg" id="enRange">
-        <button class="seg-btn active" data-erange="all">全部</button>
-        <button class="seg-btn" data-erange="month">本月</button>
-        <button class="seg-btn" data-erange="week">本週</button>
-        <button class="seg-btn" data-erange="today">今日</button>
-        <button class="seg-btn" data-erange="custom">自訂</button>
+        <button class="seg-btn range-quick active" data-erange="all">全部</button>
+        <button class="seg-btn range-quick" data-erange="month">本月</button>
+        <button class="seg-btn range-quick" data-erange="week">本週</button>
+        <button class="seg-btn range-quick" data-erange="today">今日</button>
+        <button class="seg-btn range-custom" data-erange="custom">自訂</button>
+        <button class="seg-btn range-back" data-erange="back" hidden>返回</button>
       </div>
       <div class="custom-range" id="entriesCustomRange" hidden>
         <label>開始 <input id="entriesRangeFrom" type="date" /></label>

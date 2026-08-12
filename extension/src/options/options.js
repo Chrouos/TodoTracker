@@ -1,6 +1,6 @@
 import * as db from '../lib/db.js';
 import {
-  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, dailySeries,
+  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, currentWeekDateRange, dailySeries,
   timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
@@ -78,6 +78,7 @@ let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], setting
 let range = 'week';
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;
+const customReturnRange = { report: 'week', entries: 'all' };
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
@@ -109,14 +110,23 @@ const inRange = () => {
 
 function syncRangeControls() {
   const customActive = range === 'custom' || enUI.range === 'custom';
-  $('reportCustomRange').hidden = !customRangeOpen && !customActive;
-  $('entriesCustomRange').hidden = !customRangeOpen && !customActive;
+  const customMode = customRangeOpen || customActive;
+  $('reportCustomRange').hidden = !customMode;
+  $('entriesCustomRange').hidden = !customMode;
   $('reportRangeFrom').value = customRange.from;
   $('reportRangeTo').value = customRange.to;
   $('entriesRangeFrom').value = customRange.from;
   $('entriesRangeTo').value = customRange.to;
-  const reportActiveRange = activeRange(range, customRangeOpen);
-  const entriesActiveRange = activeRange(enUI.range, customRangeOpen);
+  const reportActiveRange = activeRange(range, customMode);
+  const entriesActiveRange = activeRange(enUI.range, customMode);
+  document.querySelectorAll('#range .range-quick, #range .range-custom').forEach((button) => {
+    button.hidden = customMode;
+  });
+  document.querySelectorAll('#enRange .range-quick, #enRange .range-custom').forEach((button) => {
+    button.hidden = customMode;
+  });
+  document.querySelector('#range .range-back').hidden = !customMode;
+  document.querySelector('#enRange .range-back').hidden = !customMode;
   document.querySelectorAll('#range .seg-btn').forEach((button) =>
     button.classList.toggle('active', button.dataset.range === reportActiveRange));
   document.querySelectorAll('#enRange .seg-btn').forEach((button) =>
@@ -124,8 +134,22 @@ function syncRangeControls() {
 }
 
 function openCustomRange() {
+  if (!customRangeOpen) {
+    customReturnRange.report = range === 'custom' ? 'week' : range;
+    customReturnRange.entries = enUI.range === 'custom' ? 'all' : enUI.range;
+  }
+  if (!customRange.from || !customRange.to) Object.assign(customRange, currentWeekDateRange());
   customRangeOpen = true;
   syncRangeControls();
+}
+
+function closeCustomRange() {
+  if (range === 'custom') range = customReturnRange.report;
+  if (enUI.range === 'custom') enUI.range = customReturnRange.entries;
+  customRangeOpen = false;
+  syncRangeControls();
+  renderReport();
+  renderEntries();
 }
 
 function applyCustomRange(source) {
@@ -1084,6 +1108,7 @@ $('enFilter').addEventListener('change', (e) => {
 $('enRange').addEventListener('click', (e) => {
   const r = e.target.dataset.erange;
   if (!r) return;
+  if (r === 'back') { closeCustomRange(); return; }
   if (r === 'custom') { openCustomRange(); return; }
   enUI.range = r; enUI.limit = 50;
   customRangeOpen = false;
@@ -1266,6 +1291,7 @@ $('tabs').addEventListener('click', (e) => {
 $('range').addEventListener('click', (e) => {
   const r = e.target.dataset.range;
   if (!r) return;
+  if (r === 'back') { closeCustomRange(); return; }
   if (r === 'custom') { openCustomRange(); return; }
   range = r;
   customRangeOpen = false;

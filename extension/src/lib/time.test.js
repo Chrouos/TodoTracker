@@ -1,11 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeRange, localDateRange } from './time.js';
+import { activeRange, currentWeekDateRange, localDateRange } from './time.js';
 
 test('activeRange highlights custom while custom controls are open', () => {
   assert.equal(activeRange('all', true), 'custom');
   assert.equal(activeRange('month', true), 'custom');
   assert.equal(activeRange('week', false), 'week');
+});
+
+test('currentWeekDateRange defaults to Monday through Sunday', () => {
+  assert.deepEqual(currentWeekDateRange(new Date(2026, 7, 12)), {
+    from: '2026-08-10',
+    to: '2026-08-16',
+  });
 });
 
 test('localDateRange includes both local calendar dates', () => {

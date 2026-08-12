@@ -74,6 +74,13 @@ export function activeRange(range, customOpen) {
   return customOpen ? 'custom' : range;
 }
 
+export function currentWeekDateRange(d = new Date()) {
+  const from = startOfWeek(d, 1);
+  const to = new Date(from);
+  to.setDate(to.getDate() + 6);
+  return { from: fmtDate(from), to: fmtDate(to) };
+}
+
 /** 連續每日序列（沒紀錄的日子補 0），折線圖才不會斷掉。durationOf 用來取秒數 */
 export function dailySeries(entries, from, to, durationOf) {
   const bucket = new Map();
