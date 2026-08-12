@@ -1,6 +1,6 @@
 import * as db from '../lib/db.js';
 import {
-  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, dailySeries,
+  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, dailySeries,
   timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
@@ -76,6 +76,8 @@ document.addEventListener('click', (event) => {
 
 let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], settings: db.DEFAULT_SETTINGS };
 let range = 'week';
+const customRange = { from: '', to: '' };
+let customRangeOpen = false;
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
@@ -90,12 +92,58 @@ function rangeStart() {
   if (range === 'today') return startOfDay();
   if (range === 'week') return startOfWeek(new Date(), S.settings.weekStartsOn);
   if (range === 'month') return startOfMonth();
+  if (range === 'custom') return localDateRange(customRange.from, customRange.to)?.from || new Date(0);
   return new Date(0);
 }
+function rangeEnd() {
+  if (range === 'custom') return localDateRange(customRange.from, customRange.to)?.to || null;
+  return null;
+}
 const inRange = () => {
-  const from = rangeStart().toISOString();
-  return S.entries.filter((e) => e.endedAt && e.startedAt >= from);
+  const from = rangeStart();
+  const to = rangeEnd();
+  return S.entries
+    .filter((e) => e.endedAt && new Date(e.startedAt) >= from)
+    .filter((e) => !to || new Date(e.startedAt) < to);
 };
+
+function syncRangeControls() {
+  const customActive = range === 'custom' || enUI.range === 'custom';
+  $('reportCustomRange').hidden = !customRangeOpen && !customActive;
+  $('entriesCustomRange').hidden = !customRangeOpen && !customActive;
+  $('reportRangeFrom').value = customRange.from;
+  $('reportRangeTo').value = customRange.to;
+  $('entriesRangeFrom').value = customRange.from;
+  $('entriesRangeTo').value = customRange.to;
+  document.querySelectorAll('#range .seg-btn').forEach((button) =>
+    button.classList.toggle('active', button.dataset.range === range));
+  document.querySelectorAll('#enRange .seg-btn').forEach((button) =>
+    button.classList.toggle('active', button.dataset.erange === enUI.range));
+}
+
+function openCustomRange() {
+  customRangeOpen = true;
+  syncRangeControls();
+}
+
+function applyCustomRange(source) {
+  const prefix = source === 'report' ? 'report' : 'entries';
+  const from = $(`${prefix}RangeFrom`).value;
+  const to = $(`${prefix}RangeTo`).value;
+  if (!localDateRange(from, to)) {
+    alert('請選擇有效的日期區間');
+    return;
+  }
+  customRange.from = from;
+  customRange.to = to;
+  range = 'custom';
+  enUI.range = 'custom';
+  enUI.limit = 50;
+  customRangeOpen = true;
+  syncRangeControls();
+  renderReport();
+  renderEntries();
+}
 
 function renderAll() {
   renderReport(); renderProjects(); renderTodos(); renderSchedules();
@@ -138,29 +186,33 @@ function renderReport() {
 
   // 每日趨勢：區間太短就往前補，才看得出趨勢
   const today = startOfDay();
-  const lineFrom =
-    range === 'today' ? new Date(today.getTime() - 6 * 864e5)
+  const customBounds = range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
+  const lineFrom = customBounds
+    ? customBounds.from
+    : range === 'today' ? new Date(today.getTime() - 6 * 864e5)
       : range === 'week' ? startOfWeek(new Date(), S.settings.weekStartsOn)
         : range === 'month' ? startOfMonth()
           : new Date(today.getTime() - 29 * 864e5);
-  $('lineLabel').textContent =
-    '· ' + (range === 'today' ? '最近 7 天'
+  const lineTo = customBounds ? new Date(customBounds.to.getTime() - 1) : new Date();
+  $('lineLabel').textContent = customBounds
+    ? `· ${customRange.from} ～ ${customRange.to}`
+    : '· ' + (range === 'today' ? '最近 7 天'
       : range === 'week' ? '本週'
         : range === 'month' ? '本月' : '最近 30 天');
 
   const series = dailySeries(
-    S.entries.filter((e) => e.endedAt && new Date(e.startedAt) >= lineFrom),
-    lineFrom, new Date(), db.durationSec,
+    customBounds ? rows : S.entries.filter((e) => e.endedAt && new Date(e.startedAt) >= lineFrom),
+    lineFrom, lineTo, db.durationSec,
   );
   $('byDay').innerHTML = lineSVG(series);
 
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
-  const tlDates = series.map((d) => d.date).slice(-14);
+  const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
   $('timeLabel').textContent = tlDates.length
     ? `· ${tlDates[0]} ～ ${tlDates[tlDates.length - 1]}`
     : '';
   const tl = timelineData(
-    S.entries.filter((e) => e.endedAt && !e.deletedAt),
+    customBounds ? rows : S.entries.filter((e) => e.endedAt && !e.deletedAt),
     tlDates,
   );
   $('timeline').innerHTML = timelineSVG(tl, (e) => {
@@ -931,10 +983,12 @@ const enUI = { q: '', projectId: '', range: 'all', limit: 50, expanded: new Set(
 
 /** 套用搜尋 / 專案 / 區間之後的紀錄，新的在前 */
 function filteredEntries() {
-  const from = enUI.range === 'today' ? startOfDay()
+  const customBounds = enUI.range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
+  const from = customBounds?.from || (enUI.range === 'today' ? startOfDay()
     : enUI.range === 'week' ? startOfWeek(new Date(), S.settings.weekStartsOn)
       : enUI.range === 'month' ? startOfMonth()
-        : null;
+        : null);
+  const to = customBounds?.to || null;
 
   // 選了父專案時，子專案的紀錄也一起算進來
   const scope = enUI.projectId
@@ -946,6 +1000,7 @@ function filteredEntries() {
   return S.entries
     .filter((e) => e.endedAt && !e.deletedAt)
     .filter((e) => !from || new Date(e.startedAt) >= from)
+    .filter((e) => !to || new Date(e.startedAt) < to)
     .filter((e) => !scope || (e.projectId && scope.has(e.projectId)))
     .filter((e) => !kw || `${e.description} ${e.notes || ''}`.toLowerCase().includes(kw))
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
@@ -1027,11 +1082,13 @@ $('enFilter').addEventListener('change', (e) => {
 $('enRange').addEventListener('click', (e) => {
   const r = e.target.dataset.erange;
   if (!r) return;
+  if (r === 'custom') { openCustomRange(); return; }
   enUI.range = r; enUI.limit = 50;
-  $('enRange').querySelectorAll('.seg-btn')
-    .forEach((b) => b.classList.toggle('active', b.dataset.erange === r));
+  customRangeOpen = false;
+  syncRangeControls();
   renderEntries();
 });
+$('entriesApplyRange').addEventListener('click', () => applyCustomRange('entries'));
 $('enExpandAll').addEventListener('click', () => {
   enUI.allOpen = !enUI.allOpen;
   enUI.expanded.clear();
@@ -1207,16 +1264,20 @@ $('tabs').addEventListener('click', (e) => {
 $('range').addEventListener('click', (e) => {
   const r = e.target.dataset.range;
   if (!r) return;
+  if (r === 'custom') { openCustomRange(); return; }
   range = r;
-  document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === r));
+  customRangeOpen = false;
+  syncRangeControls();
   renderReport();
 });
+$('reportApplyRange').addEventListener('click', () => applyCustomRange('report'));
 
 // 進頁預設本週
 range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
 groupReportPanels();
 initCollapse();
+syncRangeControls();
 resetTodoForm();
 resetSchForm();
 load();

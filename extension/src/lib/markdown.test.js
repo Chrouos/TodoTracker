@@ -52,6 +52,20 @@ test('renders a fenced code block after up to three leading spaces', () => {
   );
 });
 
+test('renders markdown tables with aligned cells and inline markdown', () => {
+  assert.equal(
+    markdownToHTML('| Name | Hours | Note |\n| :--- | ---: | :---: |\n| **API** | 2h | `fast` |'),
+    '<table><thead><tr><th style="text-align:left">Name</th><th style="text-align:right">Hours</th><th style="text-align:center">Note</th></tr></thead><tbody><tr><td style="text-align:left"><strong>API</strong></td><td style="text-align:right">2h</td><td style="text-align:center"><code>fast</code></td></tr></tbody></table>',
+  );
+});
+
+test('escapes table cells and pads short rows', () => {
+  assert.equal(
+    markdownToHTML('| A | B |\n| --- | --- |\n| <x> |'),
+    '<table><thead><tr><th style="text-align:left">A</th><th style="text-align:left">B</th></tr></thead><tbody><tr><td style="text-align:left">&lt;x&gt;</td><td style="text-align:left"></td></tr></tbody></table>',
+  );
+});
+
 test('only shows the toggle when the note is textually and visually long', () => {
   assert.equal(shouldShowMarkdownToggle('15:34 等待中', 240, 180), false);
   assert.equal(shouldShowMarkdownToggle('x'.repeat(121), 240, 180), true);

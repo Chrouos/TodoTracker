@@ -237,6 +237,21 @@ section[hidden] { display: none; }
 /* 圖表 */
 .chart-box { border: 1px solid var(--hairline); padding: var(--lg) var(--md); }
 .scroll-x { overflow-x: auto; }
+.custom-range {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm);
+  flex-wrap: wrap;
+}
+.custom-range label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--xs);
+  color: var(--text-mute);
+  font-size: 12px;
+}
+.custom-range input { width: 142px; height: 30px; }
+.custom-range[hidden] { display: none; }
 
 /* 報表：摘要、圖表與明細分成清楚的資訊層級 */
 #p-report { padding-top: 24px; }
@@ -459,6 +474,21 @@ dialog .field { margin-bottom: var(--md); }
 .markdown-preview code { display: inline-block; padding: 1px 5px; border: 1px solid var(--hairline, #ddd); border-radius: 3px; background: var(--surface-card, #f4f4f4); font-family: var(--font-mono, ui-monospace, monospace); font-size: .95em; line-height: 1.4; white-space: pre-wrap; }
 .markdown-preview pre code { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .markdown-preview a { text-decoration: underline; }
+.markdown-preview table {
+  width: max-content;
+  min-width: 100%;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: .95em;
+}
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--hairline-strong, #aaa);
+  padding: 5px 8px;
+  vertical-align: top;
+}
+.markdown-preview th { background: var(--surface-card, #f1eeee); font-weight: 700; }
+.markdown-preview [data-markdown-content] { overflow-x: auto; }
 .row-item .markdown-preview {
   white-space: normal;
   font-family: var(--font, system-ui, sans-serif);

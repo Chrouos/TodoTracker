@@ -53,6 +53,23 @@ export function startOfMonth(d = new Date()) {
   return x;
 }
 
+export function localDateRange(fromDate, toDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate || '') || !/^\d{4}-\d{2}-\d{2}$/.test(toDate || '')) {
+    return null;
+  }
+  const [fromYear, fromMonth, fromDay] = fromDate.split('-').map(Number);
+  const [toYear, toMonth, toDay] = toDate.split('-').map(Number);
+  const from = new Date(fromYear, fromMonth - 1, fromDay);
+  const to = new Date(toYear, toMonth - 1, toDay);
+  if (from.getFullYear() !== fromYear || from.getMonth() !== fromMonth - 1 || from.getDate() !== fromDay
+    || to.getFullYear() !== toYear || to.getMonth() !== toMonth - 1 || to.getDate() !== toDay
+    || from > to) {
+    return null;
+  }
+  to.setDate(to.getDate() + 1);
+  return { from, to };
+}
+
 /** 連續每日序列（沒紀錄的日子補 0），折線圖才不會斷掉。durationOf 用來取秒數 */
 export function dailySeries(entries, from, to, durationOf) {
   const bucket = new Map();

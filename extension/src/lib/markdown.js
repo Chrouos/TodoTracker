@@ -58,6 +58,37 @@ function renderNestedList(lines) {
   return render(root, 'list');
 }
 
+function splitTableRow(line) {
+  const text = line.trim();
+  const inner = text.startsWith('|') ? text.slice(1) : text;
+  const withoutTrailing = inner.endsWith('|') ? inner.slice(0, -1) : inner;
+  return withoutTrailing.split('|').map((cell) => cell.trim());
+}
+
+function tableAlignment(cell) {
+  const value = cell.trim();
+  if (/^:-{3,}:$/.test(value)) return 'center';
+  if (/^-{3,}:$/.test(value)) return 'right';
+  return 'left';
+}
+
+function isTableSeparator(line, columnCount) {
+  if (!line.includes('|')) return false;
+  const cells = splitTableRow(line);
+  return cells.length === columnCount && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function renderTable(lines) {
+  const header = splitTableRow(lines[0]);
+  const separator = splitTableRow(lines[1]);
+  const aligns = separator.map(tableAlignment);
+  const row = (cells, tag) => {
+    const padded = [...cells, ...Array(Math.max(0, header.length - cells.length)).fill('')].slice(0, header.length);
+    return `<tr>${padded.map((cell, index) => `<${tag} style="text-align:${aligns[index]}">${inline(cell)}</${tag}>`).join('')}</tr>`;
+  };
+  return `<table><thead>${row(header, 'th')}</thead><tbody>${lines.slice(2).map((line) => row(splitTableRow(line), 'td')).join('')}</tbody></table>`;
+}
+
 export function markdownToHTML(markdown) {
   const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
   const result = [];
@@ -71,6 +102,15 @@ export function markdownToHTML(markdown) {
     const line = lines[i];
     if (/^ {0,3}```/.test(line)) { if (code) flushCode(); else { flushParagraph(); flushQuote(); code = []; } continue; }
     if (code) { code.push(line); continue; }
+    if (line.includes('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1], splitTableRow(line).length)) {
+      flushParagraph(); flushQuote();
+      const tableLines = [line, lines[i + 1]];
+      i += 2;
+      while (i < lines.length && lines[i].trim() && lines[i].includes('|')) tableLines.push(lines[i++]);
+      i -= 1;
+      result.push(renderTable(tableLines));
+      continue;
+    }
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) { flushParagraph(); flushQuote(); const level = heading[1].length; result.push(`<h${level}>${inline(heading[2])}</h${level}>`); continue; }
     if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {

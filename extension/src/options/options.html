@@ -31,6 +31,13 @@
         <button class="seg-btn" data-range="week">本週</button>
         <button class="seg-btn" data-range="month">本月</button>
         <button class="seg-btn" data-range="all">全部</button>
+        <button class="seg-btn" data-range="custom">自訂</button>
+      </div>
+      <div class="custom-range" id="reportCustomRange" hidden>
+        <label>開始 <input id="reportRangeFrom" type="date" /></label>
+        <span>～</span>
+        <label>結束 <input id="reportRangeTo" type="date" /></label>
+        <button id="reportApplyRange" class="btn-sm" type="button">套用</button>
       </div>
       <div class="grow"></div>
       <button id="exportCsv">↓ CSV</button>
@@ -255,6 +262,13 @@
         <button class="seg-btn" data-erange="month">本月</button>
         <button class="seg-btn" data-erange="week">本週</button>
         <button class="seg-btn" data-erange="today">今日</button>
+        <button class="seg-btn" data-erange="custom">自訂</button>
+      </div>
+      <div class="custom-range" id="entriesCustomRange" hidden>
+        <label>開始 <input id="entriesRangeFrom" type="date" /></label>
+        <span>～</span>
+        <label>結束 <input id="entriesRangeTo" type="date" /></label>
+        <button id="entriesApplyRange" class="btn-sm" type="button">套用</button>
       </div>
       <button id="enExpandAll" title="展開／收合所有工作紀錄">[+] 全部展開</button>
     </div>
