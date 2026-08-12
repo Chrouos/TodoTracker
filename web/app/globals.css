@@ -181,6 +181,7 @@ main.page { padding: var(--xxl) 0 var(--section); }
   background-repeat: no-repeat;
 }
 .task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
+.task-project-heading { margin-top: var(--lg); padding: var(--sm) var(--md); padding-left: calc(var(--project-depth, 0) * 28px + var(--md)); border-left: 4px solid var(--ink); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-mute); }
 .markdown-preview { line-height: 1.7; overflow-wrap: anywhere; }
 .markdown-preview > * + * { margin-top: var(--md); }
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { font-size: 1em; line-height: 1.5; }

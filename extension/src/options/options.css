@@ -45,6 +45,7 @@ section[hidden] { display: none; }
 .row-item .main { flex: 1; min-width: 0; }
 .task-item { position: relative; padding-left: calc(var(--task-depth, 0) * 28px + var(--md)); background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong)); background-size: 2px 100%; background-position: calc(var(--task-depth, 0) * 28px) 0; background-repeat: no-repeat; }
 .task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
+.task-project-heading { margin-top: var(--lg); padding: var(--sm) var(--md); padding-left: calc(var(--project-depth, 0) * 28px + var(--md)); border-left: 4px solid var(--ink); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-mute); }
 .task-parent-field { max-width: 520px; margin-top: var(--md); }
 .row-item .sub { font-size: 12px; color: var(--text-ash); }
 .row-item .num { font-variant-numeric: tabular-nums; }

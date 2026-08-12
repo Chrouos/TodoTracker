@@ -335,13 +335,18 @@ function renderTodos() {
     .filter((t) => (showDone ? true : t.status !== 'done'))
     .filter((t) => (scope ? scope.has(t.projectId) : true))
     ;
+  const orderedList = tree.flatMap((project) =>
+    flattenTasks(list.filter((task) => task.projectId === project.id))
+  ).concat(flattenTasks(list.filter((task) => !task.projectId)));
 
   const open = list.filter((t) => t.status !== 'done').length;
   $('tdCount').textContent = `${open} 個未完成 / 共 ${list.length}`;
 
   $('todoList').innerHTML = list.length
-    ? flattenTasks(list).map((t) => {
+    ? orderedList.map((t, index) => {
         const p = S.projects.find((x) => x.id === t.projectId);
+        const previous = orderedList[index - 1];
+        const showProject = (t.projectId || null) !== (previous?.projectId || null);
         const done = t.status === 'done';
         const m = taskMetrics(t, S.entries);
         const dl = dueLabel(m, done);
@@ -353,7 +358,8 @@ function renderTodos() {
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
-        return `<div class="row-item task-item${done ? ' done' : ''}" style="--task-depth:${t.depth}">
+        return `${showProject ? `<div class="task-project-heading" style="--project-depth:${tree.find((x) => x.id === t.projectId)?.depth || 0}"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '???芸?憿?'}</div>` : ''}
+        <div class="row-item task-item${done ? ' done' : ''}" style="--task-depth:${t.depth}">
           ${t.depth > 0 ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
           <button class="btn-sm btn-ghost" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { Fragment, useState, type CSSProperties } from 'react';
 import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
@@ -41,6 +41,11 @@ export default function TodosPage() {
       Number(a.status === 'done') - Number(b.status === 'done')
       || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999')
       || a.sortOrder - b.sortOrder);
+
+  const projectTree = flattenTree(projects);
+  const orderedList = projectTree.flatMap((project) =>
+    flattenTaskTree(list.filter((task) => task.projectId === project.id))
+  ).concat(flattenTaskTree(list.filter((task) => !task.projectId)));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,13 +163,21 @@ export default function TodosPage() {
       </div>
 
       <Section id="todo-list" title="清單">
-        {list.length ? flattenTaskTree(list).map((t) => {
+        {list.length ? orderedList.map((t, index, visibleTasks) => {
           const p = projects.find((x) => x.id === t.projectId);
+          const previous = visibleTasks[index - 1];
+          const previousProjectId = previous?.projectId ?? null;
+          const showProject = (t.projectId ?? null) !== previousProjectId;
           const done = t.status === 'done';
           const m = taskMetrics(t, entries);
           const dl = dueLabel(m, done);
           return (
-            <div className="item task-item" key={t.id}
+            <Fragment key={t.id}>
+            {showProject && <div className="task-project-heading" style={{ '--project-depth': flattenTree(projects).find((x) => x.id === t.projectId)?.depth ?? 0 } as CSSProperties}>
+              <span className="swatch" style={{ background: p ? p.color : '#9a9898' }} />
+              {p ? pathOf(projects, p.id).join(' / ') : '未分類'}
+            </div>}
+            <div className="item task-item"
               style={{ '--task-depth': t.depth } as CSSProperties}>
               {t.depth > 0 && <span className="task-branch" aria-hidden="true">↳</span>}
               <button className="btn-ghost btn-sm" style={{ width: 32 }}
@@ -206,6 +219,7 @@ export default function TodosPage() {
                 }}>[x]</button>
               </div>
             </div>
+            </Fragment>
           );
         }) : <div className="empty">沒有符合的 todo</div>}
       </Section>
