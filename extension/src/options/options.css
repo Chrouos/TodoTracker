@@ -23,6 +23,8 @@ section[hidden] { display: none; }
 .seg-btn:last-child { border-right: 0; }
 .seg-btn.active { background: var(--ink); color: var(--canvas); }
 .seg-btn.active:hover { background: var(--ink-deep); }
+.seg-btn[hidden],
+.custom-range[hidden] { display: none !important; }
 
 /* KPI：hairline 分隔，零陰影 */
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--hairline); }
@@ -251,7 +253,6 @@ section[hidden] { display: none; }
   font-size: 12px;
 }
 .custom-range input { width: 142px; height: 30px; }
-.custom-range[hidden] { display: none; }
 
 /* 報表：摘要、圖表與明細分成清楚的資訊層級 */
 #p-report { padding-top: 24px; }
