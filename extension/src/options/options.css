@@ -412,6 +412,9 @@ section[hidden] { display: none; }
 .review-calendar-title { margin-top: 3px; font-size: 12px; line-height: 1.45; }
 .review-calendar-duration { margin-top: 4px; color: var(--text-mute); font-size: 11px; }
 .review-calendar-empty { padding-top: 8px; color: var(--text-ash); }
+.review-calendar-time,
+.review-calendar-duration { display: none; }
+.review-calendar-title { margin-top: 0; font-size: 13px; font-weight: 700; }
 
 .todo-health {
   display: grid;

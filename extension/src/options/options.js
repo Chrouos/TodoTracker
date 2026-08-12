@@ -285,7 +285,7 @@ function renderReviewCalendar(groups) {
         const title = entry.description || task?.title || '未命名工作';
         return `<div class="review-calendar-entry" style="--project-color:${safeColor(project?.color)}">
           <div class="review-calendar-time num">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div>
-          <div class="review-calendar-title">${esc(title)}</div>
+          <div class="review-calendar-title">${esc(project?.name || '一般工作')}</div>
           <div class="review-calendar-duration num">${fmtHM(db.durationSec(entry))}</div>
         </div>`;
       }).join('')
@@ -1386,11 +1386,13 @@ $('reportApplyRange').addEventListener('click', () => applyCustomRange('report')
 range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
 document.getElementById('reviewMode').addEventListener('click', (event) => {
+  event.stopPropagation();
   const mode = event.target.dataset.reviewMode;
   if (!mode || event.target.disabled) return;
   reviewMode = mode;
   $('dailyReview').innerHTML = renderDailyReview(reviewGroups);
 });
+document.getElementById('reviewMode').addEventListener('keydown', (event) => event.stopPropagation());
 groupReportPanels();
 initCollapse();
 syncRangeControls();
