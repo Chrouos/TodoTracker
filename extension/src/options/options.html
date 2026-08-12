@@ -81,7 +81,7 @@
   <section id="p-todos" hidden>
     <form id="todoForm" class="card">
       <input type="hidden" id="tdId" />
-      <div class="grid4">
+      <div class="grid4 todo-form-main">
         <label class="field" style="grid-column: span 2"><span>項目</span>
           <input id="tdTitle" required placeholder="要做什麼？" /></label>
         <label class="field"><span>專案</span><select id="tdProject"></select></label>
@@ -97,6 +97,10 @@
         <label class="field"><span>截止日</span>
           <input id="tdDue" type="date" />
           <span class="hint">唯一可以改的日期。</span>
+        </label>
+        <label class="field"><span>提醒時間</span>
+          <input id="tdReminder" type="datetime-local" />
+          <span class="hint">時間到會由 Chrome 發通知</span>
         </label>
         <label class="field"><span>開單時間</span>
           <input id="tdOpened" disabled />

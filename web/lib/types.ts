@@ -24,6 +24,7 @@ export type Task = {
   openedAt: string | null;
   /** 截止日 YYYY-MM-DD，唯一可以手改的日期 */
   dueDate: string | null;
+  reminderAt: string | null;
   /** 結案時間戳，按下完成的當下；重新打開就清掉 */
   completedAt: string | null;
   /** 被重新打開過幾次 */

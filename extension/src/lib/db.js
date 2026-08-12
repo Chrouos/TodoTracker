@@ -138,6 +138,7 @@ export async function upsertTask(t) {
     openedAt: prev?.openedAt || nowISO(),
     // 截止日：唯一可以手改的日期，只到日期精度
     dueDate: t.dueDate || null,
+    reminderAt: t.reminderAt || null,
     // 結案時間：按下完成的當下；重新打開就清掉
     completedAt: isDone ? (prev?.completedAt || nowISO()) : null,
     // 被重新打開過幾次 —— 一直回來的事情值得注意

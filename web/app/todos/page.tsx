@@ -9,10 +9,12 @@ import { fmtHM } from '@/lib/time';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '@/lib/tasks';
 import { flattenTree, indentLabel, descendantIds, pathOf } from '@/lib/tree';
 import type { Task, TaskStatus } from '@/lib/types';
+import MarkdownPreview from '@/components/MarkdownPreview';
 
 const blank = () => ({
   id: '', title: '', projectId: '', status: 'todo' as TaskStatus,
   dueDate: '', notes: '',
+  reminderAt: '',
 });
 
 export default function TodosPage() {
@@ -49,6 +51,7 @@ export default function TodosPage() {
       projectId: form.projectId || null,
       status: form.status,
       dueDate: form.dueDate || null,   // 開單／結案時間由 db.js 自己維護
+      reminderAt: form.reminderAt || null,
       notes: form.notes,
     });
     setForm(blank());
@@ -57,6 +60,7 @@ export default function TodosPage() {
   const edit = (t: Task) => setForm({
     id: t.id, title: t.title, projectId: t.projectId ?? '', status: t.status,
     dueDate: t.dueDate ?? '', notes: t.notes ?? '',
+    reminderAt: t.reminderAt ?? '',
   });
 
   const editing = form.id ? tasks.find((t) => t.id === form.id) : undefined;
@@ -90,11 +94,16 @@ export default function TodosPage() {
           </label>
         </div>
 
-        <div className="grid4" style={{ marginTop: 12 }}>
+        <div className="todo-form-meta" style={{ marginTop: 12 }}>
           <label className="field"><span>截止日</span>
             <input type="date" value={form.dueDate}
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             <span className="hint">唯一可以改的日期。</span>
+          </label>
+          <label className="field"><span>提醒時間</span>
+            <input type="datetime-local" value={form.reminderAt}
+              onChange={(e) => setForm({ ...form, reminderAt: e.target.value })} />
+            <span className="hint">時間到會由 Chrome 發通知</span>
           </label>
           <label className="field"><span>開單時間</span>
             <input disabled value={editing ? stampLabel(editing.openedAt) : '建立後自動記錄'} />
@@ -162,9 +171,9 @@ export default function TodosPage() {
                 </div>
                 <div className="sub">{p ? pathOf(projects, p.id).join(' / ') : '未分類'}</div>
                 <div className="sub num">
-                  開單 {stampLabel(t.openedAt)} · 截止 {t.dueDate ?? '—'} · 結案 {stampLabel(t.completedAt)}
+                  開單 {stampLabel(t.openedAt)} · 截止 {t.dueDate ?? '—'} · 提醒 {t.reminderAt ? new Date(t.reminderAt).toLocaleString() : '—'} · 結案 {stampLabel(t.completedAt)}
                 </div>
-                {t.notes && <div className="notes">{t.notes}</div>}
+                {t.notes && <div className="notes"><MarkdownPreview source={t.notes} /></div>}
               </div>
               <span className="num" title="累積工時">{m.worked ? fmtHM(m.worked) : '—'}</span>
               <div className="act">

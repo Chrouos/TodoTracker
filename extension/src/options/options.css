@@ -33,6 +33,7 @@ section[hidden] { display: none; }
 
 .card { border: 1px solid var(--hairline); padding: var(--lg); margin-bottom: var(--lg); }
 .grid4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--md); }
+.todo-form-main { grid-template-columns: 2fr 1fr 1.5fr 1fr; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
 .actions { display: flex; gap: var(--sm); margin-top: var(--md); flex-wrap: wrap; }
 

@@ -364,6 +364,7 @@ $('todoForm').addEventListener('submit', async (e) => {
     projectId: $('tdProject').value || null,
     status: $('tdStatus').value,
     dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
+    reminderAt: $('tdReminder').value || null,
     notes: $('tdNotes').value,
   });
   resetTodoForm();
@@ -393,6 +394,7 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdProject').value = t.projectId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
     $('tdDue').value = t.dueDate || '';
+    $('tdReminder').value = t.reminderAt ? t.reminderAt.slice(0, 16) : '';
     $('tdOpened').value = stampLabel(t.openedAt);
     $('tdDone').value = stampLabel(t.completedAt);
     const m = taskMetrics(t, S.entries);

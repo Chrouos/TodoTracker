@@ -120,6 +120,7 @@ create table tasks (
   opened_at     timestamptz not null default now(),
   -- 截止日：唯一可以手改的，只到日期精度
   due_date      date,
+  reminder_at   timestamptz,
   -- 結案時間：按下完成的當下；重新打開時設回 null
   completed_at  timestamptz,
   -- 被重新打開過幾次
