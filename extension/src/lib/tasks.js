@@ -16,6 +16,23 @@ export function entriesForTask(task, entries) {
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
+export function todoHealth(tasks, today = fmtDate(new Date().toISOString())) {
+  const current = tasks.filter((task) => task.status !== 'archived');
+  const total = current.length;
+  const done = current.filter((task) => task.status === 'done').length;
+  const active = current.filter((task) => task.status === 'doing').length;
+  const overdue = current.filter((task) =>
+    task.status !== 'done' && task.dueDate && task.dueDate < today).length;
+
+  return {
+    total,
+    done,
+    completionRate: total ? done / total : 0,
+    active,
+    overdue,
+  };
+}
+
 export function taskMetrics(task, entries) {
   const worked = entries
     .filter((e) => e.taskId === task.id && e.endedAt && !e.deletedAt)

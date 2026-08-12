@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entriesForTask } from './tasks.js';
+import { entriesForTask, todoHealth } from './tasks.js';
 
 test('returns completed work records for a todo, newest first', () => {
   const result = entriesForTask(
@@ -14,4 +14,32 @@ test('returns completed work records for a todo, newest first', () => {
   );
 
   assert.deepEqual(result.map((entry) => entry.id), ['new', 'old']);
+});
+
+test('todoHealth counts active, completed, and overdue todos', () => {
+  const result = todoHealth([
+    { status: 'done', dueDate: '2026-08-10' },
+    { status: 'doing', dueDate: '2026-08-12' },
+    { status: 'todo', dueDate: '2026-08-01' },
+    { status: 'todo', dueDate: '2026-08-20' },
+    { status: 'archived', dueDate: '2026-08-01' },
+  ], '2026-08-12');
+
+  assert.deepEqual(result, {
+    total: 4,
+    done: 1,
+    completionRate: 0.25,
+    active: 1,
+    overdue: 1,
+  });
+});
+
+test('todoHealth handles empty todos without division by zero', () => {
+  assert.deepEqual(todoHealth([], '2026-08-12'), {
+    total: 0,
+    done: 0,
+    completionRate: 0,
+    active: 0,
+    overdue: 0,
+  });
 });
