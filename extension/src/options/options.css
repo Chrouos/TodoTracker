@@ -290,10 +290,15 @@ section[hidden] { display: none; }
 #p-report > #byDay { width: 100%; box-sizing: border-box; }
 
 #p-report > .report-panel { min-width: 0; }
+#p-report > .report-panel-health { grid-column: 1 / -1; }
 #p-report > .report-panel-donut { grid-column: 1; }
 #p-report > .report-panel-time { grid-column: 2; }
 #p-report > .report-panel-wide { grid-column: 1 / -1; margin-top: 16px; }
-#p-report > .report-panel > h2.sec { margin: 0 0 10px; }
+#p-report > .report-panel > h2.sec {
+  margin: 0 0 14px;
+  padding: 6px 2px 8px;
+  line-height: 1.45;
+}
 #p-report > .report-panel > #byProject,
 #p-report > .report-panel > #timeline,
 #p-report > .report-panel > #byDay {
@@ -305,6 +310,39 @@ section[hidden] { display: none; }
 #p-report > .report-panel > #byProject .chart-split { border: 0; padding: 22px 24px; }
 #p-report > .report-panel > #timeline,
 #p-report > .report-panel > #byDay { padding: 18px 20px; }
+
+.todo-health {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--canvas, #fff);
+  box-shadow: 0 3px 12px rgba(24, 24, 24, .035);
+  overflow: hidden;
+}
+.todo-health-item {
+  min-height: 88px;
+  padding: 16px 18px;
+  border-right: 1px solid var(--hairline);
+}
+.todo-health-item:last-child { border-right: 0; }
+.todo-health-item .cap { display: block; line-height: 1.5; }
+.todo-health-item .num {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.todo-health-item small {
+  color: var(--text-mute);
+  font-size: 12px;
+  font-weight: 500;
+}
+.todo-health-complete .num small { color: var(--success); }
+.todo-health-overdue .num { color: var(--danger); }
 
 .chart-split {
   display: flex; align-items: center; gap: var(--xxl);
@@ -360,6 +398,11 @@ dialog .field { margin-bottom: var(--md); }
   .bar-label { width: 110px; flex: 0 0 110px; }
   #p-report { display: block; }
   #p-report > .report-panel-wide { margin-top: 0; }
+  .todo-health { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .todo-health-item:nth-child(2) { border-right: 0; }
+  .todo-health-item:nth-child(-n + 2) { border-bottom: 1px solid var(--hairline); }
+  .todo-health-item:nth-child(3) { border-right: 1px solid var(--hairline); }
+  .todo-health-item:nth-child(4) { border-right: 0; }
   .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
 }
 .markdown-preview {

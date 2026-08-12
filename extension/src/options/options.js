@@ -8,7 +8,7 @@ import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
-import { taskMetrics, entriesForTask, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
@@ -106,6 +106,7 @@ function groupReportPanels() {
   const report = $('p-report');
   if (report.querySelector('.report-panel')) return;
   [
+    ['rep-health', 'todoHealth', 'report-panel-health'],
     ['rep-donut', 'byProject', 'report-panel-donut'],
     ['rep-time', 'timeline', 'report-panel-time'],
     ['rep-line', 'byDay', 'report-panel-wide'],
@@ -130,6 +131,7 @@ function renderReport() {
   $('kCount').textContent = rows.length;
   $('kAvg').textContent = rows.length ? fmtHM(sec / rows.length) : '—';
   $('kDays').textContent = dayKeys.size;
+  renderTodoHealth();
 
   // 專案分配：甜甜圈 + 圖例，時數向上累加，可以往下鑽
   renderDonut(rows);
@@ -168,6 +170,30 @@ function renderReport() {
       label: e.description || (p ? p.name : '未分類'),
     };
   });
+}
+
+function renderTodoHealth() {
+  const health = todoHealth(S.tasks);
+  const completionRate = health.total ? `${Math.round(health.completionRate * 100)}%` : '—';
+
+  $('todoHealth').innerHTML = `<div class="todo-health">
+    <div class="todo-health-item">
+      <span class="cap">Todo 總數</span>
+      <span class="num">${health.total}</span>
+    </div>
+    <div class="todo-health-item todo-health-complete">
+      <span class="cap">已完成</span>
+      <span class="num">${health.done}<small>${completionRate}</small></span>
+    </div>
+    <div class="todo-health-item">
+      <span class="cap">進行中</span>
+      <span class="num">${health.active}</span>
+    </div>
+    <div class="todo-health-item todo-health-overdue">
+      <span class="cap">逾期未完成</span>
+      <span class="num">${health.overdue}</span>
+    </div>
+  </div>`;
 }
 
 /* ---------------- 甜甜圈（可鑽取） ---------------- */
