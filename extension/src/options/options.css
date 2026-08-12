@@ -43,6 +43,9 @@ section[hidden] { display: none; }
   padding: var(--md) 0; border-bottom: 1px solid var(--hairline); font-size: 13px;
 }
 .row-item .main { flex: 1; min-width: 0; }
+.task-item { position: relative; padding-left: calc(var(--task-depth, 0) * 28px + var(--md)); background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong)); background-size: 2px 100%; background-position: calc(var(--task-depth, 0) * 28px) 0; background-repeat: no-repeat; }
+.task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
+.task-parent-field { max-width: 520px; margin-top: var(--md); }
 .row-item .sub { font-size: 12px; color: var(--text-ash); }
 .row-item .num { font-variant-numeric: tabular-nums; }
 .row-item .notes {

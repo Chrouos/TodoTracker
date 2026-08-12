@@ -17,6 +17,7 @@ export type TaskStatus = 'todo' | 'doing' | 'done' | 'archived';
 export type Task = {
   id: string;
   projectId: string | null;
+  parentTaskId: string | null;
   title: string;
   notes: string;
   status: TaskStatus;

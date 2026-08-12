@@ -130,6 +130,7 @@ export async function upsertTask(t) {
   const row = {
     id: t.id || uid(),
     projectId: t.projectId || null,
+    parentTaskId: t.parentTaskId || null,
     title: (t.title || '').trim(),
     notes: t.notes || '',
     status,

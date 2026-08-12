@@ -172,6 +172,15 @@ main.page { padding: var(--xxl) 0 var(--section); }
   border-left: 2px solid var(--hairline);
   font-size: 12px; color: var(--text-body);
 }
+.task-item {
+  position: relative;
+  padding-left: calc(var(--task-depth, 0) * 28px + var(--md));
+  background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong));
+  background-size: 2px 100%;
+  background-position: calc(var(--task-depth, 0) * 28px) 0;
+  background-repeat: no-repeat;
+}
+.task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
 .markdown-preview { line-height: 1.7; overflow-wrap: anywhere; }
 .markdown-preview > * + * { margin-top: var(--md); }
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { font-size: 1em; line-height: 1.5; }
@@ -227,6 +236,7 @@ main.page { padding: var(--xxl) 0 var(--section); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
 .grid4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--md); }
 .todo-form-meta { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--md); }
+.task-parent-field { max-width: 520px; }
 .actions { display: flex; gap: var(--sm); margin-top: var(--md); flex-wrap: wrap; }
 
 .seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: var(--r); overflow: hidden; }

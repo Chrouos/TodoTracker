@@ -274,8 +274,39 @@ $('projList').addEventListener('click', async (e) => {
 
 let showDone = false;
 
+function taskDescendants(id) {
+  const out = new Set();
+  const visit = (parentId) => S.tasks.forEach((task) => {
+    if (task.parentTaskId === parentId && !out.has(task.id)) { out.add(task.id); visit(task.id); }
+  });
+  visit(id);
+  return out;
+}
+
+function flattenTasks(tasks) {
+  const byParent = new Map();
+  tasks.forEach((task) => {
+    const key = task.parentTaskId || null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(task);
+  });
+  const sort = (a, b) => Number(a.status === 'done') - Number(b.status === 'done')
+    || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || a.sortOrder - b.sortOrder;
+  const out = [];
+  const visit = (parentId, depth, seen = new Set()) => {
+    for (const task of (byParent.get(parentId) || []).sort(sort)) {
+      if (seen.has(task.id)) continue;
+      out.push({ ...task, depth });
+      visit(task.id, depth + 1, new Set(seen).add(task.id));
+    }
+  };
+  visit(null, 0);
+  return out.concat(tasks.filter((task) => !out.some((x) => x.id === task.id)).map((task) => ({ ...task, depth: 0 })));
+}
+
 function renderTodos() {
   const tree = flattenTree(S.projects);
+  const taskTree = flattenTasks(S.tasks.filter((t) => t.status !== 'archived'));
   const opts = (blank) => `<option value="">${blank}</option>` +
     tree.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
 
@@ -287,6 +318,13 @@ function renderTodos() {
   $('tdFilter').innerHTML = opts('— 全部專案 —');
   $('tdFilter').value = keepF;
 
+  const keepParent = $('tdParentTask').value;
+  const editingTaskId = $('tdId').value;
+  $('tdParentTask').innerHTML = '<option value="">— 最上層任務 —</option>' +
+    taskTree.filter((t) => t.id !== editingTaskId && !taskDescendants(editingTaskId).has(t.id))
+      .map((t) => `<option value="${t.id}">${esc('　'.repeat(t.depth) + t.title)}</option>`).join('');
+  $('tdParentTask').value = keepParent;
+
   $('tdToggleDone').textContent = showDone ? '[x] 顯示已完成' : '[ ] 顯示已完成';
 
   // 選了父專案時，子專案的 todo 也一起列出來
@@ -296,16 +334,13 @@ function renderTodos() {
     .filter((t) => t.status !== 'archived')
     .filter((t) => (showDone ? true : t.status !== 'done'))
     .filter((t) => (scope ? scope.has(t.projectId) : true))
-    .sort((a, b) =>
-      Number(a.status === 'done') - Number(b.status === 'done')
-      || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
-      || (a.sortOrder - b.sortOrder));
+    ;
 
   const open = list.filter((t) => t.status !== 'done').length;
   $('tdCount').textContent = `${open} 個未完成 / 共 ${list.length}`;
 
   $('todoList').innerHTML = list.length
-    ? list.map((t) => {
+    ? flattenTasks(list).map((t) => {
         const p = S.projects.find((x) => x.id === t.projectId);
         const done = t.status === 'done';
         const m = taskMetrics(t, S.entries);
@@ -318,7 +353,8 @@ function renderTodos() {
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
-        return `<div class="row-item${done ? ' done' : ''}">
+        return `<div class="row-item task-item${done ? ' done' : ''}" style="--task-depth:${t.depth}">
+          ${t.depth > 0 ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
           <button class="btn-sm btn-ghost" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
@@ -347,6 +383,7 @@ function renderTodos() {
 function resetTodoForm() {
   $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
   $('tdStatus').value = 'todo'; $('tdDue').value = '';
+  $('tdParentTask').value = '';
   $('tdOpened').value = '建立後自動記錄';
   $('tdDone').value = '—';
   $('tdWorked').value = '—';
@@ -362,6 +399,7 @@ $('todoForm').addEventListener('submit', async (e) => {
     id: $('tdId').value || undefined,
     title: $('tdTitle').value,
     projectId: $('tdProject').value || null,
+    parentTaskId: $('tdParentTask').value || null,
     status: $('tdStatus').value,
     dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
     reminderAt: $('tdReminder').value || null,
@@ -392,6 +430,7 @@ $('todoList').addEventListener('click', async (e) => {
     const t = S.tasks.find((x) => x.id === ed);
     $('tdId').value = t.id; $('tdTitle').value = t.title;
     $('tdProject').value = t.projectId || '';
+    $('tdParentTask').value = t.parentTaskId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
     $('tdDue').value = t.dueDate || '';
     $('tdReminder').value = t.reminderAt ? t.reminderAt.slice(0, 16) : '';
