@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeRange, currentWeekDateRange, localDateRange, rangeControlState } from './time.js';
+import { activeRange, currentWeekDateRange, dailyReviewData, localDateRange, rangeControlState } from './time.js';
+
+test('dailyReviewData keeps empty dates and sorts work by start time', () => {
+  const result = dailyReviewData([
+    { id: 'late', startedAt: '2026-08-11T13:00:00+08:00', endedAt: '2026-08-11T14:00:00+08:00' },
+    { id: 'deleted', startedAt: '2026-08-10T09:00:00+08:00', endedAt: '2026-08-10T10:00:00+08:00', deletedAt: '2026-08-10T10:01:00+08:00' },
+    { id: 'early', startedAt: '2026-08-11T09:00:00+08:00', endedAt: '2026-08-11T10:00:00+08:00' },
+    { id: 'open', startedAt: '2026-08-12T09:00:00+08:00' },
+  ], ['2026-08-10', '2026-08-11', '2026-08-12']);
+
+  assert.deepEqual(result.map((group) => group.date), ['2026-08-10', '2026-08-11', '2026-08-12']);
+  assert.deepEqual(result[0].entries, []);
+  assert.deepEqual(result[1].entries.map((entry) => entry.id), ['early', 'late']);
+  assert.deepEqual(result[2].entries, []);
+});
 
 test('rangeControlState switches between quick ranges and custom controls', () => {
   assert.deepEqual(rangeControlState(false), { quick: true, custom: false, back: false });

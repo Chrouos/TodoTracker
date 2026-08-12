@@ -98,6 +98,19 @@ export function dailySeries(entries, from, to, durationOf) {
   return [...bucket.entries()].map(([date, seconds]) => ({ date, seconds }));
 }
 
+export function dailyReviewData(entries, dates) {
+  const byDate = new Map(dates.map((date) => [date, []]));
+  for (const entry of entries) {
+    if (!entry.endedAt || entry.deletedAt) continue;
+    const date = fmtDate(entry.startedAt);
+    if (byDate.has(date)) byDate.get(date).push(entry);
+  }
+  return [...byDate.entries()].map(([date, items]) => ({
+    date,
+    entries: items.sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt)),
+  }));
+}
+
 /** 兩個 YYYY-MM-DD 之間相差幾天（b - a）。用 UTC 算避免日光節約時間誤差 */
 export function daysBetween(a, b) {
   if (!a || !b) return null;
