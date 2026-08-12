@@ -79,6 +79,8 @@ let range = 'week';
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;
 const customReturnRange = { report: 'week', entries: 'all' };
+let reviewMode = 'list';
+let reviewGroups = [];
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
@@ -235,8 +237,14 @@ function renderReport() {
 
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
+  const reviewDates = range === 'week' && !customBounds
+    ? dailySeries([], lineFrom, new Date(lineFrom.getTime() + 6 * 864e5), () => 0).map((d) => d.date)
+    : tlDates;
   $('reviewLabel').textContent = tlDates.length
     ? `· ${tlDates[0]} ～ ${tlDates[tlDates.length - 1]}`
+    : '';
+  $('reviewLabel').textContent = reviewDates.length
+    ? `· ${reviewDates[0]} ～ ${reviewDates[reviewDates.length - 1]}`
     : '';
   if ($('timeline')) { const tl = timelineData(
     customBounds ? rows : S.entries.filter((e) => e.endedAt && !e.deletedAt),
@@ -250,10 +258,47 @@ function renderReport() {
     };
   });
   }
-  $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, tlDates));
+  $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, reviewDates));
 }
 
 function renderDailyReview(groups) {
+  reviewGroups = groups;
+  const canCalendar = groups.length > 0 && groups.length <= 7;
+  if (!canCalendar && reviewMode === 'calendar') reviewMode = 'list';
+  document.querySelectorAll('#reviewMode [data-review-mode]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.reviewMode === reviewMode);
+    if (button.dataset.reviewMode === 'calendar') button.disabled = !canCalendar;
+  });
+  return reviewMode === 'calendar' ? renderReviewCalendar(groups) : renderReviewList(groups);
+}
+
+function renderReviewCalendar(groups) {
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
+  return `<div class="review-calendar" style="--review-days:${groups.length}">${groups.map((group) => {
+    const day = new Date(`${group.date}T00:00:00`);
+    const total = group.entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
+    const items = group.entries.length
+      ? group.entries.map((entry) => {
+        const project = S.projects.find((item) => item.id === entry.projectId);
+        const task = S.tasks.find((item) => item.id === entry.taskId);
+        const title = entry.description || task?.title || '未命名工作';
+        return `<div class="review-calendar-entry" style="--project-color:${safeColor(project?.color)}">
+          <div class="review-calendar-time num">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div>
+          <div class="review-calendar-title">${esc(title)}</div>
+          <div class="review-calendar-duration num">${fmtHM(db.durationSec(entry))}</div>
+        </div>`;
+      }).join('')
+      : '<div class="review-calendar-empty">—</div>';
+    return `<article class="review-calendar-day">
+      <header><strong>${esc(group.date.slice(5))}</strong><span>週${weekdays[day.getDay()]}</span></header>
+      <div class="review-calendar-total num">${fmtHM(total)}</div>
+      <div class="review-calendar-list">${items}</div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function renderReviewList(groups) {
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
   return groups.map((group) => {
@@ -1340,6 +1385,12 @@ $('reportApplyRange').addEventListener('click', () => applyCustomRange('report')
 // 進頁預設本週
 range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
+document.getElementById('reviewMode').addEventListener('click', (event) => {
+  const mode = event.target.dataset.reviewMode;
+  if (!mode || event.target.disabled) return;
+  reviewMode = mode;
+  $('dailyReview').innerHTML = renderDailyReview(reviewGroups);
+});
 groupReportPanels();
 initCollapse();
 syncRangeControls();
