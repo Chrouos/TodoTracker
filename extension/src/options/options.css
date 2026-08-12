@@ -134,13 +134,14 @@ section[hidden] { display: none; }
 
 /* Todo 清單：以卡片呈現，讓優先級、截止日與提醒一眼可見 */
 #todoList { display: grid; gap: 12px; }
+.todo-card > .swatch { display: none; }
 .task-project-heading { margin-top: var(--lg); padding: var(--sm) var(--md); border-left: 4px solid var(--ink); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-mute); }
 .task-item { position: relative; margin-left: 0 !important; padding-left: calc(var(--task-depth, 0) * 28px + var(--md)); background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong)); background-size: 2px 100%; background-position: calc(var(--task-depth, 0) * 28px) 0; background-repeat: no-repeat; }
 .task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
 #todoList .todo-card {
   position: relative;
   display: grid;
-  grid-template-columns: 34px 8px minmax(0, 1fr) auto auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   min-height: 76px;
@@ -162,7 +163,26 @@ section[hidden] { display: none; }
 }
 #todoList .todo-card.priority-urgent::before { background: var(--danger); }
 #todoList .todo-card.priority-high::before { background: var(--warning); }
-#todoList .todo-card.priority-low::before { background: var(--text-mute); }
+#todoList .todo-card.priority-normal::before { background: #64748b; }
+#todoList .todo-card.priority-low::before { background: #16a34a; }
+.priority-badge { font-weight: 700; }
+.priority-badge.priority-urgent { color: #b42318; background: #fff1f0; border-color: #f2aaa5; }
+.priority-badge.priority-high { color: #b45309; background: #fff7ed; border-color: #fdba74; }
+.priority-badge.priority-normal { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
+.priority-badge.priority-low { color: #15803d; background: #f0fdf4; border-color: #86efac; }
+#todoList .todo-card.priority-normal .main > .ellipsis::after {
+  content: '一般';
+  display: inline-block;
+  margin-left: 6px;
+  padding: 3px var(--sm);
+  border: 1px solid #cbd5e1;
+  border-radius: var(--r);
+  color: #475569;
+  background: #f1f5f9;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+}
 #todoList .todo-card:hover,
 #todoList .todo-card:focus-within {
   border-color: var(--text-mute);
@@ -180,7 +200,7 @@ section[hidden] { display: none; }
 
 /* Todo 內容採上下流式，避免長筆記被右側欄位壓縮 */
 #todoList .todo-card {
-  grid-template-columns: 34px 8px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
   align-items: start;
 }
 #todoList .todo-card > .main { grid-column: 3; grid-row: 1; }
