@@ -126,6 +126,8 @@ function syncRangeControls() {
   });
   document.querySelector('#range .range-back').hidden = !controls.back;
   document.querySelector('#enRange .range-back').hidden = !controls.back;
+  document.querySelector('#range').classList.toggle('is-custom', controls.custom);
+  document.querySelector('#enRange').classList.toggle('is-custom', controls.custom);
   document.querySelectorAll('#range .seg-btn').forEach((button) =>
     button.classList.toggle('active', button.dataset.range === reportActiveRange));
   document.querySelectorAll('#enRange .seg-btn').forEach((button) =>

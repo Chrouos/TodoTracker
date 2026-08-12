@@ -25,6 +25,16 @@ section[hidden] { display: none; }
 .seg-btn.active:hover { background: var(--ink-deep); }
 .seg-btn[hidden],
 .custom-range[hidden] { display: none !important; }
+.seg.is-custom { border: 0; overflow: visible; }
+.seg.is-custom .range-back {
+  height: 32px;
+  padding: 0 var(--md);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r);
+  background: var(--canvas);
+  color: var(--text-ink);
+}
+.seg.is-custom .range-back:hover { background: var(--surface-soft); }
 
 /* KPI：hairline 分隔，零陰影 */
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--hairline); }
