@@ -134,6 +134,9 @@ section[hidden] { display: none; }
 
 /* Todo 清單：以卡片呈現，讓優先級、截止日與提醒一眼可見 */
 #todoList { display: grid; gap: 12px; }
+.task-project-heading { margin-top: var(--lg); padding: var(--sm) var(--md); border-left: 4px solid var(--ink); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-mute); }
+.task-item { position: relative; margin-left: 0 !important; padding-left: calc(var(--task-depth, 0) * 28px + var(--md)); background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong)); background-size: 2px 100%; background-position: calc(var(--task-depth, 0) * 28px) 0; background-repeat: no-repeat; }
+.task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
 #todoList .todo-card {
   position: relative;
   display: grid;

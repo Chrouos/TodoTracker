@@ -521,6 +521,31 @@ $('projList').addEventListener('click', async (e) => {
 
 let showDone = false;
 
+function flattenTodoTree(tasks) {
+  const children = new Map();
+  tasks.forEach((task) => {
+    const parentId = task.parentId || null;
+    if (!children.has(parentId)) children.set(parentId, []);
+    children.get(parentId).push(task);
+  });
+  const compare = (a, b) =>
+    Number(a.status === 'done') - Number(b.status === 'done')
+    || ({ urgent: 0, high: 1, normal: 2, low: 3 }[a.priority || 'normal'] - { urgent: 0, high: 1, normal: 2, low: 3 }[b.priority || 'normal'])
+    || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
+    || (a.sortOrder - b.sortOrder);
+  const out = [];
+  const visit = (parentId, depth, seen = new Set()) => {
+    for (const task of (children.get(parentId) || []).sort(compare)) {
+      if (seen.has(task.id)) continue;
+      out.push({ ...task, depth });
+      visit(task.id, depth + 1, new Set(seen).add(task.id));
+    }
+  };
+  visit(null, 0);
+  return out.concat(tasks.filter((task) => !out.some((item) => item.id === task.id))
+    .map((task) => ({ ...task, depth: 0 })));
+}
+
 function renderTodos() {
   const tree = flattenTree(S.projects);
   const opts = (blank) => `<option value="">${blank}</option>` +
@@ -565,12 +590,18 @@ function renderTodos() {
       || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
       || (a.sortOrder - b.sortOrder));
 
+  const orderedTasks = tree.flatMap((project) =>
+    flattenTodoTree(list.filter((task) => task.projectId === project.id))
+  ).concat(flattenTodoTree(list.filter((task) => !task.projectId)));
+
   const open = list.filter((t) => t.status !== 'done').length;
   $('tdCount').textContent = `${open} 個未完成 / 共 ${list.length}`;
 
   $('todoList').innerHTML = list.length
-    ? list.map((t) => {
+    ? orderedTasks.map((t, index) => {
         const p = S.projects.find((x) => x.id === t.projectId);
+        const previous = orderedTasks[index - 1];
+        const showProject = (t.projectId || null) !== (previous?.projectId || null);
         const done = t.status === 'done';
         const m = taskMetrics(t, S.entries);
         const workEntries = entriesForTask(t, S.entries);
@@ -591,7 +622,9 @@ function renderTodos() {
           `結案 ${stampLabel(t.completedAt)}`,
         ].join(' · ');
 
-        return `<div class="row-item todo-card priority-${t.priority || 'normal'}${done ? ' done' : ''}" style="margin-left:${taskDepth * 20}px">
+        return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>` : ''}
+        <div class="row-item todo-card task-item priority-${t.priority || 'normal'}${done ? ' done' : ''}" style="--task-depth:${t.depth}">
+          ${t.depth ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
           <button class="btn-sm btn-ghost" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
