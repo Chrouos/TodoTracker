@@ -1,7 +1,7 @@
 import * as db from '../lib/db.js';
 import {
   fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
-  timelineData, toLocalInput, fromLocalInput,
+  dailyReviewData, timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
@@ -183,7 +183,7 @@ function groupReportPanels() {
   [
     ['rep-health', 'todoHealth', 'report-panel-health'],
     ['rep-donut', 'byProject', 'report-panel-donut'],
-    ['rep-time', 'timeline', 'report-panel-time'],
+    ['rep-review', 'dailyReview', 'report-panel-review'],
     ['rep-line', 'byDay', 'report-panel-wide'],
   ].forEach(([collapseId, bodyId, className]) => {
     const heading = report.querySelector(`[data-collapse="${collapseId}"]`);
@@ -235,10 +235,10 @@ function renderReport() {
 
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
-  $('timeLabel').textContent = tlDates.length
+  $('reviewLabel').textContent = tlDates.length
     ? `· ${tlDates[0]} ～ ${tlDates[tlDates.length - 1]}`
     : '';
-  const tl = timelineData(
+  if ($('timeline')) { const tl = timelineData(
     customBounds ? rows : S.entries.filter((e) => e.endedAt && !e.deletedAt),
     tlDates,
   );
@@ -249,6 +249,42 @@ function renderReport() {
       label: e.description || (p ? p.name : '未分類'),
     };
   });
+  }
+  $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, tlDates));
+}
+
+function renderDailyReview(groups) {
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
+  return groups.map((group) => {
+    const day = new Date(`${group.date}T00:00:00`);
+    const total = group.entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
+    const entries = group.entries.length
+      ? group.entries.map((entry) => {
+        const project = S.projects.find((item) => item.id === entry.projectId);
+        const task = S.tasks.find((item) => item.id === entry.taskId);
+        const title = entry.description || task?.title || '未命名工作';
+        const projectName = project?.name || '一般工作';
+        const color = safeColor(project?.color);
+        return `<div class="daily-review-entry">
+          <div class="daily-review-time num">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div>
+          <span class="daily-review-swatch" style="background:${color}" aria-hidden="true"></span>
+          <div class="daily-review-main">
+            <div class="daily-review-title">${esc(title)} <span class="cap">${esc(projectName)}</span></div>
+            ${entry.notes ? `<div class="daily-review-notes">${renderMarkdownPreview(entry.notes)}</div>` : ''}
+          </div>
+          <div class="daily-review-duration num">${fmtHM(db.durationSec(entry))}</div>
+        </div>`;
+      }).join('')
+      : '<div class="daily-review-empty">這天沒有工作紀錄</div>';
+    return `<section class="daily-review-day">
+      <div class="daily-review-day-head">
+        <strong>${esc(group.date)}（${weekdays[day.getDay()]}）</strong>
+        <span class="cap">${fmtHM(total)} · ${group.entries.length} 筆</span>
+      </div>
+      <div class="daily-review-list">${entries}</div>
+    </section>`;
+  }).join('');
 }
 
 function renderTodoHealth() {

@@ -320,6 +320,14 @@ section[hidden] { display: none; }
 #p-report > .report-panel-donut { grid-column: 1; }
 #p-report > .report-panel-time { grid-column: 2; }
 #p-report > .report-panel-wide { grid-column: 1 / -1; margin-top: 16px; }
+#p-report {
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 0;
+}
+#p-report > .report-panel-health,
+#p-report > .report-panel-donut,
+#p-report > .report-panel-review,
+#p-report > .report-panel-wide { grid-column: 1; }
 #p-report > .report-panel > h2.sec {
   margin: 0 0 14px;
   padding: 6px 2px 8px;
@@ -336,6 +344,46 @@ section[hidden] { display: none; }
 #p-report > .report-panel > #byProject .chart-split { border: 0; padding: 22px 24px; }
 #p-report > .report-panel > #timeline,
 #p-report > .report-panel > #byDay { padding: 18px 20px; }
+
+#p-report > .report-panel-review > #dailyReview {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--canvas, #fff);
+  box-shadow: 0 3px 12px rgba(24, 24, 24, .035);
+  padding: 0 20px;
+}
+.daily-review-day { padding: 18px 0; }
+.daily-review-day + .daily-review-day { border-top: 1px solid var(--hairline); }
+.daily-review-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--md);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 15px;
+}
+.daily-review-day-head .cap { white-space: nowrap; }
+.daily-review-list { display: grid; }
+.daily-review-entry {
+  display: grid;
+  grid-template-columns: 126px 8px minmax(0, 1fr) 76px;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+.daily-review-entry:last-child { border-bottom: 0; }
+.daily-review-time,
+.daily-review-duration { padding-top: 2px; color: var(--text-mute); }
+.daily-review-duration { text-align: right; color: var(--text-ink); font-weight: 700; }
+.daily-review-swatch { width: 8px; min-height: 30px; border-radius: 2px; }
+.daily-review-main { min-width: 0; }
+.daily-review-title { line-height: 1.5; overflow-wrap: anywhere; }
+.daily-review-title .cap { margin-left: 6px; }
+.daily-review-notes { margin-top: 6px; color: var(--text-body); }
+.daily-review-empty { padding: 14px 0 4px; color: var(--text-ash); }
 
 .todo-health {
   display: grid;
@@ -430,6 +478,8 @@ dialog .field { margin-bottom: var(--md); }
   .todo-health-item:nth-child(3) { border-right: 1px solid var(--hairline); }
   .todo-health-item:nth-child(4) { border-right: 0; }
   .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
+  .daily-review-entry { grid-template-columns: 104px 8px minmax(0, 1fr); }
+  .daily-review-duration { grid-column: 3; text-align: left; padding-top: 0; }
 }
 .markdown-preview {
   --markdown-preview-collapsed-height: 180px;
