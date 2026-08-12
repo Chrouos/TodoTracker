@@ -475,10 +475,12 @@ dialog .field { margin-bottom: var(--md); }
 .markdown-preview pre code { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .markdown-preview a { text-decoration: underline; }
 .markdown-preview table {
-  width: max-content;
+  width: 100%;
+  max-width: 100%;
   min-width: 100%;
   margin: 8px 0;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: .95em;
 }
 .markdown-preview th,
@@ -486,9 +488,11 @@ dialog .field { margin-bottom: var(--md); }
   border: 1px solid var(--hairline-strong, #aaa);
   padding: 5px 8px;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .markdown-preview th { background: var(--surface-card, #f1eeee); font-weight: 700; }
-.markdown-preview [data-markdown-content] { overflow-x: auto; }
+.markdown-preview [data-markdown-content] { min-width: 0; overflow-x: auto; }
 .row-item .markdown-preview {
   white-space: normal;
   font-family: var(--font, system-ui, sans-serif);
