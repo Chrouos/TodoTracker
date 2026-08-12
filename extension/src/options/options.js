@@ -1,6 +1,6 @@
 import * as db from '../lib/db.js';
 import {
-  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, dailySeries,
+  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, dailySeries,
   timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
@@ -115,10 +115,12 @@ function syncRangeControls() {
   $('reportRangeTo').value = customRange.to;
   $('entriesRangeFrom').value = customRange.from;
   $('entriesRangeTo').value = customRange.to;
+  const reportActiveRange = activeRange(range, customRangeOpen);
+  const entriesActiveRange = activeRange(enUI.range, customRangeOpen);
   document.querySelectorAll('#range .seg-btn').forEach((button) =>
-    button.classList.toggle('active', button.dataset.range === range));
+    button.classList.toggle('active', button.dataset.range === reportActiveRange));
   document.querySelectorAll('#enRange .seg-btn').forEach((button) =>
-    button.classList.toggle('active', button.dataset.erange === enUI.range));
+    button.classList.toggle('active', button.dataset.erange === entriesActiveRange));
 }
 
 function openCustomRange() {

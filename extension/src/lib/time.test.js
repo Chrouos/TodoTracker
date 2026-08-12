@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localDateRange } from './time.js';
+import { activeRange, localDateRange } from './time.js';
+
+test('activeRange highlights custom while custom controls are open', () => {
+  assert.equal(activeRange('all', true), 'custom');
+  assert.equal(activeRange('month', true), 'custom');
+  assert.equal(activeRange('week', false), 'week');
+});
 
 test('localDateRange includes both local calendar dates', () => {
   const result = localDateRange('2026-08-10', '2026-08-12');

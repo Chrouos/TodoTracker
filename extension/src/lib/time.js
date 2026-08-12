@@ -70,6 +70,10 @@ export function localDateRange(fromDate, toDate) {
   return { from, to };
 }
 
+export function activeRange(range, customOpen) {
+  return customOpen ? 'custom' : range;
+}
+
 /** 連續每日序列（沒紀錄的日子補 0），折線圖才不會斷掉。durationOf 用來取秒數 */
 export function dailySeries(entries, from, to, durationOf) {
   const bucket = new Map();
