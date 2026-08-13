@@ -187,9 +187,11 @@ function renderRecent() {
 
 function renderTodo() {
   const filterSelect = $('todoFilter');
+  const priorityFilter = $('todoPriorityFilter');
   const createProject = $('todoCreateProject');
   const parentSelect = $('todoParent');
   const keepFilter = filterSelect.value;
+  const keepPriorityFilter = priorityFilter.value;
   const keepCreateProject = createProject.value;
   const keepParent = parentSelect.value;
   const projectOptions = flattenTree(state.projects, { includeArchived: false });
@@ -197,6 +199,7 @@ function renderTodo() {
   filterSelect.innerHTML = '<option value="">— 全部專案 —</option>' +
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   filterSelect.value = keepFilter;
+  priorityFilter.value = keepPriorityFilter;
 
   createProject.innerHTML = '<option value="">— 未指定專案 —</option>' +
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
@@ -218,8 +221,10 @@ function renderTodo() {
   $('todoMore').textContent = todoAdvancedOpen ? '[-] 收合設定' : '[+] 詳細設定';
 
   const filter = filterSelect.value;
+  const priority = priorityFilter.value;
   const list = state.tasks
     .filter((t) => t.status !== 'archived' && (!filter || t.projectId === filter))
+    .filter((t) => !priority || (t.priority || 'normal') === priority)
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
 
   $('todoList').innerHTML = list.length
@@ -369,6 +374,7 @@ $('todoMore').addEventListener('click', () => {
   renderTodo();
 });
 $('todoFilter').addEventListener('change', renderTodo);
+$('todoPriorityFilter').addEventListener('change', renderTodo);
 $('todoCreateProject').addEventListener('change', renderTodo);
 
 $('todoList').addEventListener('click', async (e) => {
