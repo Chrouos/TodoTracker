@@ -41,6 +41,9 @@ export type TaskStatus = 'todo' | 'doing' | 'done' | 'archived';
 export type Task = {
   id: string;
   projectId: string | null;
+  /** 上層任務；舊同步資料也可能使用 parentTaskId。 */
+  parentId?: string | null;
+  parentTaskId?: string | null;
   title: string;
   notes: string;
   status: TaskStatus;
@@ -48,6 +51,7 @@ export type Task = {
   openedAt: string | null;
   /** 截止日 YYYY-MM-DD，唯一可以手改的日期 */
   dueDate: string | null;
+  reminderAt?: string | null;
   /** 截止時間 HH:MM，排程產生的才會有 */
   dueTime: string | null;
   /** 由哪一條排程產生的 */
