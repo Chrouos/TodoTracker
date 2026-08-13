@@ -71,6 +71,23 @@ main[hidden] { display: none; }
 
 .fields { display: flex; flex-direction: column; gap: var(--sm); }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sm); }
+.quick-todo { display: flex; align-items: center; gap: var(--sm); }
+.quick-todo #newTodo { flex: 1; min-width: 0; }
+.quick-todo #todoMore { flex: 0 0 auto; white-space: nowrap; }
+.todo-advanced {
+  display: grid;
+  gap: var(--sm);
+  margin-top: var(--sm);
+  padding: var(--sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  background: var(--surface-soft);
+}
+.todo-advanced[hidden] { display: none; }
+.quick-field { display: flex; align-items: center; gap: var(--sm); min-width: 0; }
+.quick-field > span { flex: 0 0 88px; color: var(--text-mute); font-size: 11px; }
+.quick-field select,
+.quick-field input { flex: 1; min-width: 0; height: 30px; }
 
 .tagrow { display: flex; flex-wrap: wrap; gap: var(--xs); }
 .tagchip {

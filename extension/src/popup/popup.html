@@ -80,9 +80,42 @@
 
   <!-- ── Todo 分頁 ── -->
   <main id="tab-todo" hidden>
-    <div class="fields">
+    <div class="quick-todo">
       <input id="newTodo" placeholder="新增 todo，Enter 送出" autocomplete="off" />
-      <select id="todoProject"></select>
+      <button id="todoMore" type="button" class="btn-ghost btn-sm" aria-expanded="false">[+] 詳細設定</button>
+    </div>
+    <div id="todoAdvanced" class="todo-advanced" hidden>
+      <label class="quick-field">
+        <span>新增到專案</span>
+        <select id="todoCreateProject"></select>
+      </label>
+      <label class="quick-field">
+        <span>父任務（建立子任務）</span>
+        <select id="todoParent"></select>
+      </label>
+      <div class="two">
+        <label class="quick-field">
+          <span>優先級</span>
+          <select id="todoPriority">
+            <option value="normal">一般</option>
+            <option value="urgent">緊急</option>
+            <option value="high">高</option>
+            <option value="low">低</option>
+          </select>
+        </label>
+        <label class="quick-field">
+          <span>截止日期</span>
+          <input id="todoDue" type="date" />
+        </label>
+      </div>
+      <label class="quick-field">
+        <span>截止時間（可選）</span>
+        <input id="todoDueTime" type="time" />
+      </label>
+      <label class="quick-field">
+        <span>清單篩選</span>
+        <select id="todoFilter"></select>
+      </label>
     </div>
     <div class="hr"></div>
     <div id="todoList"></div>

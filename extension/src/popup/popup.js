@@ -18,6 +18,7 @@ let state = {
 let ticker = null;
 /** 剛停止、還沒補工作紀錄的那筆 entry id */
 let pendingLogId = null;
+let todoAdvancedOpen = false;
 
 /* ---------------- draft（計時前暫存的選擇，關掉 popup 也留著） ---------------- */
 const getDraft = async () =>
@@ -185,14 +186,38 @@ function renderRecent() {
 }
 
 function renderTodo() {
-  const ps = $('todoProject');
-  const keep = ps.value;
-  ps.innerHTML = '<option value="">— 全部專案 —</option>' +
-    flattenTree(state.projects, { includeArchived: false })
-      .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
-  ps.value = keep;
+  const filterSelect = $('todoFilter');
+  const createProject = $('todoCreateProject');
+  const parentSelect = $('todoParent');
+  const keepFilter = filterSelect.value;
+  const keepCreateProject = createProject.value;
+  const keepParent = parentSelect.value;
+  const projectOptions = flattenTree(state.projects, { includeArchived: false });
 
-  const filter = ps.value;
+  filterSelect.innerHTML = '<option value="">— 全部專案 —</option>' +
+    projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+  filterSelect.value = keepFilter;
+
+  createProject.innerHTML = '<option value="">— 未指定專案 —</option>' +
+    projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+  createProject.value = projectOptions.some((p) => p.id === keepCreateProject) ? keepCreateProject : '';
+
+  const parentOptions = state.tasks
+    .filter((t) => t.status !== 'archived' && t.status !== 'done')
+    .filter((t) => !createProject.value || t.projectId === createProject.value)
+    .sort((a, b) => a.title.localeCompare(b.title));
+  parentSelect.innerHTML = '<option value="">— 最上層任務 —</option>' +
+    parentOptions.map((t) => {
+      const p = state.projects.find((item) => item.id === t.projectId);
+      return `<option value="${t.id}">${esc(t.title)}${p ? ` · ${esc(p.name)}` : ''}</option>`;
+    }).join('');
+  parentSelect.value = parentOptions.some((t) => t.id === keepParent) ? keepParent : '';
+
+  $('todoAdvanced').hidden = !todoAdvancedOpen;
+  $('todoMore').setAttribute('aria-expanded', String(todoAdvancedOpen));
+  $('todoMore').textContent = todoAdvancedOpen ? '[-] 收合設定' : '[+] 詳細設定';
+
+  const filter = filterSelect.value;
   const list = state.tasks
     .filter((t) => t.status !== 'archived' && (!filter || t.projectId === filter))
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
@@ -207,6 +232,7 @@ function renderTodo() {
             <div class="t1">${esc(t.title)}</div>
             <div class="t2">${p ? esc(p.name) : '未分類'}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
+          <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="新增子任務">[＋子]</button>
           ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="對這個 todo 計時">[&gt;]</button>`}
           <button class="btn-ghost btn-sm act" data-del-task="${t.id}" title="刪除">[-]</button>
         </div>`;
@@ -327,20 +353,42 @@ $('logText').addEventListener('keydown', (ev) => {
 /* Todo 分頁 */
 $('newTodo').addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter' || !e.target.value.trim()) return;
-  await db.upsertTask({ title: e.target.value, projectId: $('todoProject').value || null });
+  await db.upsertTask({
+    title: e.target.value,
+    projectId: $('todoCreateProject').value || null,
+    parentId: $('todoParent').value || null,
+    priority: $('todoPriority').value,
+    dueDate: $('todoDue').value || null,
+    dueTime: $('todoDueTime').value || null,
+  });
   e.target.value = '';
   await load();
 });
-$('todoProject').addEventListener('change', renderTodo);
+$('todoMore').addEventListener('click', () => {
+  todoAdvancedOpen = !todoAdvancedOpen;
+  renderTodo();
+});
+$('todoFilter').addEventListener('change', renderTodo);
+$('todoCreateProject').addEventListener('change', renderTodo);
 
 $('todoList').addEventListener('click', async (e) => {
   const check = e.target.closest('[data-check]')?.dataset.check;
+  const addSubtaskId = e.target.closest('[data-add-subtask]')?.dataset.addSubtask;
   const startId = e.target.closest('[data-start-task]')?.dataset.startTask;
   const delId = e.target.closest('[data-del-task]')?.dataset.delTask;
 
   if (check) {
     const t = state.tasks.find((x) => x.id === check);
     await db.upsertTask({ ...t, status: t.status === 'done' ? 'todo' : 'done' });
+  } else if (addSubtaskId) {
+    const parent = state.tasks.find((x) => x.id === addSubtaskId);
+    if (!parent) return;
+    todoAdvancedOpen = true;
+    $('todoCreateProject').value = parent.projectId || '';
+    renderTodo();
+    $('todoParent').value = parent.id;
+    $('newTodo').focus();
+    return;
   } else if (startId) {
     const t = state.tasks.find((x) => x.id === startId);
     await db.startTimer({ projectId: t.projectId, taskId: t.id, description: t.title });
