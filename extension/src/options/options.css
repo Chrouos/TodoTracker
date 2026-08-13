@@ -711,3 +711,109 @@ dialog .field { margin-bottom: var(--md); }
 .workspace-day > .num:last-child { width: 70px; flex: 0 0 70px; text-align: right; }
 .workspace-day-bar { flex: 1; height: 8px; background: var(--surface-card); }
 .workspace-day-bar i { display: block; height: 100%; background: var(--ink); }
+
+/* TODO／紀錄沿用「每日工作回顧」的閱讀順序：左側資訊、專案色條、內容、右側工時。 */
+.activity-row {
+  display: grid;
+  grid-template-columns: 126px 8px minmax(0, 1fr) 76px auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+.activity-row:last-child { border-bottom: 0; }
+.activity-row .activity-time,
+.activity-row .activity-duration { padding-top: 2px; }
+.activity-row .activity-time { color: var(--text-mute); }
+.activity-row .activity-duration { color: var(--text-ink); text-align: right; font-weight: 700; }
+.activity-row .activity-swatch { width: 8px; min-height: 30px; border-radius: 2px; }
+.activity-row .main { min-width: 0; }
+.activity-row .main > .ellipsis { line-height: 1.5; overflow-wrap: anywhere; }
+.activity-row .main > .sub:first-of-type { margin-top: 3px; }
+.activity-row .act { align-self: start; padding-top: 0; }
+
+#entryList .day-group { margin-bottom: 18px; }
+#entryList .day-head {
+  padding: 0 0 8px;
+  margin-bottom: 0;
+  font-size: 15px;
+}
+#entryList .entry-row .activity-swatch { min-height: 30px; }
+
+/* TODO 保留勾選、階層與操作鈕，但改成每日回顧的扁平分隔列。 */
+#todoList .task-project-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  margin-top: 20px;
+  padding: 0 0 8px;
+  border-left: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  font-size: 15px;
+}
+#todoList .task-project-heading .swatch { width: 8px; min-height: 22px; border-radius: 2px; }
+#todoList .todo-card.activity-row {
+  grid-template-columns: 34px 8px minmax(0, 1fr) 76px auto;
+  min-height: 0;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+#todoList .todo-card.activity-row::before { display: none; }
+#todoList .todo-card.activity-row > .activity-swatch { display: block; }
+#todoList .todo-card.activity-row > .main {
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  align-self: start;
+  display: block;
+}
+#todoList .todo-card.activity-row > .activity-duration {
+  grid-column: 4;
+  grid-row: 1;
+  min-width: 0;
+  margin-top: 0;
+  color: var(--text-ink);
+  text-align: right;
+}
+#todoList .todo-card.activity-row > .activity-duration::before { content: none; }
+#todoList .todo-card.activity-row > .act {
+  grid-column: 5;
+  grid-row: 1;
+  margin-top: 0;
+  opacity: 0;
+}
+#todoList .todo-card.activity-row:hover > .act,
+#todoList .todo-card.activity-row:focus-within > .act { opacity: 1; }
+#todoList .todo-card.activity-row.done { opacity: .68; background: transparent; }
+#todoList .todo-card.activity-row:hover,
+#todoList .todo-card.activity-row:focus-within {
+  border-color: var(--hairline);
+  box-shadow: none;
+  transform: none;
+}
+
+@media (max-width: 760px) {
+  .activity-row { grid-template-columns: 104px 8px minmax(0, 1fr); }
+  .activity-row .activity-duration { grid-column: 3; text-align: left; padding-top: 0; }
+  .activity-row .act { grid-column: 3; opacity: 1; }
+  #todoList .todo-card.activity-row { grid-template-columns: 34px 8px minmax(0, 1fr); }
+  #todoList .todo-card.activity-row > .activity-duration {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: start;
+    margin-top: 8px;
+    text-align: left;
+  }
+  #todoList .todo-card.activity-row > .act {
+    grid-column: 3;
+    grid-row: 3;
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+}

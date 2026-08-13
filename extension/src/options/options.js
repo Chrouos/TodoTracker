@@ -846,11 +846,11 @@ function renderTodos() {
         ].join(' · ');
 
         return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>` : ''}
-        <div class="row-item todo-card task-item priority-${t.priority || 'normal'}${done ? ' done' : ''}" style="--task-depth:${t.depth}">
+        <div class="row-item todo-card task-item activity-row priority-${t.priority || 'normal'}${done ? ' done' : ''}" style="--task-depth:${t.depth}">
           ${t.depth ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
-          <button class="btn-sm btn-ghost" data-check="${t.id}"
+          <button class="btn-sm btn-ghost activity-status" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
-          <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
+          <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
               ${t.priority && t.priority !== 'normal' ? `<span class="badge priority-${t.priority}">${({ urgent: '緊急', high: '高', low: '低' })[t.priority]}</span>` : ''}
@@ -870,7 +870,7 @@ function renderTodos() {
                 <span class="num">${fmtHM(db.durationSec(entry))}</span>
               </div>`).join('')}</div></details>` : ''}
           </div>
-          <span class="num" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
+          <span class="num activity-duration" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
             ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="對這個 todo 開始計時">[&gt;]</button>`}
             <button class="btn-sm" data-add-subtask="${t.id}" title="新增子任務">＋子任務</button>
@@ -1189,10 +1189,10 @@ function renderEntries() {
             const notes = e.notes || '';
             // 太長的工作紀錄預設收起來，不然一筆就吃掉整個畫面
             
-            return `<div class="row-item">
-              <span class="num mute" style="width:104px;flex:0 0 104px">
+            return `<div class="row-item activity-row entry-row">
+              <span class="activity-time num mute">
                 ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</span>
-              <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
+              <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
               <div class="main">
                 <div class="ellipsis">${esc(e.description || '（無描述）')}
                   ${task ? `<span class="badge">${esc(task.title)}</span>` : ''}
@@ -1200,7 +1200,7 @@ function renderEntries() {
                 <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
                 ${notes ? renderMarkdownPreview(notes, 'notes') : ''}
               </div>
-              <span class="num">${fmtHM(db.durationSec(e))}</span>
+              <span class="num activity-duration">${fmtHM(db.durationSec(e))}</span>
               <div class="act">
                 <button class="btn-sm" data-edit-e="${e.id}">[編輯]</button>
                 <button class="btn-sm btn-danger" data-del-e="${e.id}">[x]</button>
