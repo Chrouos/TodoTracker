@@ -1,7 +1,7 @@
 import * as db from '../lib/db.js';
 import {
   fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
-  dailyReviewData, timelineData, toLocalInput, fromLocalInput,
+  dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
@@ -273,6 +273,43 @@ function renderDailyReview(groups) {
 }
 
 function renderReviewCalendar(groups) {
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
+  const dates = groups.map((group) => group.date);
+  const calendar = calendarReviewData(groups.flatMap((group) => group.entries), dates);
+  const span = calendar.axis.to - calendar.axis.from;
+  const labels = [];
+  for (let minute = calendar.axis.from; minute <= calendar.axis.to; minute += 60) {
+    const top = ((minute - calendar.axis.from) / span) * 100;
+    labels.push(`<span class="review-calendar-axis-label num" style="top:${top}%">${String(Math.floor(minute / 60)).padStart(2, '0')}:00</span>`);
+  }
+  const dayHeaders = calendar.days.map((day) => {
+    const date = new Date(`${day.date}T00:00:00`);
+    return `<div class="review-calendar-day-head"><strong>${esc(day.date.slice(5))}</strong><span>週${weekdays[date.getDay()]}</span></div>`;
+  }).join('');
+  const dayBodies = calendar.days.map((day) => {
+    const entries = day.entries.map((item) => {
+      const entry = item.entry;
+      const project = S.projects.find((projectItem) => projectItem.id === entry.projectId);
+      const task = S.tasks.find((taskItem) => taskItem.id === entry.taskId);
+      const title = entry.description || task?.title || '未命名工作';
+      const projectName = project?.name || '一般工作';
+      const tooltip = calendarEntryTooltip(title, entry, projectName);
+      const top = ((item.start - calendar.axis.from) / span) * 100;
+      const height = Math.max(4, ((item.end - item.start) / span) * 100);
+      return `<div class="review-calendar-entry" tabindex="0" title="${esc(tooltip)}" aria-label="${esc(tooltip)}" data-tooltip="${esc(tooltip)}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
+        <span class="review-calendar-title">${esc(projectName)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="review-calendar-day-body">${entries}</div>`;
+  }).join('');
+  return `<div class="review-calendar" style="--review-days:${calendar.days.length};--calendar-from:${calendar.axis.from};--calendar-span:${span};--calendar-hours:${span / 60};--calendar-height:${Math.max(480, span * .9)}px">
+    <div class="review-calendar-corner"></div>${dayHeaders}
+    <div class="review-calendar-axis">${labels.join('')}</div>${dayBodies}
+  </div>`;
+}
+
+function renderReviewCalendarLegacy(groups) {
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
   return `<div class="review-calendar" style="--review-days:${groups.length}">${groups.map((group) => {

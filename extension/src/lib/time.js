@@ -111,6 +111,58 @@ export function dailyReviewData(entries, dates) {
   }));
 }
 
+export function calendarReviewData(entries, dates, defaultFrom = 8 * 60, defaultTo = 18 * 60) {
+  const byDate = new Map(dates.map((date) => [date, []]));
+  for (const entry of entries) {
+    if (!entry.endedAt || entry.deletedAt) continue;
+    const date = fmtDate(entry.startedAt);
+    if (!byDate.has(date)) continue;
+    const started = new Date(entry.startedAt);
+    const ended = new Date(entry.endedAt);
+    const start = started.getHours() * 60 + started.getMinutes();
+    const end = Math.max(start + 1, ended.getHours() * 60 + ended.getMinutes());
+    byDate.get(date).push({ entry, id: entry.id, start, end });
+  }
+
+  let axisFrom = defaultFrom;
+  let axisTo = defaultTo;
+  for (const items of byDate.values()) {
+    for (const item of items) {
+      axisFrom = Math.min(axisFrom, Math.floor(item.start / 60) * 60);
+      axisTo = Math.max(axisTo, Math.ceil(item.end / 60) * 60);
+    }
+  }
+
+  const days = [...byDate.entries()].map(([date, items]) => {
+    const laneEnds = [];
+    const sorted = items.sort((a, b) => a.start - b.start || a.end - b.end);
+    for (const item of sorted) {
+      let lane = laneEnds.findIndex((end) => end <= item.start);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(0);
+      }
+      laneEnds[lane] = item.end;
+      item.lane = lane;
+    }
+    const lanes = Math.max(1, laneEnds.length);
+    return { date, entries: sorted.map((item) => ({ ...item, lanes })) };
+  });
+  return { axis: { from: axisFrom, to: axisTo }, days };
+}
+
+export function calendarEntryTooltip(title, entry, projectName) {
+  const note = String(entry.notes || '')
+    .replace(/[\n\r]+/g, ' ')
+    .replace(/[`*_#[\]()>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  return [title, `${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}`, projectName, note]
+    .filter(Boolean)
+    .join('\n');
+}
+
 /** 兩個 YYYY-MM-DD 之間相差幾天（b - a）。用 UTC 算避免日光節約時間誤差 */
 export function daysBetween(a, b) {
   if (!a || !b) return null;

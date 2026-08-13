@@ -1,6 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeRange, currentWeekDateRange, dailyReviewData, localDateRange, rangeControlState } from './time.js';
+import { activeRange, calendarEntryTooltip, calendarReviewData, currentWeekDateRange, dailyReviewData, localDateRange, rangeControlState } from './time.js';
+
+test('calendarEntryTooltip includes readable work context', () => {
+  const tooltip = calendarEntryTooltip('API 問題', {
+    startedAt: '2026-08-10T09:00:00+08:00',
+    endedAt: '2026-08-10T10:30:00+08:00',
+    notes: '**回覆** c01\n第二行',
+  }, '客服內部應用');
+
+  assert.equal(tooltip, 'API 問題\n09:00–10:30\n客服內部應用\n回覆 c01 第二行');
+});
+
+test('calendarReviewData maps work to a shared time axis', () => {
+  const result = calendarReviewData([
+    { id: 'late', startedAt: '2026-08-10T13:30:00+08:00', endedAt: '2026-08-10T15:00:00+08:00' },
+    { id: 'early', startedAt: '2026-08-10T09:00:00+08:00', endedAt: '2026-08-10T10:30:00+08:00' },
+    { id: 'next', startedAt: '2026-08-11T10:00:00+08:00', endedAt: '2026-08-11T11:00:00+08:00' },
+  ], ['2026-08-10', '2026-08-11']);
+
+  assert.deepEqual(result.axis, { from: 8 * 60, to: 18 * 60 });
+  assert.deepEqual(result.days[0].entries.map(({ id, start, end }) => ({ id, start, end })), [
+    { id: 'early', start: 540, end: 630 },
+    { id: 'late', start: 810, end: 900 },
+  ]);
+  assert.deepEqual(result.days[1].entries[0].start, 600);
+});
 
 test('dailyReviewData keeps empty dates and sorts work by start time', () => {
   const result = dailyReviewData([

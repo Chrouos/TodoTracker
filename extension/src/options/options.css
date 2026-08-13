@@ -415,6 +415,88 @@ section[hidden] { display: none; }
 .review-calendar-time,
 .review-calendar-duration { display: none; }
 .review-calendar-title { margin-top: 0; font-size: 13px; font-weight: 700; }
+.review-calendar {
+  grid-template-columns: 58px repeat(var(--review-days), minmax(112px, 1fr));
+  grid-template-rows: auto var(--calendar-height);
+  overflow-x: auto;
+  overflow-y: visible;
+}
+.review-calendar-corner { border-bottom: 1px solid var(--hairline); }
+.review-calendar-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 10px 10px;
+  border-left: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.review-calendar-day-head strong { font-size: 14px; }
+.review-calendar-day-head span { color: var(--text-mute); font-size: 12px; }
+.review-calendar-axis,
+.review-calendar-day-body {
+  position: relative;
+  min-height: 0;
+  height: var(--calendar-height);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc((100% / var(--calendar-hours)) - 1px),
+    var(--hairline) calc((100% / var(--calendar-hours)) - 1px),
+    var(--hairline) calc(100% / var(--calendar-hours))
+  );
+}
+.review-calendar-day-body { border-left: 1px solid var(--hairline); }
+.review-calendar-axis-label {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--text-mute);
+  font-size: 11px;
+}
+.review-calendar-axis-label:first-child { transform: none; }
+.review-calendar-entry {
+  position: absolute;
+  top: calc(var(--entry-top) * 1%);
+  left: calc(var(--entry-lane) * (100% / var(--entry-lanes)) + 4px);
+  width: calc(100% / var(--entry-lanes) - 8px);
+  height: calc(var(--entry-height) * 1%);
+  min-height: 24px;
+  margin: 0;
+  padding: 5px 7px;
+  border-left: 3px solid var(--project-color);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--project-color) 14%, var(--canvas));
+  overflow: visible;
+  z-index: 1;
+}
+.review-calendar-entry:hover,
+.review-calendar-entry:focus-visible { z-index: 10; outline: 1px solid var(--project-color); }
+.review-calendar-entry::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r);
+  background: var(--surface-dark);
+  color: var(--canvas);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: pre-line;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.review-calendar-entry:hover::after,
+.review-calendar-entry:focus-visible::after { opacity: 1; visibility: visible; }
+.review-calendar-title { display: block; margin: 0; font-size: 12px; line-height: 1.35; }
 
 .todo-health {
   display: grid;
