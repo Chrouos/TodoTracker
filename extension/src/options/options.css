@@ -497,6 +497,16 @@ section[hidden] { display: none; }
 .review-calendar-entry:hover::after,
 .review-calendar-entry:focus-visible::after { opacity: 1; visibility: visible; }
 .review-calendar-title { display: block; margin: 0; font-size: 12px; line-height: 1.35; }
+.review-calendar { overflow: visible; }
+.review-calendar-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-calendar-entry::after {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .todo-health {
   display: grid;
