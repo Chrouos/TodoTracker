@@ -254,6 +254,7 @@ function renderReport() {
   });
   }
   $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, reviewDates));
+  initializeMarkdownPreviews($('dailyReview'));
 }
 
 function renderDailyReview(groups) {
@@ -290,10 +291,19 @@ function renderReviewCalendar(groups) {
       const title = entry.description || task?.title || '未命名工作';
       const projectName = project?.name || '一般工作';
       const tooltip = calendarEntryTooltip(title, entry, projectName);
+      const notePreview = entry.notes
+        ? renderMarkdownPreview(entry.notes, 'review-calendar-tooltip-notes')
+        : '';
       const top = ((item.start - calendar.axis.from) / span) * 100;
       const height = Math.max(4, ((item.end - item.start) / span) * 100);
-      return `<div class="review-calendar-entry" tabindex="0" title="${esc(tooltip)}" aria-label="${esc(tooltip)}" data-tooltip="${esc(tooltip)}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
+      return `<div class="review-calendar-entry" tabindex="0" title="${esc(tooltip)}" aria-label="${esc(tooltip)}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
         <span class="review-calendar-title">${esc(projectName)}</span>
+        <div class="review-calendar-tooltip" role="tooltip">
+          <strong>${esc(title)}</strong>
+          <span>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
+          <span>${esc(projectName)}</span>
+          ${notePreview}
+        </div>
       </div>`;
     }).join('');
     return `<div class="review-calendar-day-body">${entries}</div>`;
@@ -1556,6 +1566,7 @@ document.getElementById('reviewMode').addEventListener('click', (event) => {
   if (!mode || event.target.disabled) return;
   reviewMode = mode;
   $('dailyReview').innerHTML = renderDailyReview(reviewGroups);
+  initializeMarkdownPreviews($('dailyReview'));
 });
 document.getElementById('reviewMode').addEventListener('keydown', (event) => event.stopPropagation());
 groupReportPanels();

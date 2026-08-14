@@ -463,29 +463,39 @@ section[hidden] { display: none; }
 }
 .review-calendar-entry:hover,
 .review-calendar-entry:focus-visible { z-index: 10; outline: 1px solid var(--project-color); }
-.review-calendar-entry::after {
-  content: attr(data-tooltip);
+.review-calendar-tooltip {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  width: max-content;
-  max-width: 280px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 280px;
+  overflow-y: auto;
   padding: 8px 10px;
   border: 1px solid var(--hairline-strong);
   border-radius: var(--r);
-  background: var(--surface-dark);
-  color: var(--canvas);
+  background: var(--canvas);
+  color: var(--text-body);
   box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
-  font-size: 12px;
+  font-family: var(--font, system-ui, sans-serif);
+  font-size: 13px;
   font-weight: 400;
-  line-height: 1.5;
-  white-space: pre-line;
+  line-height: 1.6;
+  white-space: normal;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
-.review-calendar-entry:hover::after,
-.review-calendar-entry:focus-visible::after { opacity: 1; visibility: visible; }
+.review-calendar-tooltip > * { display: block; }
+.review-calendar-tooltip > strong { margin-bottom: 4px; }
+.review-calendar-tooltip .markdown-preview {
+  margin-top: 8px;
+  font-family: var(--font, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.review-calendar-tooltip .markdown-preview p { margin: 0 0 6px; }
+.review-calendar-entry:hover .review-calendar-tooltip,
+.review-calendar-entry:focus-visible .review-calendar-tooltip { opacity: 1; visibility: visible; }
 .review-calendar-title { display: block; margin: 0; font-size: 12px; line-height: 1.35; }
 .review-calendar { overflow: visible; }
 .review-calendar-title {
@@ -493,10 +503,7 @@ section[hidden] { display: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.review-calendar-entry::after {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+.review-calendar-tooltip { overflow-wrap: anywhere; word-break: break-word; }
 
 .todo-health {
   display: grid;
