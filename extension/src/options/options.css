@@ -314,16 +314,13 @@ section[hidden] { display: none; }
 #p-report > .report-panel { min-width: 0; }
 #p-report > .report-panel-health { grid-column: 1 / -1; }
 #p-report > .report-panel-donut { grid-column: 1; }
-#p-report > .report-panel-time { grid-column: 2; }
-#p-report > .report-panel-wide { grid-column: 1 / -1; margin-top: 16px; }
 #p-report {
   grid-template-columns: minmax(0, 1fr);
   column-gap: 0;
 }
 #p-report > .report-panel-health,
 #p-report > .report-panel-donut,
-#p-report > .report-panel-review,
-#p-report > .report-panel-wide { grid-column: 1; }
+#p-report > .report-panel-review { grid-column: 1; }
 #p-report > .report-panel > h2.sec {
   margin: 0 0 14px;
   padding: 6px 2px 8px;
@@ -534,12 +531,6 @@ section[hidden] { display: none; }
 .todo-health-complete .num small { color: var(--success); }
 .todo-health-overdue .num { color: var(--danger); }
 
-.chart-split {
-  display: flex; align-items: center; gap: var(--xxl);
-  border: 1px solid var(--hairline); padding: var(--lg);
-}
-.chart-split > svg { flex: 0 0 auto; }
-
 .project-trend-wrap { padding: 18px 20px 22px; }
 .project-trend-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--md); margin-bottom: 10px; }
 .project-trend-toolbar button { background: var(--surface-soft); border-color: var(--hairline); }
@@ -618,12 +609,9 @@ dialog .field { margin-bottom: var(--md); }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .kpi:nth-child(2) { border-right: 0; }
   .grid4, .grid2 { grid-template-columns: 1fr; }
-  .chart-split { flex-direction: column; gap: var(--lg); }
-  .chart-split > svg { align-self: center; }
   .legend { width: 100%; }
   .bar-label { width: 110px; flex: 0 0 110px; }
   #p-report { display: block; }
-  #p-report > .report-panel-wide { margin-top: 0; }
   .todo-health { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .todo-health-item:nth-child(2) { border-right: 0; }
   .todo-health-item:nth-child(-n + 2) { border-bottom: 1px solid var(--hairline); }

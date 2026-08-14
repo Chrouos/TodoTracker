@@ -1,4 +1,4 @@
-import { fmtDate, fmtHM } from './time.js';
+import { fmtDate } from './time.js';
 
 const UNCLASSIFIED = {
   id: null,
@@ -6,21 +6,8 @@ const UNCLASSIFIED = {
   color: '#9a9898',
 };
 
-const byName = (a, b) => a.name.localeCompare(b.name);
-
 function projectMap(projects) {
   return new Map(projects.map((project) => [project.id, project]));
-}
-
-function childrenMap(projects) {
-  const map = new Map();
-  for (const project of projects) {
-    const parentId = project.parentId || null;
-    if (!map.has(parentId)) map.set(parentId, []);
-    map.get(parentId).push(project);
-  }
-  for (const children of map.values()) children.sort(byName);
-  return map;
 }
 
 function rootIdFor(projectId, projectsById) {
@@ -33,47 +20,18 @@ function rootIdFor(projectId, projectsById) {
   return current?.id || projectId;
 }
 
-function bucketIdFor(projectId, focusId, projectsById) {
+function bucketIdFor(projectId, projectsById) {
   if (!projectId) return null;
-  if (!focusId) return rootIdFor(projectId, projectsById);
-  if (projectId === focusId) return `direct:${focusId}`;
-
-  let current = projectsById.get(projectId);
-  const seen = new Set();
-  while (current?.parentId && !seen.has(current.id)) {
-    if (current.parentId === focusId) return current.id;
-    seen.add(current.id);
-    current = projectsById.get(current.parentId);
-  }
-  return null;
+  return rootIdFor(projectId, projectsById);
 }
 
-function bucketDefinitions(projects, focusId, projectsById, children) {
+function bucketDefinitions(projects, projectsById) {
   const roots = projects.filter((project) => !project.parentId || !projectsById.has(project.parentId));
-  if (!focusId) return [...roots, UNCLASSIFIED];
-
-  const focus = projectsById.get(focusId);
-  if (!focus) return [UNCLASSIFIED];
-  const direct = (children.get(focusId) || []).map((project) => ({
-    id: project.id,
-    name: project.name,
-    color: project.color || '#9a9898',
-  }));
-  const own = projects.some((project) => project.id === focusId);
-  if (own) direct.push({
-    id: `direct:${focusId}`,
-    name: `${focus.name}（直接）`,
-    color: focus.color || '#9a9898',
-  });
-  return direct;
+  return [...roots, UNCLASSIFIED];
 }
 
 function emptyValues(dates) {
   return dates.map(() => 0);
-}
-
-export function formatTrendSeconds(seconds) {
-  return fmtHM(seconds);
 }
 
 export function buildProjectTrendData({
@@ -81,13 +39,11 @@ export function buildProjectTrendData({
   projects,
   dates,
   durationSec,
-  focusId = null,
   limit = 8,
 }) {
   const safeDates = [...dates];
   const projectsById = projectMap(projects);
-  const children = childrenMap(projects);
-  const definitions = bucketDefinitions(projects, focusId, projectsById, children);
+  const definitions = bucketDefinitions(projects, projectsById);
   const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   const valuesById = new Map(definitions.map((definition) => [definition.id, emptyValues(safeDates)]));
   const detailsByDate = safeDates.map(() => []);
@@ -97,7 +53,7 @@ export function buildProjectTrendData({
     const date = fmtDate(entry.startedAt);
     const index = dateIndex.get(date);
     if (index === undefined) continue;
-    const bucketId = bucketIdFor(entry.projectId, focusId, projectsById);
+    const bucketId = bucketIdFor(entry.projectId, projectsById);
     if (!byId.has(bucketId)) continue;
     const seconds = Math.max(0, Number(durationSec(entry)) || 0);
     valuesById.get(bucketId)[index] += seconds;
@@ -145,7 +101,6 @@ export function buildProjectTrendData({
     dailyTotals,
     detailsByDate,
     maxCellSeconds,
-    focusId,
   };
 }
 

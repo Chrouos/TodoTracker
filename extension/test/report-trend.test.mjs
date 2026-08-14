@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import {
   buildProjectTrendData,
   buildProjectDetailData,
-  formatTrendSeconds,
 } from '../src/lib/project-trend.js';
 import { heatmapSVG, stackedAreaSVG } from '../src/lib/charts.js';
 
@@ -33,8 +32,6 @@ assert.deepEqual(data.dates, ['2026-08-10', '2026-08-11']);
 assert.deepEqual(data.dailyTotals, [11700, 1800]);
 assert.equal(data.series.find((series) => series.id === 'project-a').values[0], 10800);
 assert.equal(data.series.find((series) => series.id === null).values[0], 900);
-assert.equal(formatTrendSeconds(11700), '3h 15m');
-
 const detail = buildProjectDetailData({
   entries: [
     ...entries,
@@ -51,16 +48,6 @@ assert.equal(detail.totalEntries, 3);
 assert.deepEqual(detail.dailyTotals, [10800, 1800]);
 assert.equal(detail.tasksDone, 1);
 assert.equal(detail.tasksTotal, 2);
-
-const focused = buildProjectTrendData({
-  entries,
-  projects,
-  dates: ['2026-08-10', '2026-08-11'],
-  durationSec: (entry) => entry.seconds,
-  focusId: 'project-a',
-});
-assert.deepEqual(focused.series.map((series) => series.name), ['子專案 A', '專案 A（直接）']);
-assert.deepEqual(focused.dailyTotals, [10800, 0]);
 
 const stacked = stackedAreaSVG(data);
 const heatmap = heatmapSVG(data);
