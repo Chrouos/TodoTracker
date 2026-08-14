@@ -154,6 +154,8 @@ label.field > span { display: block; font-size: 12px; color: var(--text-mute); m
   white-space: nowrap;
 }
 .badge-dark { background: var(--surface-dark); color: var(--canvas); border-color: var(--surface-dark); }
+.badge.priority-urgent { color: var(--danger); border-color: var(--danger); }
+.badge.priority-high { color: var(--ink); border-color: var(--ink); }
 
 /* 專案色塊：8px 方形，radius 0 */
 .swatch { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 0; background: var(--text-ash); }

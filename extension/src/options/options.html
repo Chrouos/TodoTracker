@@ -92,6 +92,9 @@
             <option value="done">已完成</option>
           </select>
         </label>
+        <label class="field"><span>優先級</span>
+          <select id="tdPriority"></select>
+        </label>
       </div>
       <label class="field task-parent-field"><span>上層任務</span>
         <select id="tdParentTask"></select>
@@ -129,6 +132,7 @@
 
     <div class="toolbar">
       <select id="tdFilter" style="width:260px"></select>
+      <select id="tdPriorityFilter" style="width:150px"></select>
       <button id="tdToggleDone">[ ] 顯示已完成</button>
       <div class="grow"></div>
       <span class="cap" id="tdCount"></span>

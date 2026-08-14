@@ -9,6 +9,9 @@ import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tre
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import {
+  TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
+} from '../lib/todo-filter.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -309,6 +312,8 @@ function renderTodos() {
   const taskTree = flattenTasks(S.tasks.filter((t) => t.status !== 'archived'));
   const opts = (blank) => `<option value="">${blank}</option>` +
     tree.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+  const priorityOpts = (blank = null) => (blank === null ? '' : `<option value="">${blank}</option>`) +
+    TODO_PRIORITIES.map((p) => `<option value="${p.value}">${p.label}</option>`).join('');
 
   const keepP = $('tdProject').value;
   $('tdProject').innerHTML = opts('— 未分類 —');
@@ -317,6 +322,14 @@ function renderTodos() {
   const keepF = $('tdFilter').value;
   $('tdFilter').innerHTML = opts('— 全部專案 —');
   $('tdFilter').value = keepF;
+
+  const keepPriority = $('tdPriority').value || 'normal';
+  $('tdPriority').innerHTML = priorityOpts();
+  $('tdPriority').value = normalizePriority(keepPriority);
+
+  const keepPriorityFilter = $('tdPriorityFilter').value;
+  $('tdPriorityFilter').innerHTML = priorityOpts('— 全部優先級 —');
+  $('tdPriorityFilter').value = keepPriorityFilter;
 
   const keepParent = $('tdParentTask').value;
   const editingTaskId = $('tdId').value;
@@ -329,18 +342,16 @@ function renderTodos() {
 
   // 選了父專案時，子專案的 todo 也一起列出來
   const scope = keepF ? new Set([keepF, ...descendantSet(keepF)]) : null;
-
-  const list = S.tasks
-    .filter((t) => t.status !== 'archived')
-    .filter((t) => (showDone ? true : t.status !== 'done'))
-    .filter((t) => (scope ? scope.has(t.projectId) : true))
-    ;
+  const list = filterTasks(S.tasks, {
+    projectScope: scope,
+    priority: keepPriorityFilter,
+    showDone,
+  });
   const orderedList = tree.flatMap((project) =>
     flattenTasks(list.filter((task) => task.projectId === project.id))
   ).concat(flattenTasks(list.filter((task) => !task.projectId)));
 
-  const open = list.filter((t) => t.status !== 'done').length;
-  $('tdCount').textContent = `${open} 個未完成 / 共 ${list.length}`;
+  $('tdCount').textContent = taskCountLabel(list, showDone);
 
   $('todoList').innerHTML = list.length
     ? orderedList.map((t, index) => {
@@ -367,6 +378,7 @@ function renderTodos() {
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
+              <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority)}</span>
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
               ${m.leadMs !== null ? `<span class="badge">歷時 ${leadLabel(m.leadMs)}</span>` : ''}
               ${t.reopenCount ? `<span class="badge">重開 ${t.reopenCount} 次</span>` : ''}
@@ -389,6 +401,7 @@ function renderTodos() {
 function resetTodoForm() {
   $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
   $('tdStatus').value = 'todo'; $('tdDue').value = '';
+  $('tdPriority').value = 'normal';
   $('tdParentTask').value = '';
   $('tdOpened').value = '建立後自動記錄';
   $('tdDone').value = '—';
@@ -407,6 +420,7 @@ $('todoForm').addEventListener('submit', async (e) => {
     projectId: $('tdProject').value || null,
     parentTaskId: $('tdParentTask').value || null,
     status: $('tdStatus').value,
+    priority: $('tdPriority').value,
     dueDate: $('tdDue').value || null,   // 開單／結案時間由 db.js 自己維護
     reminderAt: $('tdReminder').value || null,
     notes: $('tdNotes').value,
@@ -418,6 +432,7 @@ $('todoForm').addEventListener('submit', async (e) => {
 $('tdCancel').addEventListener('click', resetTodoForm);
 $('tdProject').addEventListener('change', renderTodos);
 $('tdFilter').addEventListener('change', renderTodos);
+$('tdPriorityFilter').addEventListener('change', renderTodos);
 $('tdToggleDone').addEventListener('click', () => { showDone = !showDone; renderTodos(); });
 
 $('todoList').addEventListener('click', async (e) => {
@@ -438,6 +453,7 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdProject').value = t.projectId || '';
     $('tdParentTask').value = t.parentTaskId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
+    $('tdPriority').value = normalizePriority(t.priority);
     $('tdDue').value = t.dueDate || '';
     $('tdReminder').value = t.reminderAt ? t.reminderAt.slice(0, 16) : '';
     $('tdOpened').value = stampLabel(t.openedAt);

@@ -8,6 +8,7 @@ const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 2
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
 import { fmtHMS, fmtHM, fmtClock, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
+import { TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel } from '../lib/todo-filter.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -192,9 +193,17 @@ function renderTodo() {
       .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   ps.value = keep;
 
-  const filter = ps.value;
-  const list = state.tasks
-    .filter((t) => t.status !== 'archived' && (!filter || t.projectId === filter))
+  const priorityFilter = $('todoPriorityFilter');
+  const keepPriority = priorityFilter.value;
+  priorityFilter.innerHTML = '<option value="">— 全部優先級 —</option>' +
+    TODO_PRIORITIES.map((p) => `<option value="${p.value}">${p.label}</option>`).join('');
+  priorityFilter.value = keepPriority;
+
+  const list = filterTasks(state.tasks, {
+    projectScope: ps.value ? new Set([ps.value]) : null,
+    priority: priorityFilter.value,
+    showDone: true,
+  })
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
 
   $('todoList').innerHTML = list.length
@@ -204,7 +213,7 @@ function renderTodo() {
         return `<div class="item ${done ? 'done' : ''}">
           <button class="check" data-check="${t.id}">${done ? '[x]' : '[ ]'}</button>
           <div class="main">
-            <div class="t1">${esc(t.title)}</div>
+            <div class="t1">${esc(t.title)} <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority)}</span></div>
             <div class="t2">${p ? esc(p.name) : '未分類'}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
           ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="對這個 todo 計時">[&gt;]</button>`}
@@ -327,11 +336,16 @@ $('logText').addEventListener('keydown', (ev) => {
 /* Todo 分頁 */
 $('newTodo').addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter' || !e.target.value.trim()) return;
-  await db.upsertTask({ title: e.target.value, projectId: $('todoProject').value || null });
+  await db.upsertTask({
+    title: e.target.value,
+    projectId: $('todoProject').value || null,
+    priority: 'normal',
+  });
   e.target.value = '';
   await load();
 });
 $('todoProject').addEventListener('change', renderTodo);
+$('todoPriorityFilter').addEventListener('change', renderTodo);
 
 $('todoList').addEventListener('click', async (e) => {
   const check = e.target.closest('[data-check]')?.dataset.check;

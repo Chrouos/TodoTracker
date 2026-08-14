@@ -20,6 +20,7 @@ const K = {
 };
 
 import { wouldCycle } from './tree.js';
+import { normalizePriority } from './todo-filter.js';
 
 export const uid = () => crypto.randomUUID();
 export const nowISO = () => new Date().toISOString();
@@ -134,6 +135,7 @@ export async function upsertTask(t) {
     title: (t.title || '').trim(),
     notes: t.notes || '',
     status,
+    priority: normalizePriority(t.priority),
 
     // 開單時間：建立當下決定，之後一律沿用舊值，不接受外部覆蓋
     openedAt: prev?.openedAt || nowISO(),
