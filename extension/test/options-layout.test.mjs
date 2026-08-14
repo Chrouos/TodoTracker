@@ -46,6 +46,8 @@ assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
   'Management timer should give project and Todo selectors enough width');
+assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*180px[^}]*overflow-y:\s*auto\s*!important/s,
+  'Management timer notes should be larger and scrollable');
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
 console.log('options layout contract passed');

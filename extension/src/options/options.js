@@ -19,7 +19,7 @@ const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 3
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
 autoGrow(document.getElementById('pjNoteDraft'), { min: 72, max: 320 });
 autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
-const growTimerNotes = autoGrow(document.getElementById('mgTimerNotes'), { min: 80, max: 260 });
+const growTimerNotes = autoGrow(document.getElementById('mgTimerNotes'), { min: 180, max: 360 });
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
