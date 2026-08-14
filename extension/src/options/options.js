@@ -278,6 +278,12 @@ async function flushManagementTimerNotes() {
   setTimeout(() => { $('mgTimerSaved').textContent = ''; }, 1200);
 }
 
+async function reloadTimerViewPreservingScroll() {
+  const scrollY = window.scrollY;
+  await load();
+  window.scrollTo(0, scrollY);
+}
+
 $('mgTimerDescription').addEventListener('input', (event) => {
   patchManagementTimer({ description: event.target.value });
 });
@@ -326,7 +332,7 @@ $('mgTimerToggle').addEventListener('click', async () => {
     });
     timerDraft = { ...timerDraft, ...started };
   }
-  await load();
+  await reloadTimerViewPreservingScroll();
 });
 
 function groupReportPanels() {

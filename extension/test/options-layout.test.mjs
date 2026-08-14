@@ -40,6 +40,8 @@ assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a re
 assert.doesNotMatch(options, /data-tooltip="\$\{esc\(tooltip\)\}"/, 'Calendar hover should not render tooltip content through attr()');
 assert.match(options, /getTimer/, 'Management timer should load the shared timer');
 assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
+assert.match(options, /const scrollY = window\.scrollY/, 'Management timer should capture scroll position before reload');
+assert.match(options, /window\.scrollTo\(0, scrollY\)/, 'Management timer should restore scroll position after reload');
 assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
