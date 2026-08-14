@@ -1133,6 +1133,7 @@ function renderSchedules() {
   $('schList').innerHTML = list.length
     ? list.map((s) => {
         const p = S.projects.find((x) => x.id === s.projectId);
+        const priority = normalizePriority(s.priority);
         const bits = [
           dowLabel(s.weekdays),
           `${s.createTime} 開單`,
@@ -1145,6 +1146,7 @@ function renderSchedules() {
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(s.title)}
+              <span class="badge priority-${priority}">${priorityLabel(priority)}</span>
               ${s.enabled ? '' : '<span class="badge">已停用</span>'}</div>
             <div class="sub num">${bits}</div>
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}${
@@ -1162,6 +1164,7 @@ function renderSchedules() {
 
 function resetSchForm() {
   $('scId').value = ''; $('scTitle').value = ''; $('scNotes').value = '';
+  $('scPriority').value = 'normal';
   $('scCreate').value = '09:00'; $('scDue').value = ''; $('scRemind').value = '';
   $('scEnabled').value = '1'; $('scCancel').hidden = true;
   scDays = new Set([1, 2, 3, 4, 5]);
@@ -1188,6 +1191,7 @@ $('schForm').addEventListener('submit', async (e) => {
     id: $('scId').value || undefined,
     title: $('scTitle').value,
     projectId: $('scProject').value || null,
+    priority: normalizePriority($('scPriority').value),
     notes: $('scNotes').value,
     weekdays: [...scDays],
     createTime: $('scCreate').value || '09:00',
@@ -1221,6 +1225,7 @@ $('schList').addEventListener('click', async (e) => {
     const s = S.schedules.find((x) => x.id === ed);
     $('scId').value = s.id; $('scTitle').value = s.title;
     $('scProject').value = s.projectId || '';
+    $('scPriority').value = normalizePriority(s.priority);
     $('scNotes').value = s.notes || '';
     $('scCreate').value = s.createTime; $('scDue').value = s.dueTime || '';
     $('scRemind').value = s.remindMinutes ?? '';

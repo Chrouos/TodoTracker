@@ -11,6 +11,7 @@ assert.match(css, /\.todo-form-main\s*\{[^}]*grid-template-columns:\s*2fr\s+1fr\
 
 assert.match(html, /id="tdPriority"/, 'Todo should have a priority field');
 assert.match(html, /id="tdPriorityFilter"/, 'Todo should have a priority filter');
+assert.match(html, /id="scPriority"/, 'Schedule should have a priority field');
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');

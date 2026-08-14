@@ -73,7 +73,7 @@ globalThis.chrome = {
     },
   },
 };
-const { listTasks, upsertTask } = await import('../src/lib/db.js');
+const { listTasks, upsertTask, listSchedules, upsertSchedule, runDueSchedules } = await import('../src/lib/db.js');
 const created = await upsertTask({ id: 'priority-default', title: 'Default priority' });
 assert.equal(created.priority, 'normal');
 
@@ -81,5 +81,19 @@ taskStorage.tasks = [{ id: 'legacy-task', title: 'Legacy task', status: 'todo' }
 const updatedLegacy = await upsertTask({ ...taskStorage.tasks[0], status: 'doing' });
 assert.equal(updatedLegacy.priority, 'normal');
 assert.equal((await listTasks())[0].priority, 'normal');
+
+const schedule = await upsertSchedule({
+  id: 'schedule-priority', title: '優先排程', weekdays: [1], createTime: '09:00', priority: 'high',
+});
+assert.equal(schedule.priority, 'high');
+assert.equal((await listSchedules())[0].priority, 'high');
+const generated = await runDueSchedules(new Date('2026-08-10T09:01:00'));
+assert.equal(generated[0].priority, 'high');
+assert.equal((await listTasks()).find((task) => task.scheduleId === 'schedule-priority').priority, 'high');
+
+const legacySchedule = await upsertSchedule({
+  id: 'schedule-default', title: '預設排程', weekdays: [2], createTime: '09:00', priority: 'invalid',
+});
+assert.equal(legacySchedule.priority, 'normal');
 
 console.log('todo priority contract passed');

@@ -22,6 +22,7 @@ const K = {
 
 import { wouldCycle } from './tree.js';
 import { removeProjectData } from './relations.js';
+import { normalizePriority } from './todo-filter.js';
 
 export const uid = () => crypto.randomUUID();
 export const nowISO = () => new Date().toISOString();
@@ -217,6 +218,7 @@ export async function upsertSchedule(s) {
     id: s.id || uid(),
     title: (s.title || '').trim(),
     projectId: s.projectId || null,
+    priority: normalizePriority(s.priority),
     notes: s.notes || '',
     weekdays: Array.isArray(s.weekdays) ? [...s.weekdays].sort() : [1, 2, 3, 4, 5],
     createTime: s.createTime || '09:00',        // 幾點自動開單
@@ -268,6 +270,7 @@ export async function runDueSchedules(now = new Date()) {
       // 每次排程產生的 Todo 都帶上執行日期，避免每天看起來是同一筆工作
       title: `${s.title} · ${today}`,
       projectId: s.projectId,
+      priority: s.priority,
       notes: s.notes,
       status: 'todo',
       dueDate: today,
