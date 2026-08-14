@@ -12,6 +12,14 @@ assert.match(css, /\.todo-form-main\s*\{[^}]*grid-template-columns:\s*2fr\s+1fr\
 assert.match(html, /id="tdPriority"/, 'Todo should have a priority field');
 assert.match(html, /id="tdPriorityFilter"/, 'Todo should have a priority filter');
 assert.match(html, /id="scPriority"/, 'Schedule should have a priority field');
+assert.match(html, /data-tab="timer"/, 'Management timer should have its own tab');
+assert.match(html, /id="p-timer"/, 'Management timer should be inside its own panel');
+for (const id of [
+  'managementTimer', 'mgTimerClock', 'mgTimerDescription', 'mgTimerProject',
+  'mgTimerTask', 'mgTimerTags', 'mgTimerNotes', 'mgTimerComplete', 'mgTimerToggle',
+]) {
+  assert.match(html, new RegExp(`id="${id}"`), `Management timer should have ${id}`);
+}
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
@@ -27,4 +35,6 @@ assert.match(options, /buildProjectDetailData/, 'Project selection should render
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
 assert.doesNotMatch(options, /data-tooltip="\$\{esc\(tooltip\)\}"/, 'Calendar hover should not render tooltip content through attr()');
+assert.match(options, /getTimer/, 'Management timer should load the shared timer');
+assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
 console.log('options layout contract passed');

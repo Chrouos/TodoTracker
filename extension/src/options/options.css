@@ -51,6 +51,21 @@ section[hidden] { display: none; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
 .actions { display: flex; gap: var(--sm); margin-top: var(--md); flex-wrap: wrap; }
 
+.timer-panel { padding: var(--lg); }
+.timer-panel-head,
+.timer-panel-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--md); }
+.timer-clock { margin-top: var(--xs); font-size: 30px; font-weight: 700; letter-spacing: .04em; }
+.timer-fields { margin-top: var(--lg); }
+.timer-tags-field,
+.timer-notes-field { margin-top: var(--md); }
+.timer-tags { display: flex; flex-wrap: wrap; gap: var(--xs); margin-top: var(--xs); min-height: 30px; }
+.timer-tag { padding: 5px 9px; border: 1px solid var(--hairline); border-radius: var(--r); background: var(--surface-soft); color: var(--text-mute); }
+.timer-tag.on { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
+.timer-complete { display: inline-flex; align-items: center; gap: var(--xs); font-size: 12px; }
+.timer-complete[hidden] { display: none; }
+.timer-panel.is-running { border-color: var(--ink); box-shadow: 0 4px 18px rgba(32, 29, 29, .08); }
+.timer-panel.is-running .timer-clock { color: var(--ink); }
+
 /* 列表 */
 .row-item {
   display: flex; align-items: center; gap: var(--md);

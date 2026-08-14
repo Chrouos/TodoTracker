@@ -16,12 +16,49 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="report">報表</button>
     <button class="tab" data-tab="projects">專案</button>
+    <button class="tab" data-tab="timer">計時</button>
     <button class="tab" data-tab="todos">Todo</button>
     <button class="tab" data-tab="schedules">排程</button>
     <button class="tab" data-tab="tags">標籤</button>
     <button class="tab" data-tab="entries">紀錄</button>
     <button class="tab" data-tab="settings">設定</button>
   </nav>
+
+  <section id="p-timer" hidden>
+    <div id="managementTimer" class="card timer-panel" aria-live="polite">
+      <div class="timer-panel-head">
+        <div>
+          <div class="cap">目前計時</div>
+          <div id="mgTimerClock" class="timer-clock num">00:00:00</div>
+          <div id="mgTimerStatus" class="cap">尚未開始</div>
+        </div>
+        <button id="mgTimerToggle" type="button" class="btn-primary">開始計時</button>
+      </div>
+
+      <div class="grid4 timer-fields">
+        <label class="field" style="grid-column: span 2"><span>工作描述</span>
+          <input id="mgTimerDescription" placeholder="正在做什麼？" autocomplete="off" /></label>
+        <label class="field"><span>專案</span><select id="mgTimerProject"></select></label>
+        <label class="field"><span>Todo</span><select id="mgTimerTask"></select></label>
+      </div>
+
+      <div class="field timer-tags-field">
+        <span>標籤</span>
+        <div id="mgTimerTags" class="timer-tags"></div>
+      </div>
+
+      <label class="field timer-notes-field"><span>當下紀錄</span>
+        <textarea id="mgTimerNotes" placeholder="邊做邊記，停止時會一起保存"></textarea></label>
+
+      <div class="timer-panel-foot">
+        <label id="mgTimerCompleteRow" class="timer-complete" hidden>
+          <input id="mgTimerComplete" type="checkbox" />
+          停止時標記 Todo 為完成
+        </label>
+        <span id="mgTimerSaved" class="cap"></span>
+      </div>
+    </div>
+  </section>
 
   <!-- ── 報表 ── -->
   <section id="p-report">

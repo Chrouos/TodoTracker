@@ -389,8 +389,9 @@ export async function patchTimer(patch) {
  * 停止計時並落地成一筆 entry。
  * @param {string|null} endedAt ISO 字串；不給就用現在
  * @param {number} discardSeconds 要從尾端扣掉的秒數（閒置扣除用）
+ * @param {{ completeTask?: boolean }} options 停止時是否完成掛上的 Todo
  */
-export async function stopTimer(endedAt = null, discardSeconds = 0) {
+export async function stopTimer(endedAt = null, discardSeconds = 0, { completeTask = false } = {}) {
   const t = await getTimer();
   if (!t) return null;
   let end = new Date(endedAt || nowISO()).getTime() - discardSeconds * 1000;
@@ -415,6 +416,11 @@ export async function stopTimer(endedAt = null, discardSeconds = 0) {
     startedAt: t.startedAt,
     endedAt: endISO,
   });
+  if (completeTask && t.taskId) {
+    const tasks = await read(K.tasks, []);
+    const task = tasks.find((item) => item.id === t.taskId);
+    if (task && task.status !== 'done') await upsertTask({ ...task, status: 'done' });
+  }
   await chrome.storage.local.remove(K.timer);
   return entry;
 }

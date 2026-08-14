@@ -105,7 +105,7 @@ Expected: FAIL，原因是管理頁尚未有 timer panel。
 - Modify: `extension/src/options/options.css`
 
 **Interfaces:**
-- Add a fixed section between the page header and tabs so it remains visible across all management tabs.
+- Add a `計時` navigation tab and a `p-timer` section; the timer panel is visible only when the timer tab is selected.
 - Use the IDs defined in Task 3.
 - The toggle button changes between `開始計時` and `停止並儲存`; the complete checkbox is hidden when no task is attached.
 

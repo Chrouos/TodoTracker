@@ -19,6 +19,7 @@ const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 3
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
 autoGrow(document.getElementById('pjNoteDraft'), { min: 72, max: 320 });
 autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
+const growTimerNotes = autoGrow(document.getElementById('mgTimerNotes'), { min: 80, max: 260 });
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -78,20 +79,24 @@ document.addEventListener('click', (event) => {
   setMarkdownPreviewExpanded(preview, !preview.classList.contains('is-expanded'));
 });
 
-let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], settings: db.DEFAULT_SETTINGS };
+let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
 let range = 'week';
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;
 const customReturnRange = { report: 'week', entries: 'all' };
 let reviewMode = 'list';
 let reviewGroups = [];
+let timerTicker = null;
+let timerNotesSaveTimer = null;
+let timerCompleteChoice = false;
+let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
 
 async function load() {
-  const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
+  const [projects, tags, tasks, entries, schedules, timer, settings] = await Promise.all([
     db.listProjects({ includeArchived: true }), db.listTags(),
-    db.listTasks(), db.listEntries(), db.listSchedules(), db.getSettings(),
+    db.listTasks(), db.listEntries(), db.listSchedules(), db.getTimer(), db.getSettings(),
   ]);
-  S = { projects, tags, tasks, entries, schedules, settings };
+  S = { projects, tags, tasks, entries, schedules, timer, settings };
   renderAll();
 }
 
@@ -179,9 +184,150 @@ function applyCustomRange(source) {
 }
 
 function renderAll() {
-  renderReport(); renderProjects(); renderTodos(); renderSchedules();
+  renderTimer(); renderReport(); renderProjects(); renderTodos(); renderSchedules();
   renderTags(); renderEntries(); renderSettings();
 }
+
+function timerClock(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+function stopTimerTicker() {
+  clearInterval(timerTicker);
+  timerTicker = null;
+}
+
+function startTimerTicker(timer) {
+  stopTimerTicker();
+  const tick = () => {
+    $('mgTimerClock').textContent = timerClock(
+      (Date.now() - new Date(timer.startedAt).getTime()) / 1000,
+    );
+  };
+  tick();
+  timerTicker = setInterval(tick, 1000);
+}
+
+function renderTimer() {
+  const timer = S.timer;
+  const current = timer || timerDraft;
+  const panel = $('managementTimer');
+  const project = $('mgTimerProject');
+  const task = $('mgTimerTask');
+  const projectId = current.projectId || '';
+  const taskId = current.taskId || '';
+
+  panel.classList.toggle('is-running', Boolean(timer));
+  $('mgTimerStatus').textContent = timer ? '計時中' : '尚未開始';
+  $('mgTimerToggle').textContent = timer ? '停止並儲存' : '開始計時';
+  $('mgTimerDescription').value = current.description || '';
+  if (timer && $('mgTimerNotes') !== document.activeElement) $('mgTimerNotes').value = timer.notes || '';
+
+  project.innerHTML = '<option value="">— 未分類 —</option>' +
+    flattenTree(S.projects, { includeArchived: false })
+      .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+  project.value = projectId;
+
+  const tasks = S.tasks
+    .filter((item) => item.status !== 'done' && item.status !== 'archived')
+    .filter((item) => !projectId || item.projectId === projectId);
+  const selectedTask = taskId && S.tasks.find((item) => item.id === taskId);
+  if (selectedTask && !tasks.some((item) => item.id === taskId)) tasks.unshift(selectedTask);
+  task.innerHTML = '<option value="">— 不掛 Todo —</option>' +
+    tasks.map((item) => `<option value="${item.id}">${esc(item.title)}</option>`).join('');
+  task.value = taskId;
+
+  const selectedTags = current.tagIds || [];
+  $('mgTimerTags').innerHTML = S.tags.length
+    ? S.tags.map((tag) => `<button type="button" class="timer-tag${selectedTags.includes(tag.id) ? ' on' : ''}"
+        data-mg-timer-tag="${tag.id}">${esc(tag.name)}</button>`).join('')
+    : '<span class="cap">尚未建立標籤</span>';
+
+  $('mgTimerCompleteRow').hidden = !timer?.taskId;
+  $('mgTimerComplete').checked = Boolean(timer && timerCompleteChoice);
+  if (!timer) {
+    $('mgTimerClock').textContent = '00:00:00';
+    stopTimerTicker();
+  } else {
+    startTimerTicker(timer);
+  }
+  growTimerNotes();
+}
+
+async function patchManagementTimer(patch) {
+  if (S.timer) {
+    S.timer = await db.patchTimer(patch);
+  } else {
+    timerDraft = { ...timerDraft, ...patch };
+  }
+}
+
+async function flushManagementTimerNotes() {
+  clearTimeout(timerNotesSaveTimer);
+  const notes = $('mgTimerNotes').value;
+  if (!S.timer) {
+    timerDraft.notes = notes;
+    return;
+  }
+  S.timer = await db.patchTimer({ notes });
+  $('mgTimerSaved').textContent = '已保存';
+  setTimeout(() => { $('mgTimerSaved').textContent = ''; }, 1200);
+}
+
+$('mgTimerDescription').addEventListener('input', (event) => {
+  patchManagementTimer({ description: event.target.value });
+});
+$('mgTimerProject').addEventListener('change', async (event) => {
+  await patchManagementTimer({ projectId: event.target.value || null, taskId: null });
+  renderTimer();
+});
+$('mgTimerTask').addEventListener('change', async (event) => {
+  await patchManagementTimer({ taskId: event.target.value || null });
+  renderTimer();
+});
+$('mgTimerTags').addEventListener('click', async (event) => {
+  const id = event.target.closest('[data-mg-timer-tag]')?.dataset.mgTimerTag;
+  if (!id) return;
+  const current = S.timer || timerDraft;
+  const tagIds = current.tagIds || [];
+  await patchManagementTimer({ tagIds: tagIds.includes(id)
+    ? tagIds.filter((tagId) => tagId !== id) : [...tagIds, id] });
+  renderTimer();
+});
+$('mgTimerNotes').addEventListener('input', () => {
+  if (!S.timer) {
+    timerDraft.notes = $('mgTimerNotes').value;
+    return;
+  }
+  $('mgTimerSaved').textContent = '儲存中…';
+  clearTimeout(timerNotesSaveTimer);
+  timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(), 500);
+});
+$('mgTimerComplete').addEventListener('change', (event) => {
+  timerCompleteChoice = event.target.checked;
+});
+$('mgTimerToggle').addEventListener('click', async () => {
+  if (S.timer) {
+    await flushManagementTimerNotes();
+    await db.stopTimer(null, 0, { completeTask: timerCompleteChoice });
+    timerCompleteChoice = false;
+    timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
+  } else {
+    const started = await db.startTimer({
+      description: $('mgTimerDescription').value,
+      projectId: $('mgTimerProject').value || null,
+      taskId: $('mgTimerTask').value || null,
+      tagIds: [...(timerDraft.tagIds || [])],
+      notes: $('mgTimerNotes').value,
+    });
+    timerDraft = { ...timerDraft, ...started };
+  }
+  await load();
+});
 
 function groupReportPanels() {
   const report = $('p-report');
@@ -1545,7 +1691,7 @@ $('tabs').addEventListener('click', (e) => {
   const name = e.target.dataset.tab;
   if (!name) return;
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-  ['report', 'projects', 'todos', 'schedules', 'tags', 'entries', 'settings']
+  ['report', 'projects', 'timer', 'todos', 'schedules', 'tags', 'entries', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
 });
