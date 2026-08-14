@@ -14,4 +14,8 @@ assert.match(html, /id="tdPriorityFilter"/, 'Todo should have a priority filter'
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
+assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');
+assert.doesNotMatch(html, /id="byDay"/, 'Report should not render a separate daily trend panel');
+assert.match(options, /buildProjectTrendData/, 'Report should build the fused project trend data');
+assert.match(options, /data-trend-date/, 'Report should wire date hover interaction');
 console.log('options layout contract passed');

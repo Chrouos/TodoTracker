@@ -3,7 +3,7 @@ import {
   fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
   dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
-import { donutSVG, lineSVG, timelineSVG } from '../lib/charts.js';
+import { timelineSVG, stackedAreaSVG, heatmapSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
@@ -13,6 +13,7 @@ import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
+import { buildProjectTrendData } from '../lib/project-trend.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -189,7 +190,6 @@ function groupReportPanels() {
     ['rep-health', 'todoHealth', 'report-panel-health'],
     ['rep-donut', 'byProject', 'report-panel-donut'],
     ['rep-review', 'dailyReview', 'report-panel-review'],
-    ['rep-line', 'byDay', 'report-panel-wide'],
   ].forEach(([collapseId, bodyId, className]) => {
     const heading = report.querySelector(`[data-collapse="${collapseId}"]`);
     const body = $(bodyId);
@@ -213,10 +213,7 @@ function renderReport() {
   $('kDays').textContent = dayKeys.size;
   renderTodoHealth();
 
-  // 專案分配：甜甜圈 + 圖例，時數向上累加，可以往下鑽
-  renderDonut(rows);
-
-  // 每日趨勢：區間太短就往前補，才看得出趨勢
+  // 融合專案分配與每日趨勢：區間太短就往前補，才看得出趨勢
   const today = startOfDay();
   const customBounds = range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
   const lineFrom = customBounds
@@ -226,17 +223,12 @@ function renderReport() {
         : range === 'month' ? startOfMonth()
           : new Date(today.getTime() - 29 * 864e5);
   const lineTo = customBounds ? new Date(customBounds.to.getTime() - 1) : new Date();
-  $('lineLabel').textContent = customBounds
-    ? `· ${customRange.from} ～ ${customRange.to}`
-    : '· ' + (range === 'today' ? '最近 7 天'
-      : range === 'week' ? '本週'
-        : range === 'month' ? '本月' : '最近 30 天');
-
   const series = dailySeries(
     customBounds ? rows : S.entries.filter((e) => e.endedAt && new Date(e.startedAt) >= lineFrom),
     lineFrom, lineTo, db.durationSec,
   );
-  $('byDay').innerHTML = lineSVG(series);
+  const trendDates = series.map((day) => day.date);
+  renderProjectTrend(customBounds ? rows : S.entries.filter((e) => e.endedAt && !e.deletedAt), trendDates);
 
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
@@ -400,77 +392,96 @@ function renderTodoHealth() {
 
 let focusId = null; // null = 看最頂層
 
-function renderDonut(rows) {
-  const own = db.secondsByProject(rows);
-  const roll = rollup(S.projects, own);
+let projectTrendState = null;
 
-  // 這一層要顯示的切片 = 目前焦點的直接子專案（時數含各自的後代）
-  const slices = childrenOf(S.projects, focusId)
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      seconds: roll.get(p.id)?.total || 0,
-      canDrill: childrenOf(S.projects, p.id).length > 0,
-    }))
-    .filter((s) => s.seconds > 0)
-    .sort((a, b) => b.seconds - a.seconds);
+function trendSummary(date) {
+  if (!projectTrendState) return '';
+  const index = projectTrendState.dates.indexOf(date);
+  if (index < 0) return '';
+  const total = projectTrendState.dailyTotals[index] || 0;
+  const details = projectTrendState.detailsByDate[index] || [];
+  const rows = details.length
+    ? details.map((item) => {
+        const pct = total ? Math.round((item.seconds / total) * 100) : 0;
+        return `${esc(item.name)} ${fmtHM(item.seconds)} (${pct}%)`;
+      }).join(' · ')
+    : '沒有專案工時';
+  return `<strong>${esc(date)}</strong> · 總計 ${fmtHM(total)}<br><span>${rows}</span>`;
+}
 
-  // 直接記在這一層、沒有掛到子專案的時間
-  const here = own.get(focusId) || 0;
-  if (here > 0) {
-    slices.push({
-      id: null,
-      name: focusId ? '（直接記在本層）' : '（未分類）',
-      color: '#9a9898',
-      seconds: here,
-      canDrill: false,
-    });
-  }
+function setTrendHover(date) {
+  document.querySelectorAll('#byProject [data-trend-date]').forEach((element) => {
+    element.classList.toggle('is-hovered', Boolean(date) && element.dataset.trendDate === date);
+  });
+  const tooltip = $('projectTrendTooltip');
+  if (tooltip) tooltip.innerHTML = date ? trendSummary(date) : '移動滑鼠到日期或儲存格查看明細';
+}
 
-  const total = slices.reduce((s, x) => s + x.seconds, 0);
-  const crumbs = focusId ? pathOf(S.projects, focusId) : [];
-  const ancestors = [];
-  {
-    let cur = S.projects.find((p) => p.id === focusId);
-    while (cur) {
-      ancestors.unshift(cur.id);
-      cur = cur.parentId ? S.projects.find((p) => p.id === cur.parentId) : null;
-    }
-  }
+function renderProjectTrend(entries, dates) {
+  const data = buildProjectTrendData({
+    entries,
+    projects: S.projects,
+    dates,
+    durationSec: db.durationSec,
+    focusId,
+  });
+  projectTrendState = data;
 
-  const crumbHtml = `<div class="crumbs">
-    <span class="crumb" data-focus="">全部</span>
-    ${crumbs.map((n, i) => `<span class="mute">/</span>
-      <span class="crumb" data-focus="${ancestors[i]}">${esc(n)}</span>`).join('')}
-  </div>`;
+  const projectLinks = data.series
+    .filter((series) => series.id && series.id !== 'other' && !String(series.id).startsWith('direct:'))
+    .map((series) => `<button class="trend-project-link" type="button" data-trend-project="${esc(series.id)}">
+      <span class="swatch" style="background:${esc(series.color)}"></span>${esc(series.name)}</button>`)
+    .join('');
+  const crumb = focusId
+    ? `<button class="btn-sm" type="button" data-trend-clear>全部專案</button>`
+    : '<span class="mute">全部專案</span>';
 
-  if (!slices.length) {
-    $('byProject').innerHTML = crumbHtml + '<div class="empty">這個區間沒有紀錄</div>';
-    return;
-  }
-
-  $('byProject').innerHTML = crumbHtml + `<div class="chart-split">
-    ${donutSVG(slices)}
-    <div class="legend">
-      ${slices.map((s) => `
-        <div class="legend-row${s.canDrill ? ' drillable' : ''}"
-             ${s.canDrill ? `data-focus="${s.id}" title="點開看子專案"` : ''}>
-          <span class="swatch" style="background:${s.color}"></span>
-          <span class="grow ellipsis">${esc(s.name)}${s.canDrill ? ' <span class="mark">[+]</span>' : ''}</span>
-          <span class="num">${fmtHM(s.seconds)}</span>
-          <span class="num mute" style="width:48px;text-align:right">
-            ${total ? Math.round((s.seconds / total) * 100) + '%' : '—'}</span>
-        </div>`).join('')}
-    </div>
+  $('byProject').innerHTML = `<div class="project-trend-wrap">
+    <div class="project-trend-toolbar"><span>${crumb}</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
+    <div id="projectTrend">${stackedAreaSVG(data)}</div>
+    <div id="projectTrendTooltip" class="project-trend-tooltip">移動滑鼠到日期或儲存格查看明細</div>
+    <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
+    <div class="project-heatmap-title">專案 × 日期</div>
+    <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
   </div>`;
 }
 
 $('byProject').addEventListener('click', (e) => {
+  const project = e.target.closest('[data-trend-project]');
+  if (project) {
+    focusId = project.dataset.trendProject || null;
+    renderReport();
+    return;
+  }
+  if (e.target.closest('[data-trend-clear]')) {
+    focusId = null;
+    renderReport();
+    return;
+  }
   const el = e.target.closest('[data-focus]');
   if (!el) return;
   focusId = el.dataset.focus || null;
   renderReport();
+});
+
+$('byProject').addEventListener('pointerover', (e) => {
+  const target = e.target.closest('[data-trend-date]');
+  if (target) setTrendHover(target.dataset.trendDate);
+});
+
+$('byProject').addEventListener('pointerout', (e) => {
+  if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  setTrendHover(null);
+});
+
+$('byProject').addEventListener('focusin', (e) => {
+  const target = e.target.closest('[data-trend-date]');
+  if (target) setTrendHover(target.dataset.trendDate);
+});
+
+$('byProject').addEventListener('focusout', (e) => {
+  if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  setTrendHover(null);
 });
 
 /* ---------------- 專案 ---------------- */

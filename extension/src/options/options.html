@@ -56,8 +56,11 @@
     </h2>
     <div id="todoHealth" data-collapse-body="rep-health"></div>
 
-    <h2 class="sec" data-collapse="rep-donut"><span class="mark">[-]</span> 專案時間分配</h2>
-    <div id="byProject" data-collapse-body="rep-donut"></div>
+    <h2 class="sec" data-collapse="rep-donut"><span class="mark">[-]</span> 專案時間與每日趨勢</h2>
+    <div id="byProject" data-collapse-body="rep-donut">
+      <div id="projectTrend"></div>
+      <div id="projectHeatmap"></div>
+    </div>
 
     <h2 class="sec" data-collapse="rep-review">
       <span class="mark">[-]</span> 每日工作回顧 <span id="reviewLabel" class="mute"></span>
@@ -68,10 +71,6 @@
     </h2>
     <div id="dailyReview" data-collapse-body="rep-review"></div>
 
-    <h2 class="sec" data-collapse="rep-line">
-      <span class="mark">[-]</span> 每日趨勢 <span id="lineLabel" class="mute"></span>
-    </h2>
-    <div id="byDay" class="chart-box" data-collapse-body="rep-line"></div>
   </section>
 
   <!-- ── 專案 ── -->

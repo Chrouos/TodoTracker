@@ -284,19 +284,16 @@ section[hidden] { display: none; }
 }
 #p-report > h2.sec .mark { color: var(--text-mute); font-weight: 400; }
 #p-report > #byProject,
-#p-report > #timeline,
-#p-report > #byDay {
+#p-report > #timeline {
   border: 1px solid var(--hairline);
   border-radius: 12px;
   background: var(--canvas, #fff);
   box-shadow: 0 3px 12px rgba(24, 24, 24, .035);
 }
 #p-report > #byProject { padding: 0; overflow: hidden; }
-#p-report > #byProject .chart-split { border: 0; padding: 22px 24px; }
-#p-report > #timeline,
-#p-report > #byDay { padding: 18px 20px; }
+#p-report > #timeline { padding: 18px 20px; }
 
-/* 報表主畫面：專案分布與時間軸並排，趨勢圖獨立滿版 */
+/* 報表主畫面：融合專案趨勢與時間軸 */
 #p-report {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
@@ -310,11 +307,9 @@ section[hidden] { display: none; }
 #p-report > #byProject { grid-column: 1; }
 #p-report > h2.sec:nth-of-type(2),
 #p-report > #timeline { grid-column: 2; }
-#p-report > h2.sec:nth-of-type(3),
-#p-report > #byDay { grid-column: 1 / -1; }
+#p-report > h2.sec:nth-of-type(3) { grid-column: 1 / -1; }
 #p-report > #byProject,
-#p-report > #timeline,
-#p-report > #byDay { width: 100%; box-sizing: border-box; }
+#p-report > #timeline { width: 100%; box-sizing: border-box; }
 
 #p-report > .report-panel { min-width: 0; }
 #p-report > .report-panel-health { grid-column: 1 / -1; }
@@ -335,16 +330,13 @@ section[hidden] { display: none; }
   line-height: 1.45;
 }
 #p-report > .report-panel > #byProject,
-#p-report > .report-panel > #timeline,
-#p-report > .report-panel > #byDay {
+#p-report > .report-panel > #timeline {
   width: 100%;
   min-height: 210px;
   box-sizing: border-box;
 }
 #p-report > .report-panel > #byProject { padding: 0; overflow: hidden; }
-#p-report > .report-panel > #byProject .chart-split { border: 0; padding: 22px 24px; }
-#p-report > .report-panel > #timeline,
-#p-report > .report-panel > #byDay { padding: 18px 20px; }
+#p-report > .report-panel > #timeline { padding: 18px 20px; }
 
 .report-panel-review > h2.sec { display: flex; align-items: center; gap: 8px; }
 .review-mode { display: inline-flex; gap: 4px; margin-left: auto; }
@@ -547,6 +539,26 @@ section[hidden] { display: none; }
   border: 1px solid var(--hairline); padding: var(--lg);
 }
 .chart-split > svg { flex: 0 0 auto; }
+
+.project-trend-wrap { padding: 18px 20px 22px; }
+.project-trend-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--md); margin-bottom: 10px; }
+.project-trend-toolbar button { background: var(--surface-soft); border-color: var(--hairline); }
+.project-trend-svg { width: 100%; min-height: 220px; }
+.project-trend-svg .axis-label,
+.project-heatmap-svg .axis-label,
+.project-heatmap-svg .heatmap-label,
+.project-heatmap-svg .heatmap-cell-text { fill: var(--text-mute); font: 11px var(--font-mono); }
+.project-trend-svg .trend-hover-zone { cursor: crosshair; }
+.project-trend-svg .trend-hover-zone.is-hovered { fill: var(--ink); fill-opacity: .06; }
+.project-heatmap-scroll { overflow-x: auto; border-top: 1px solid var(--hairline); padding-top: 12px; }
+.project-heatmap-svg .heatmap-cell { cursor: pointer; outline: none; }
+.project-heatmap-svg .heatmap-cell.is-hovered rect { stroke: var(--ink); stroke-width: 2; }
+.project-heatmap-svg .heatmap-cell:focus rect { stroke: var(--ink); stroke-width: 2; }
+.project-heatmap-title { margin-top: 18px; font-size: 12px; font-weight: 700; color: var(--text-mute); }
+.project-trend-tooltip { min-height: 22px; margin: 10px 0; padding: 8px 10px; border-left: 3px solid var(--ink); background: var(--surface-soft); font-size: 12px; line-height: 1.6; }
+.trend-legend { display: flex; flex-wrap: wrap; gap: var(--xs); margin: 10px 0 4px; }
+.trend-project-link { display: inline-flex; align-items: center; gap: var(--xs); border: 1px solid var(--hairline); background: transparent; padding: 4px 7px; color: var(--text-body); font-size: 12px; }
+.trend-project-link:hover, .trend-project-link:focus-visible { border-color: var(--ink); color: var(--ink); }
 
 .legend { flex: 1; min-width: 0; }
 .legend-row {
