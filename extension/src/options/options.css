@@ -55,7 +55,7 @@ section[hidden] { display: none; }
 .timer-panel-head,
 .timer-panel-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--md); }
 .timer-clock { margin-top: var(--xs); font-size: 30px; font-weight: 700; letter-spacing: .04em; }
-.timer-fields { margin-top: var(--lg); }
+.timer-fields { margin-top: var(--lg); grid-template-columns: 2fr 1.5fr 1.5fr; }
 .timer-tags-field,
 .timer-notes-field { margin-top: var(--md); }
 .timer-tags { display: flex; flex-wrap: wrap; gap: var(--xs); margin-top: var(--xs); min-height: 30px; }
@@ -63,6 +63,16 @@ section[hidden] { display: none; }
 .timer-tag.on { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
 .timer-complete { display: inline-flex; align-items: center; gap: var(--xs); font-size: 12px; }
 .timer-complete[hidden] { display: none; }
+.timer-complete input[type="checkbox"] {
+  appearance: auto;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
 .timer-panel.is-running { border-color: var(--ink); box-shadow: 0 4px 18px rgba(32, 29, 29, .08); }
 .timer-panel.is-running .timer-clock { color: var(--ink); }
 

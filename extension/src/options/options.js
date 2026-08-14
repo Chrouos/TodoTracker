@@ -229,7 +229,7 @@ function renderTimer() {
 
   project.innerHTML = '<option value="">— 未分類 —</option>' +
     flattenTree(S.projects, { includeArchived: false })
-      .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
+      .map((p) => `<option value="${p.id}">${esc(p.depth ? `${'› '.repeat(p.depth)}${p.name}` : p.name)}</option>`).join('');
   project.value = projectId;
 
   const tasks = S.tasks
@@ -1691,7 +1691,7 @@ $('tabs').addEventListener('click', (e) => {
   const name = e.target.dataset.tab;
   if (!name) return;
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-  ['report', 'projects', 'timer', 'todos', 'schedules', 'tags', 'entries', 'settings']
+  ['report', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
 });

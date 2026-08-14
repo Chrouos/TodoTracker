@@ -14,6 +14,9 @@ assert.match(html, /id="tdPriorityFilter"/, 'Todo should have a priority filter'
 assert.match(html, /id="scPriority"/, 'Schedule should have a priority field');
 assert.match(html, /data-tab="timer"/, 'Management timer should have its own tab');
 assert.match(html, /id="p-timer"/, 'Management timer should be inside its own panel');
+assert.match(html,
+  /data-tab="report"[\s\S]*data-tab="timer"[\s\S]*data-tab="projects"[\s\S]*data-tab="todos"[\s\S]*data-tab="entries"[\s\S]*data-tab="schedules"[\s\S]*data-tab="tags"[\s\S]*data-tab="settings"/,
+  'Management tabs should follow the requested order');
 for (const id of [
   'managementTimer', 'mgTimerClock', 'mgTimerDescription', 'mgTimerProject',
   'mgTimerTask', 'mgTimerTags', 'mgTimerNotes', 'mgTimerComplete', 'mgTimerToggle',
@@ -37,4 +40,10 @@ assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a re
 assert.doesNotMatch(options, /data-tooltip="\$\{esc\(tooltip\)\}"/, 'Calendar hover should not render tooltip content through attr()');
 assert.match(options, /getTimer/, 'Management timer should load the shared timer');
 assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
+assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
+  'Management timer checkbox should have compact custom styling');
+assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
+  'Management timer should give project and Todo selectors enough width');
+assert.match(options, /'› '\.repeat\(p\.depth\)/,
+  'Management timer project options should use compact hierarchy labels');
 console.log('options layout contract passed');
