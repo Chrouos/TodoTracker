@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildProjectTrendData,
+  buildProjectDetailData,
   formatTrendSeconds,
 } from '../src/lib/project-trend.js';
 import { heatmapSVG, stackedAreaSVG } from '../src/lib/charts.js';
@@ -16,6 +17,10 @@ const entries = [
   { id: 'b', projectId: 'project-b', startedAt: '2026-08-11T09:00:00Z', seconds: 1800 },
   { id: 'unclassified', projectId: null, startedAt: '2026-08-10T13:00:00Z', seconds: 900 },
 ];
+const tasks = [
+  { id: 'task-child', projectId: 'project-a-child', title: '子專案工作', status: 'doing' },
+  { id: 'task-done', projectId: 'project-a', title: '已完成工作', status: 'done' },
+];
 
 const data = buildProjectTrendData({
   entries,
@@ -29,6 +34,23 @@ assert.deepEqual(data.dailyTotals, [11700, 1800]);
 assert.equal(data.series.find((series) => series.id === 'project-a').values[0], 10800);
 assert.equal(data.series.find((series) => series.id === null).values[0], 900);
 assert.equal(formatTrendSeconds(11700), '3h 15m');
+
+const detail = buildProjectDetailData({
+  entries: [
+    ...entries,
+    { id: 'task-entry', projectId: null, taskId: 'task-child', startedAt: '2026-08-11T10:00:00Z', seconds: 1800 },
+  ],
+  projects,
+  tasks,
+  projectId: 'project-a',
+  dates: ['2026-08-10', '2026-08-11'],
+  durationSec: (entry) => entry.seconds,
+});
+assert.equal(detail.totalSeconds, 12600);
+assert.equal(detail.totalEntries, 3);
+assert.deepEqual(detail.dailyTotals, [10800, 1800]);
+assert.equal(detail.tasksDone, 1);
+assert.equal(detail.tasksTotal, 2);
 
 const focused = buildProjectTrendData({
   entries,

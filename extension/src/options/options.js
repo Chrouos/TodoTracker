@@ -13,7 +13,7 @@ import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
-import { buildProjectTrendData } from '../lib/project-trend.js';
+import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -393,6 +393,7 @@ function renderTodoHealth() {
 let highlightProjectId = null;
 
 let projectTrendState = null;
+let projectTrendSource = null;
 
 function sameTrendProject(left, right) {
   return (left || null) === (right || null);
@@ -462,6 +463,64 @@ function applyTrendHighlight() {
   });
 }
 
+function renderTrendDetails(projectId) {
+  const box = $('projectTrendDetail');
+  if (!box || !projectTrendSource) return;
+  if (!projectId) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+
+  const detail = buildProjectDetailData({
+    ...projectTrendSource,
+    projects: S.projects,
+    tasks: S.tasks,
+    projectId,
+    durationSec: db.durationSec,
+  });
+  const project = S.projects.find((item) => item.id === projectId);
+  if (!project) return;
+  const projectPath = pathOf(S.projects, project.id).join(' / ');
+  const grouped = new Map();
+  for (const entry of detail.entries) {
+    const date = fmtDate(entry.startedAt);
+    if (!grouped.has(date)) grouped.set(date, []);
+    grouped.get(date).push(entry);
+  }
+  const dailyTotals = new Map(projectTrendSource.dates.map((date, index) => [date, detail.dailyTotals[index] || 0]));
+  const taskById = new Map(S.tasks.map((task) => [task.id, task]));
+  const dayMarkup = [...grouped.entries()].map(([date, entries]) => `
+    <section class="trend-detail-day">
+      <div class="trend-detail-day-head"><strong>${esc(date)}</strong><span class="num">${fmtHM(dailyTotals.get(date) || 0)} · ${entries.length} 筆</span></div>
+      ${entries.map((entry) => {
+        const task = taskById.get(entry.taskId);
+        const title = entry.description || task?.title || '未命名工作';
+        const projectItem = S.projects.find((item) => item.id === entry.projectId);
+        const location = projectItem ? pathOf(S.projects, projectItem.id).join(' / ') : '透過 Todo 記錄';
+        return `<div class="trend-detail-entry">
+          <span class="num mute">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
+          <div class="grow"><strong>${esc(title)}</strong>${task && entry.description ? ` <span class="badge">${esc(task.title)}</span>` : ''}<div class="sub">${esc(location)}</div></div>
+          <span class="num">${fmtHM(entry.seconds)}</span>
+        </div>`;
+      }).join('')}
+    </section>`).join('');
+
+  const truncated = detail.totalEntries - detail.entries.length;
+  box.hidden = false;
+  box.innerHTML = `<div class="trend-detail-head">
+    <div><strong>${esc(project.name)} 細項</strong><div class="sub">${esc(projectPath)} · 含子專案</div></div>
+    <button type="button" class="btn-sm" data-trend-detail-close>收合</button>
+  </div>
+  <div class="trend-detail-kpis">
+    <span class="badge">${fmtHM(detail.totalSeconds)} 總工時</span>
+    <span class="badge">${detail.tasksDone}/${detail.tasksTotal} Todo 完成</span>
+    <span class="badge">${detail.totalEntries} 筆工作紀錄</span>
+  </div>
+  <div class="trend-detail-list">${dayMarkup || '<div class="empty">這個區間沒有工作紀錄</div>'}</div>
+  ${truncated > 0 ? `<div class="cap trend-detail-more">另有 ${truncated} 筆紀錄未展開</div>` : ''}`;
+}
+
 function renderProjectTrend(entries, dates) {
   const data = buildProjectTrendData({
     entries,
@@ -470,6 +529,7 @@ function renderProjectTrend(entries, dates) {
     durationSec: db.durationSec,
   });
   projectTrendState = data;
+  projectTrendSource = { entries, dates };
 
   const projectLinks = data.series
     .filter((series) => series.id && series.id !== 'other' && !String(series.id).startsWith('direct:'))
@@ -484,9 +544,11 @@ function renderProjectTrend(entries, dates) {
     <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
     <div class="project-heatmap-title">專案 × 日期</div>
     <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
+    <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
   </div>`;
   applyTrendHighlight();
   setTrendHover(null);
+  renderTrendDetails(highlightProjectId);
 }
 
 $('byProject').addEventListener('click', (e) => {
@@ -495,7 +557,13 @@ $('byProject').addEventListener('click', (e) => {
     const projectId = project.dataset.trendProject || null;
     highlightProjectId = highlightProjectId === projectId ? null : projectId;
     applyTrendHighlight();
+    renderTrendDetails(highlightProjectId);
     return;
+  }
+  if (e.target.closest('[data-trend-detail-close]')) {
+    highlightProjectId = null;
+    applyTrendHighlight();
+    renderTrendDetails(null);
   }
 });
 

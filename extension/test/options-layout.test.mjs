@@ -22,4 +22,6 @@ assert.match(options, /highlightProjectId/, 'Project selection should highlight 
 assert.match(options, /trendOverview/, 'Report should show a useful summary before hover');
 assert.doesNotMatch(options, /focusId = project\.dataset\.trendProject/, 'Project selection should not enter drill-down mode');
 assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'Report should not use a meaningless hover placeholder');
+assert.match(options, /buildProjectDetailData/, 'Project selection should render project detail data');
+assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 console.log('options layout contract passed');

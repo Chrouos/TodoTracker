@@ -567,6 +567,14 @@ section[hidden] { display: none; }
 .trend-project-link { display: inline-flex; align-items: center; gap: var(--xs); border: 1px solid var(--hairline); background: transparent; padding: 4px 7px; color: var(--text-body); font-size: 12px; }
 .trend-project-link.is-active { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
 .trend-project-link:hover, .trend-project-link:focus-visible { border-color: var(--ink); color: var(--ink); }
+.project-trend-detail { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.trend-detail-head { display: flex; align-items: center; justify-content: space-between; gap: var(--md); }
+.trend-detail-kpis { display: flex; flex-wrap: wrap; gap: var(--sm); margin: 12px 0; }
+.trend-detail-day { margin-top: 14px; }
+.trend-detail-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--md); padding: 8px 0; border-bottom: 1px solid var(--hairline); }
+.trend-detail-entry { display: grid; grid-template-columns: 126px minmax(0, 1fr) 76px; align-items: start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+.trend-detail-entry .sub { margin-top: 3px; }
+.trend-detail-more { margin-top: 10px; }
 
 .legend { flex: 1; min-width: 0; }
 .legend-row {
@@ -624,6 +632,8 @@ dialog .field { margin-bottom: var(--md); }
   .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
   .daily-review-entry { grid-template-columns: 104px 8px minmax(0, 1fr); }
   .daily-review-duration { grid-column: 3; text-align: left; padding-top: 0; }
+  .trend-detail-entry { grid-template-columns: 1fr auto; }
+  .trend-detail-entry > .mute { grid-column: 1 / -1; }
 }
 .markdown-preview {
   --markdown-preview-collapsed-height: 180px;

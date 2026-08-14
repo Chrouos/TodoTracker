@@ -148,3 +148,55 @@ export function buildProjectTrendData({
     focusId,
   };
 }
+
+function descendantIds(projectId, projects) {
+  const ids = new Set([projectId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const project of projects) {
+      if (project.parentId && ids.has(project.parentId) && !ids.has(project.id)) {
+        ids.add(project.id);
+        changed = true;
+      }
+    }
+  }
+  return ids;
+}
+
+export function buildProjectDetailData({
+  entries,
+  projects,
+  tasks,
+  projectId,
+  dates,
+  durationSec,
+  limit = 60,
+}) {
+  const safeDates = [...dates];
+  const dateSet = new Set(safeDates);
+  const projectIds = descendantIds(projectId, projects);
+  const scopedTasks = tasks.filter((task) => task.projectId && projectIds.has(task.projectId));
+  const taskIds = new Set(scopedTasks.map((task) => task.id));
+  const relevant = entries
+    .filter((entry) => !entry.deletedAt && dateSet.has(fmtDate(entry.startedAt)))
+    .filter((entry) => (entry.projectId && projectIds.has(entry.projectId))
+      || (entry.taskId && taskIds.has(entry.taskId)))
+    .map((entry) => ({ ...entry, seconds: Math.max(0, Number(durationSec(entry)) || 0) }))
+    .filter((entry) => entry.seconds > 0)
+    .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+  const dailyTotals = safeDates.map((date) => relevant
+    .filter((entry) => fmtDate(entry.startedAt) === date)
+    .reduce((sum, entry) => sum + entry.seconds, 0));
+
+  return {
+    projectId,
+    projectIds: [...projectIds],
+    entries: relevant.slice(0, limit),
+    totalEntries: relevant.length,
+    totalSeconds: relevant.reduce((sum, entry) => sum + entry.seconds, 0),
+    dailyTotals,
+    tasksTotal: scopedTasks.length,
+    tasksDone: scopedTasks.filter((task) => task.status === 'done').length,
+  };
+}
