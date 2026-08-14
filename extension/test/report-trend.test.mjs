@@ -45,6 +45,10 @@ const heatmap = heatmapSVG(data);
 assert.match(stacked, /role="img"/);
 assert.match(stacked, /data-trend-date="2026-08-10"/);
 assert.match(stacked, /<title>/);
+const polygons = [...stacked.matchAll(/<polygon[^>]+points="([^"]+)"/g)]
+  .map((match) => match[1].split(' ').map((point) => point.split(',').map(Number)));
+assert.deepEqual(polygons[1].slice(-2), [[742, 226], [48, 71.5]],
+  'stacked area polygons should reverse both x and y coordinates for the lower edge');
 assert.match(heatmap, /role="img"/);
 assert.match(heatmap, /data-trend-date="2026-08-11"/);
 assert.match(heatmap, /data-project-id="project-a"/);

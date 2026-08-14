@@ -188,7 +188,10 @@ export function stackedAreaSVG(data) {
     const top = series.values.map((value, index) => bottom[index] + value);
     top.forEach((value, index) => { tops[index] = value; });
     const points = top.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`)
-      .concat(bottom.map((value, index) => `${x(data.dates.length - 1 - index).toFixed(1)},${y(value).toFixed(1)}`))
+      .concat(bottom.map((value, index) => {
+        const reverseIndex = data.dates.length - 1 - index;
+        return `${x(reverseIndex).toFixed(1)},${y(bottom[reverseIndex]).toFixed(1)}`;
+      }))
       .join(' ');
     return `<polygon class="trend-segment" data-project-id="${esc(series.id)}" points="${points}" fill="${esc(series.color)}" fill-opacity="0.72"></polygon>`;
   }).join('');
