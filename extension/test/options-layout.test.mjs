@@ -44,6 +44,8 @@ assert.match(options, /const scrollY = window\.scrollY/, 'Management timer shoul
 assert.match(options, /window\.scrollTo\(0, scrollY\)/, 'Management timer should restore scroll position after reload');
 assert.match(options, /name === 'timer'[\s\S]*growTimerNotes\(\)/,
   'Management timer should recalculate notes height when its tab becomes visible');
+assert.match(options, /if \(\$\('mgTimerNotes'\) !== document\.activeElement\) \$\('mgTimerNotes'\)\.value = current\.notes \|\| '';/,
+  'Management timer should clear notes after stopping when the draft is empty');
 assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,

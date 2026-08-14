@@ -225,7 +225,7 @@ function renderTimer() {
   $('mgTimerStatus').textContent = timer ? '計時中' : '尚未開始';
   $('mgTimerToggle').textContent = timer ? '停止並儲存' : '開始計時';
   $('mgTimerDescription').value = current.description || '';
-  if (timer && $('mgTimerNotes') !== document.activeElement) $('mgTimerNotes').value = timer.notes || '';
+  if ($('mgTimerNotes') !== document.activeElement) $('mgTimerNotes').value = current.notes || '';
 
   project.innerHTML = '<option value="">— 未分類 —</option>' +
     flattenTree(S.projects, { includeArchived: false })
