@@ -8,6 +8,7 @@ const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 2
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
 import { fmtHMS, fmtHM, fmtClock, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
+import { filterTasks, normalizePriority, priorityLabel } from '../lib/todo-filter.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -222,9 +223,11 @@ function renderTodo() {
 
   const filter = filterSelect.value;
   const priority = priorityFilter.value;
-  const list = state.tasks
-    .filter((t) => t.status !== 'archived' && (!filter || t.projectId === filter))
-    .filter((t) => !priority || (t.priority || 'normal') === priority)
+  const list = filterTasks(state.tasks, {
+    projectScope: filter ? new Set([filter]) : null,
+    priority,
+    showDone: true,
+  })
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
 
   $('todoList').innerHTML = list.length
@@ -234,7 +237,7 @@ function renderTodo() {
         return `<div class="item ${done ? 'done' : ''}">
           <button class="check" data-check="${t.id}">${done ? '[x]' : '[ ]'}</button>
           <div class="main">
-            <div class="t1">${esc(t.title)}</div>
+            <div class="t1">${esc(t.title)} <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority)}</span></div>
             <div class="t2">${p ? esc(p.name) : '未分類'}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
           <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="新增子任務">[＋子]</button>
