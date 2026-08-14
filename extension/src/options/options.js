@@ -388,33 +388,78 @@ function renderTodoHealth() {
   </div>`;
 }
 
-/* ---------------- 甜甜圈（可鑽取） ---------------- */
+/* ---------------- 專案趨勢（完整資料 + highlight） ---------------- */
 
-let focusId = null; // null = 看最頂層
+let highlightProjectId = null;
 
 let projectTrendState = null;
 
-function trendSummary(date) {
+function sameTrendProject(left, right) {
+  return (left || null) === (right || null);
+}
+
+function trendOverview() {
+  if (!projectTrendState) return '';
+  const total = projectTrendState.dailyTotals.reduce((sum, value) => sum + value, 0);
+  const rows = projectTrendState.series
+    .filter((series) => series.total > 0)
+    .map((series) => {
+      const pct = total ? Math.round((series.total / total) * 100) : 0;
+      return `${esc(series.name)} ${fmtHM(series.total)} (${pct}%)`;
+    }).join(' · ');
+  return total
+    ? `<strong>區間總計 ${fmtHM(total)}</strong><br><span>${rows}</span>`
+    : '這個區間沒有專案工時';
+}
+
+function trendSummary(date, projectId = null) {
   if (!projectTrendState) return '';
   const index = projectTrendState.dates.indexOf(date);
   if (index < 0) return '';
   const total = projectTrendState.dailyTotals[index] || 0;
   const details = projectTrendState.detailsByDate[index] || [];
+  const selected = projectId === null
+    ? null
+    : details.find((item) => sameTrendProject(item.id, projectId));
   const rows = details.length
     ? details.map((item) => {
         const pct = total ? Math.round((item.seconds / total) * 100) : 0;
         return `${esc(item.name)} ${fmtHM(item.seconds)} (${pct}%)`;
       }).join(' · ')
     : '沒有專案工時';
-  return `<strong>${esc(date)}</strong> · 總計 ${fmtHM(total)}<br><span>${rows}</span>`;
+  const selectedText = selected
+    ? `<strong>${esc(selected.name)} ${fmtHM(selected.seconds)} (${total ? Math.round((selected.seconds / total) * 100) : 0}%)</strong><br>`
+    : '';
+  return `${selectedText}<strong>${esc(date)}</strong> · 當日總計 ${fmtHM(total)}<br><span>${rows}</span>`;
 }
 
-function setTrendHover(date) {
+function setTrendHover(date, projectId = null) {
   document.querySelectorAll('#byProject [data-trend-date]').forEach((element) => {
     element.classList.toggle('is-hovered', Boolean(date) && element.dataset.trendDate === date);
+    element.classList.toggle('is-project-hovered', Boolean(projectId)
+      && sameTrendProject(element.dataset.projectId, projectId));
+  });
+  document.querySelectorAll('#byProject [data-project-id]').forEach((element) => {
+    element.classList.toggle('is-project-hovered', Boolean(projectId)
+      && sameTrendProject(element.dataset.projectId, projectId));
   });
   const tooltip = $('projectTrendTooltip');
-  if (tooltip) tooltip.innerHTML = date ? trendSummary(date) : '移動滑鼠到日期或儲存格查看明細';
+  if (tooltip) tooltip.innerHTML = date ? trendSummary(date, projectId) : trendOverview();
+}
+
+function applyTrendHighlight() {
+  const projectId = highlightProjectId || null;
+  document.querySelectorAll('#byProject [data-project-id]').forEach((element) => {
+    const active = Boolean(projectId) && sameTrendProject(element.dataset.projectId, projectId);
+    element.classList.toggle('is-highlighted', active);
+    element.classList.toggle('is-dimmed', Boolean(projectId) && !active);
+  });
+  document.querySelectorAll('#byProject [data-trend-project]').forEach((button) => {
+    const active = sameTrendProject(button.dataset.trendProject, projectId);
+    button.classList.toggle('is-active', active);
+    button.classList.toggle('is-dimmed', Boolean(projectId) && !active);
+    button.setAttribute('aria-pressed', String(active));
+  });
 }
 
 function renderProjectTrend(entries, dates) {
@@ -423,64 +468,54 @@ function renderProjectTrend(entries, dates) {
     projects: S.projects,
     dates,
     durationSec: db.durationSec,
-    focusId,
   });
   projectTrendState = data;
 
   const projectLinks = data.series
     .filter((series) => series.id && series.id !== 'other' && !String(series.id).startsWith('direct:'))
-    .map((series) => `<button class="trend-project-link" type="button" data-trend-project="${esc(series.id)}">
+    .map((series) => `<button class="trend-project-link" type="button" data-trend-project="${esc(series.id)}" aria-pressed="false">
       <span class="swatch" style="background:${esc(series.color)}"></span>${esc(series.name)}</button>`)
     .join('');
-  const crumb = focusId
-    ? `<button class="btn-sm" type="button" data-trend-clear>全部專案</button>`
-    : '<span class="mute">全部專案</span>';
 
   $('byProject').innerHTML = `<div class="project-trend-wrap">
-    <div class="project-trend-toolbar"><span>${crumb}</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
+    <div class="project-trend-toolbar"><span class="mute">全部專案</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
     <div id="projectTrend">${stackedAreaSVG(data)}</div>
-    <div id="projectTrendTooltip" class="project-trend-tooltip">移動滑鼠到日期或儲存格查看明細</div>
+    <div id="projectTrendTooltip" class="project-trend-tooltip"></div>
     <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
     <div class="project-heatmap-title">專案 × 日期</div>
     <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
   </div>`;
+  applyTrendHighlight();
+  setTrendHover(null);
 }
 
 $('byProject').addEventListener('click', (e) => {
   const project = e.target.closest('[data-trend-project]');
   if (project) {
-    focusId = project.dataset.trendProject || null;
-    renderReport();
+    const projectId = project.dataset.trendProject || null;
+    highlightProjectId = highlightProjectId === projectId ? null : projectId;
+    applyTrendHighlight();
     return;
   }
-  if (e.target.closest('[data-trend-clear]')) {
-    focusId = null;
-    renderReport();
-    return;
-  }
-  const el = e.target.closest('[data-focus]');
-  if (!el) return;
-  focusId = el.dataset.focus || null;
-  renderReport();
 });
 
 $('byProject').addEventListener('pointerover', (e) => {
   const target = e.target.closest('[data-trend-date]');
-  if (target) setTrendHover(target.dataset.trendDate);
+  if (target) setTrendHover(target.dataset.trendDate, target.dataset.projectId || null);
 });
 
 $('byProject').addEventListener('pointerout', (e) => {
-  if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  if (e.relatedTarget?.closest?.('[data-trend-date]')) return;
   setTrendHover(null);
 });
 
 $('byProject').addEventListener('focusin', (e) => {
   const target = e.target.closest('[data-trend-date]');
-  if (target) setTrendHover(target.dataset.trendDate);
+  if (target) setTrendHover(target.dataset.trendDate, target.dataset.projectId || null);
 });
 
 $('byProject').addEventListener('focusout', (e) => {
-  if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  if (e.relatedTarget?.closest?.('[data-trend-date]')) return;
   setTrendHover(null);
 });
 

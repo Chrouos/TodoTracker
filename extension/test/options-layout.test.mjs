@@ -18,4 +18,8 @@ assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeat
 assert.doesNotMatch(html, /id="byDay"/, 'Report should not render a separate daily trend panel');
 assert.match(options, /buildProjectTrendData/, 'Report should build the fused project trend data');
 assert.match(options, /data-trend-date/, 'Report should wire date hover interaction');
+assert.match(options, /highlightProjectId/, 'Project selection should highlight without changing the data range');
+assert.match(options, /trendOverview/, 'Report should show a useful summary before hover');
+assert.doesNotMatch(options, /focusId = project\.dataset\.trendProject/, 'Project selection should not enter drill-down mode');
+assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'Report should not use a meaningless hover placeholder');
 console.log('options layout contract passed');
