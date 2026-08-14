@@ -1700,6 +1700,7 @@ $('tabs').addEventListener('click', (e) => {
   ['report', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
+  if (name === 'timer') requestAnimationFrame(() => growTimerNotes());
 });
 
 $('range').addEventListener('click', (e) => {

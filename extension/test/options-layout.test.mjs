@@ -42,6 +42,8 @@ assert.match(options, /getTimer/, 'Management timer should load the shared timer
 assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
 assert.match(options, /const scrollY = window\.scrollY/, 'Management timer should capture scroll position before reload');
 assert.match(options, /window\.scrollTo\(0, scrollY\)/, 'Management timer should restore scroll position after reload');
+assert.match(options, /name === 'timer'[\s\S]*growTimerNotes\(\)/,
+  'Management timer should recalculate notes height when its tab becomes visible');
 assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
