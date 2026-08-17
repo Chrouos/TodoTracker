@@ -24,6 +24,8 @@ for (const id of [
   assert.match(html, new RegExp(`id="${id}"`), `Management timer should have ${id}`);
 }
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
+assert.match(options, /projectIdForTask/, 'Entry Todo selection should synchronize its project');
+assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selection should update the project selector');
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
 assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');

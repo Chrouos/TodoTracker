@@ -13,6 +13,7 @@ import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
+import { projectIdForTask } from '../lib/entry-relations.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
@@ -80,6 +81,9 @@ document.addEventListener('click', (event) => {
 });
 
 let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
+$('enTask').addEventListener('change', (event) => {
+  $('enProject').value = projectIdForTask(event.target.value, S.tasks, $('enProject').value);
+});
 let range = 'week';
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;

@@ -22,7 +22,7 @@
 
 **Files:**
 - Create: `web/lib/entryRelations.ts`
-- Create: `web/lib/entryRelations.test.ts`
+- Create: `web/lib/entryRelations.test.mjs`
 
 **Interfaces:**
 - Produces `projectIdForTask(taskId: string, tasks: Pick<Task, 'id' | 'projectId'>[], currentProjectId: string): string`.
@@ -32,7 +32,7 @@
 
 Create a focused test using plain task objects and assert:
 
-```ts
+```js
 assert.equal(projectIdForTask('task-project', tasks, 'old-project'), 'new-project');
 assert.equal(projectIdForTask('task-unclassified', tasks, 'old-project'), '');
 assert.equal(projectIdForTask('missing', tasks, 'old-project'), 'old-project');
@@ -43,7 +43,7 @@ assert.equal(projectIdForTask('missing', tasks, 'old-project'), 'old-project');
 Run from the repository root:
 
 ```powershell
-node --experimental-strip-types web/lib/entryRelations.test.ts
+node --experimental-strip-types web/lib/entryRelations.test.mjs
 ```
 
 Expected: FAIL because `web/lib/entryRelations.ts` does not exist yet.
@@ -57,7 +57,7 @@ Implement `projectIdForTask` by finding the task by ID and returning `task.proje
 Run:
 
 ```powershell
-node --experimental-strip-types web/lib/entryRelations.test.ts
+node --experimental-strip-types web/lib/entryRelations.test.mjs
 ```
 
 Expected: PASS.
@@ -65,7 +65,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit the Web rule**
 
 ```powershell
-git add web/lib/entryRelations.ts web/lib/entryRelations.test.ts
+git add web/lib/entryRelations.ts web/lib/entryRelations.test.mjs
 git commit -m "test: define todo project sync rule"
 ```
 
@@ -192,7 +192,7 @@ Expected: every existing and new extension test passes.
 Run:
 
 ```powershell
-Get-ChildItem web/lib -Filter '*.test.ts' | ForEach-Object { node --experimental-strip-types $_.FullName }
+node --experimental-strip-types web/lib/entryRelations.test.mjs
 Push-Location web
 npm run typecheck
 npm run build
