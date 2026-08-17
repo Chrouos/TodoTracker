@@ -59,6 +59,17 @@ section[hidden] { display: none; }
 .timer-tags-field,
 .timer-notes-field { margin-top: var(--md); }
 .timer-notes-field textarea { min-height: 180px; max-height: 360px; overflow-y: auto !important; }
+.timer-notes-preview-actions { margin-top: var(--xs); }
+.timer-notes-preview {
+  min-height: 180px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-top: var(--xs);
+  padding: var(--sm);
+  border: 1px solid var(--hairline);
+  background: var(--surface-soft);
+}
+.timer-notes-markdown { margin-top: 0; }
 .timer-tags { display: flex; flex-wrap: wrap; gap: var(--xs); margin-top: var(--xs); min-height: 30px; }
 .timer-tag { padding: 5px 9px; border: 1px solid var(--hairline); border-radius: var(--r); background: var(--surface-soft); color: var(--text-mute); }
 .timer-tag.on { border-color: var(--ink); background: var(--ink); color: var(--canvas); }

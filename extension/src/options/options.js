@@ -95,6 +95,7 @@ let timerTicker = null;
 let timerNotesSaveTimer = null;
 let timerCompleteChoice = false;
 let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
+let timerNotesPreviewOpen = false;
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, timer, settings] = await Promise.all([
@@ -217,6 +218,23 @@ function startTimerTicker(timer) {
   timerTicker = setInterval(tick, 1000);
 }
 
+function renderTimerNotesPreview() {
+  const container = $('mgTimerNotesPreview');
+  container.innerHTML = renderMarkdownPreview($('mgTimerNotes').value, 'timer-notes-markdown');
+  initializeMarkdownPreviews(container);
+}
+
+function setTimerNotesPreviewOpen(open) {
+  timerNotesPreviewOpen = open;
+  $('mgTimerNotes').hidden = open;
+  $('mgTimerNotesPreview').hidden = !open;
+  const toggle = $('mgTimerNotesPreviewToggle');
+  toggle.textContent = open ? '編輯 Markdown' : '預覽 Markdown';
+  toggle.setAttribute('aria-pressed', String(open));
+  if (open) renderTimerNotesPreview();
+  else growTimerNotes();
+}
+
 function renderTimer() {
   const timer = S.timer;
   const current = timer || timerDraft;
@@ -260,7 +278,8 @@ function renderTimer() {
   } else {
     startTimerTicker(timer);
   }
-  growTimerNotes();
+  if (timerNotesPreviewOpen) renderTimerNotesPreview();
+  else growTimerNotes();
 }
 
 async function patchManagementTimer(patch) {
@@ -317,6 +336,9 @@ $('mgTimerNotes').addEventListener('input', () => {
   $('mgTimerSaved').textContent = '儲存中…';
   clearTimeout(timerNotesSaveTimer);
   timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(), 500);
+});
+$('mgTimerNotesPreviewToggle').addEventListener('click', () => {
+  setTimerNotesPreviewOpen(!timerNotesPreviewOpen);
 });
 $('mgTimerComplete').addEventListener('change', (event) => {
   timerCompleteChoice = event.target.checked;

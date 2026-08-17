@@ -49,6 +49,10 @@
 
       <label class="field timer-notes-field"><span>當下紀錄</span>
         <textarea id="mgTimerNotes" placeholder="邊做邊記，停止時會一起保存"></textarea></label>
+      <div class="timer-notes-preview-actions">
+        <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" aria-pressed="false">預覽 Markdown</button>
+      </div>
+      <div id="mgTimerNotesPreview" class="timer-notes-preview" hidden></div>
 
       <div class="timer-panel-foot">
         <label id="mgTimerCompleteRow" class="timer-complete" hidden>
