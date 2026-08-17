@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { toLocalInput, fromLocalInput } from '@/lib/time';
+import { projectIdForTask } from '@/lib/entryRelations';
 import { flattenTree, indentLabel } from '@/lib/tree';
 import AutoTextarea from '@/components/AutoTextarea';
 import AttachmentPicker from '@/components/AttachmentPicker';
@@ -72,7 +73,11 @@ export default function EntryDialog({ draft, onClose }: { draft: EntryDraft; onC
           </select>
         </label>
         <label className="field"><span>Todo</span>
-          <select value={form.taskId} onChange={(e) => setForm({ ...form, taskId: e.target.value })}>
+          <select value={form.taskId} onChange={(e) => setForm({
+            ...form,
+            taskId: e.target.value,
+            projectId: projectIdForTask(e.target.value, data.tasks, form.projectId),
+          })}>
             <option value="">— 無 —</option>
             {data.tasks
               .filter((t) => !form.projectId || t.projectId === form.projectId)
