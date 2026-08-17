@@ -14,6 +14,7 @@ import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
 import { projectIdForTask } from '../lib/entry-relations.js';
+import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
@@ -372,19 +373,26 @@ function renderReport() {
   // 融合專案分配與每日趨勢：區間太短就往前補，才看得出趨勢
   const today = startOfDay();
   const customBounds = range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
+  const quickBounds = range === 'today' || range === 'week'
+    ? trendDateBounds(range, new Date(), S.settings.weekStartsOn)
+    : null;
   const lineFrom = customBounds
     ? customBounds.from
-    : range === 'today' ? new Date(today.getTime() - 6 * 864e5)
-      : range === 'week' ? startOfWeek(new Date(), S.settings.weekStartsOn)
-        : range === 'month' ? startOfMonth()
-          : new Date(today.getTime() - 29 * 864e5);
-  const lineTo = customBounds ? new Date(customBounds.to.getTime() - 1) : new Date();
+    : quickBounds?.from
+      ?? (range === 'month' ? startOfMonth() : new Date(today.getTime() - 29 * 864e5));
+  const lineTo = customBounds
+    ? new Date(customBounds.to.getTime() - 864e5)
+    : quickBounds?.to ?? new Date();
+  const trendEndExclusive = new Date(lineTo.getTime() + 864e5);
+  const trendEntries = S.entries.filter((e) => e.endedAt && !e.deletedAt
+    && new Date(e.startedAt) >= lineFrom
+    && new Date(e.startedAt) < trendEndExclusive);
   const series = dailySeries(
-    customBounds ? rows : S.entries.filter((e) => e.endedAt && new Date(e.startedAt) >= lineFrom),
+    trendEntries,
     lineFrom, lineTo, db.durationSec,
   );
   const trendDates = series.map((day) => day.date);
-  renderProjectTrend(customBounds ? rows : S.entries.filter((e) => e.endedAt && !e.deletedAt), trendDates);
+  renderProjectTrend(trendEntries, trendDates);
 
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);

@@ -586,7 +586,9 @@ section[hidden] { display: none; }
 .project-heatmap-svg .heatmap-cell.is-hovered rect { stroke: var(--ink); stroke-width: 2; }
 .project-heatmap-svg .heatmap-cell:focus rect { stroke: var(--ink); stroke-width: 2; }
 .project-heatmap-title { margin-top: 18px; font-size: 12px; font-weight: 700; color: var(--text-mute); }
-.project-trend-tooltip { min-height: 22px; margin: 10px 0; padding: 8px 10px; border-left: 3px solid var(--ink); background: var(--surface-soft); font-size: 12px; line-height: 1.6; }
+.project-trend-tooltip { height: 82px; box-sizing: border-box; margin: 10px 0; padding: 8px 10px; border-left: 3px solid var(--ink); background: var(--surface-soft); font-size: 12px; line-height: 1.6; overflow: hidden; }
+.project-trend-tooltip > strong,
+.project-trend-tooltip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trend-legend { display: flex; flex-wrap: wrap; gap: var(--xs); margin: 10px 0 4px; }
 .trend-project-link { display: inline-flex; align-items: center; gap: var(--xs); border: 1px solid var(--hairline); background: transparent; padding: 4px 7px; color: var(--text-body); font-size: 12px; }
 .trend-project-link.is-active { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
