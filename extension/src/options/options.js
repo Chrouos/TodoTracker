@@ -382,6 +382,56 @@ function groupReportPanels() {
 }
 
 /* ---------------- 報表 ---------------- */
+function createReportChartSection(id, title) {
+  const details = document.createElement('details');
+  details.className = 'report-chart-collapse';
+  details.dataset.reportChart = id;
+  const summary = document.createElement('summary');
+  summary.className = 'report-chart-title';
+  summary.innerHTML = `<span class="mark">[-]</span><span>${esc(title)}</span>`;
+  const body = document.createElement('div');
+  body.className = 'report-chart-body';
+  details.append(summary, body);
+  return { details, body };
+}
+
+function wrapReportChartContent() {
+  const wrap = document.querySelector('#byProject .project-trend-wrap');
+  if (!wrap || wrap.querySelector('.report-chart-collapse')) return;
+
+  const trend = createReportChartSection('trend', '全部專案');
+  [
+    wrap.querySelector('.project-trend-toolbar'),
+    wrap.querySelector('#projectTrend'),
+    wrap.querySelector('#projectTrendTooltip'),
+    wrap.querySelector('.trend-legend'),
+    wrap.querySelector('#projectTrendDetail'),
+  ].filter(Boolean).forEach((node) => trend.body.append(node));
+
+  const heatmap = createReportChartSection('heatmap', '專案 × 日期');
+  wrap.querySelector('.project-heatmap-title')?.remove();
+  const heatmapNode = wrap.querySelector('#projectHeatmap');
+  if (heatmapNode) heatmap.body.append(heatmapNode);
+
+  const tracker = createReportChartSection('tracker', 'Todo Tracker');
+  [wrap.querySelector('#todoTracker'), wrap.querySelector('#todoTrackerDetail')]
+    .filter(Boolean).forEach((node) => tracker.body.append(node));
+
+  wrap.replaceChildren(trend.details, heatmap.details, tracker.details);
+  bindReportChartCollapses();
+}
+
+function bindReportChartCollapses() {
+  document.querySelectorAll('#byProject [data-report-chart]').forEach((details) => {
+    const id = details.dataset.reportChart;
+    details.open = !reportChartCollapsed.has(id);
+    details.addEventListener('toggle', () => {
+      if (details.open) reportChartCollapsed.delete(id);
+      else reportChartCollapsed.add(id);
+    });
+  });
+}
+
 function renderReport() {
   const rows = inRange();
   const sec = rows.reduce((s, e) => s + db.durationSec(e), 0);
@@ -592,6 +642,7 @@ let highlightProjectId = null;
 
 let projectTrendState = null;
 let projectTrendSource = null;
+let reportChartCollapsed = new Set();
 let todoTrackerState = null;
 let todoTrackerSource = null;
 let todoTrackerSelectedId = null;
@@ -1000,6 +1051,7 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
     <div id="todoTrackerDetail" hidden></div>
   </div>`;
+  wrapReportChartContent();
   applyTrendHighlight();
   setTrendHover(null);
   renderTrendDetails(highlightProjectId);

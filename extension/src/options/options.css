@@ -576,6 +576,22 @@ section[hidden] { display: none; }
 .todo-health-overdue .num { color: var(--danger); }
 
 .project-trend-wrap { padding: 18px 20px 22px; }
+.report-chart-collapse { border-top: 1px solid var(--hairline); }
+.report-chart-collapse:first-child { border-top: 0; }
+.report-chart-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 0;
+  cursor: pointer;
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+.report-chart-title::-webkit-details-marker { display: none; }
+.report-chart-title .mark { width: 16px; color: var(--text-mute); font-family: var(--font-mono); font-size: 12px; }
+.report-chart-body { padding: 0 0 12px; }
 .project-trend-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--md); margin-bottom: 10px; }
 .project-trend-toolbar button { background: var(--surface-soft); border-color: var(--hairline); }
 .project-trend-svg { width: 100%; min-height: 220px; }

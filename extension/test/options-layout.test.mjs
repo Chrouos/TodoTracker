@@ -47,6 +47,11 @@ assert.doesNotMatch(options, /focusId/, 'Report should not retain the removed dr
 assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'Report should not use a meaningless hover placeholder');
 assert.match(options, /buildProjectDetailData/, 'Project selection should render project detail data');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
+assert.match(options, /createReportChartSection/, 'Report charts should be wrapped in independent collapse sections');
+assert.match(options, /dataset\.reportChart = id/, 'Report chart sections should expose a collapse identity');
+assert.match(options, /wrapReportChartContent/, 'Report charts should be grouped after rendering');
+assert.match(options, /reportChartCollapsed/, 'Report chart collapse state should be tracked');
+assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
 assert.doesNotMatch(options, /data-tooltip="\$\{esc\(tooltip\)\}"/, 'Calendar hover should not render tooltip content through attr()');
 assert.match(options, /getTimer/, 'Management timer should load the shared timer');
