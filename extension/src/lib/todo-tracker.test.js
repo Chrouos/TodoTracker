@@ -234,3 +234,32 @@ test('lays out actual work segments in separate lanes when they overlap', () => 
   assert.equal(result.items[0].workSegments[0].visibleStart.getTime(), local('2026-08-17T09:00:00').getTime());
   assert.equal(result.items[0].workSegments[2].visibleEnd.getTime(), local('2026-08-18T13:00:00').getTime());
 });
+
+test('sorts tracker items by accumulated work time descending', () => {
+  const result = buildTodoTrackerData({
+    now: local('2026-08-20T15:00:00'),
+    tasks: [
+      {
+        id: 'opened-first', title: 'Opened first', status: 'todo',
+        openedAt: '2026-08-17T09:00:00', completedAt: null,
+      },
+      {
+        id: 'worked-longest', title: 'Worked longest', status: 'todo',
+        openedAt: '2026-08-19T09:00:00', completedAt: null,
+      },
+    ],
+    entries: [
+      {
+        id: 'short-entry', taskId: 'opened-first', startedAt: '2026-08-17T10:00:00',
+        endedAt: '2026-08-17T11:00:00', notes: '', description: '',
+      },
+      {
+        id: 'long-entry', taskId: 'worked-longest', startedAt: '2026-08-19T10:00:00',
+        endedAt: '2026-08-19T13:00:00', notes: '', description: '',
+      },
+    ],
+    durationSec,
+  });
+
+  assert.deepEqual(result.items.map((item) => item.id), ['worked-longest', 'opened-first']);
+});

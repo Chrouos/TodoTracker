@@ -18,6 +18,7 @@ assert.match(options, /todo-tracker-work/, 'Todo tracker should render actual wo
 assert.match(options, /todo-tracker-lifecycle/, 'Todo tracker should render the Todo lifecycle separately');
 assert.match(options, /data-todo-tracker-scroll/, 'Todo tracker should expose horizontal navigation');
 assert.match(options, /const showSegmentLabel = width >=/, 'Short work segments should not render overflowing labels');
+assert.match(options, /previousTracker \? previousScrollLeft : 0/, 'Todo tracker should start at the earliest date');
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');
 assert.match(options, /setInterval\([^\n]*60000|setInterval\([\s\S]{0,160}60000/, 'Todo tracker should refresh every 60 seconds');
 assert.match(css, /\.todo-tracker\s*\{/, 'Todo tracker should have dedicated layout styles');

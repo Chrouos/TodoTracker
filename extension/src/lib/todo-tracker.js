@@ -171,7 +171,9 @@ export function buildTodoTrackerData({
       };
     })
     .filter(Boolean)
-    .sort((left, right) => left.openedAtMs - right.openedAtMs || left.title.localeCompare(right.title))
+    .sort((left, right) => right.trackedSeconds - left.trackedSeconds
+      || left.openedAtMs - right.openedAtMs
+      || left.title.localeCompare(right.title))
     .map(({ openedAtMs, ...item }) => item);
 
   return { dates: safeDates, windowStart, windowEnd, items };

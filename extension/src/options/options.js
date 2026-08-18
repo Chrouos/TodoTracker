@@ -852,7 +852,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   </div>`;
   const tracker = mount.querySelector('.todo-tracker');
   if (tracker) requestAnimationFrame(() => {
-    tracker.scrollLeft = previousTracker ? previousScrollLeft : tracker.scrollWidth;
+    tracker.scrollLeft = previousTracker ? previousScrollLeft : 0;
   });
   renderTodoTrackerDetail();
   if (restartTimer) startTodoTrackerRefresh();
