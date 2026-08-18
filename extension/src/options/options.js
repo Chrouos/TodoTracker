@@ -16,6 +16,7 @@ import {
 import { projectIdForTask } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
+import { buildTodoTrackerData } from '../lib/todo-tracker.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -409,12 +410,13 @@ function renderReport() {
   const trendEntries = S.entries.filter((e) => e.endedAt && !e.deletedAt
     && new Date(e.startedAt) >= lineFrom
     && new Date(e.startedAt) < trendEndExclusive);
+  const trackerEntries = S.entries.filter((e) => e.endedAt && !e.deletedAt);
   const series = dailySeries(
     trendEntries,
     lineFrom, lineTo, db.durationSec,
   );
   const trendDates = series.map((day) => day.date);
-  renderProjectTrend(trendEntries, trendDates);
+  renderProjectTrend(trendEntries, trendDates, trackerEntries);
 
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
@@ -590,6 +592,10 @@ let highlightProjectId = null;
 
 let projectTrendState = null;
 let projectTrendSource = null;
+let todoTrackerState = null;
+let todoTrackerSource = null;
+let todoTrackerSelectedId = null;
+let todoTrackerRefreshTimer = null;
 
 function sameTrendProject(left, right) {
   return (left || null) === (right || null);
@@ -717,7 +723,125 @@ function renderTrendDetails(projectId) {
   ${truncated > 0 ? `<div class="cap trend-detail-more">另有 ${truncated} 筆紀錄未展開</div>` : ''}`;
 }
 
-function renderProjectTrend(entries, dates) {
+function todoStatusLabel(status) {
+  return status === 'done' ? '已完成' : status === 'doing' ? '進行中' : '待辦';
+}
+
+function todoTrackerColor(project) {
+  return /^#[0-9a-f]{6}$/i.test(project?.color || '') ? project.color : '#6faed0';
+}
+
+function todoTrackerDateTime(value) {
+  return value ? `${fmtDate(value)} ${fmtClock(value)}` : '進行中（更新中）';
+}
+
+function renderTodoTrackerDetail() {
+  const box = $('todoTrackerDetail');
+  if (!box || !todoTrackerState) return;
+  const item = todoTrackerState.items.find((candidate) => candidate.id === todoTrackerSelectedId);
+  if (!item) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+
+  const task = S.tasks.find((candidate) => candidate.id === item.id);
+  const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
+  const projectPath = project ? pathOf(S.projects, project.id).join(' / ') : '未分類專案';
+  const entries = item.entries.length
+    ? item.entries.map((entry) => `<div class="todo-tracker-entry">
+        <span class="num mute">${fmtDate(entry.startedAt)}<br>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
+        <div class="grow"><strong>${esc(entry.description || '工作紀錄')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div>
+        <span class="num">${fmtHM(entry.seconds)}</span>
+      </div>`).join('')
+    : '<div class="empty">這個日期區間沒有實際計時紀錄</div>';
+
+  box.hidden = false;
+  box.innerHTML = `<div class="todo-tracker-detail-head">
+    <div><strong>${esc(item.title)}</strong><div class="sub">${esc(projectPath)}</div></div>
+    <button type="button" class="btn-sm" data-todo-tracker-close>關閉</button>
+  </div>
+  <div class="todo-tracker-detail-kpis">
+    <span class="badge">${esc(todoStatusLabel(item.status))}</span>
+    <span class="badge">開始 ${esc(todoTrackerDateTime(item.openedAt))}</span>
+    <span class="badge">結束 ${esc(todoTrackerDateTime(item.endedAt))}</span>
+    <span class="badge">生命週期 ${fmtHM(item.lifecycleSeconds)}</span>
+    <span class="badge">區間工時 ${fmtHM(item.trackedSeconds)}</span>
+  </div>
+  ${task?.notes ? `<div class="todo-tracker-detail-notes">${renderMarkdownPreview(task.notes)}</div>` : ''}
+  <div class="todo-tracker-entry-list">${entries}</div>`;
+  initializeMarkdownPreviews(box);
+}
+
+function stopTodoTrackerRefresh() {
+  clearInterval(todoTrackerRefreshTimer);
+  todoTrackerRefreshTimer = null;
+}
+
+function startTodoTrackerRefresh() {
+  stopTodoTrackerRefresh();
+  todoTrackerRefreshTimer = setInterval(() => {
+    if (!todoTrackerSource) return;
+    renderTodoTracker(todoTrackerSource.entries, todoTrackerSource.dates, { restartTimer: false });
+  }, 60000);
+}
+
+function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
+  const mount = $('todoTracker');
+  if (!mount) return;
+  const data = buildTodoTrackerData({
+    tasks: S.tasks,
+    entries,
+    dates,
+    now: new Date(),
+    durationSec: db.durationSec,
+  });
+  todoTrackerState = data;
+  todoTrackerSource = { entries, dates };
+  if (todoTrackerSelectedId && !data.items.some((item) => item.id === todoTrackerSelectedId)) {
+    todoTrackerSelectedId = null;
+  }
+
+  if (!data.items.length) {
+    mount.innerHTML = '<div class="todo-tracker-empty">這個日期區間沒有 Todo 生命週期</div>';
+    renderTodoTrackerDetail();
+    if (restartTimer) startTodoTrackerRefresh();
+    return;
+  }
+
+  const span = data.windowEnd.getTime() - data.windowStart.getTime();
+  const dateHeaders = data.dates.map((date) => `<span>${esc(date.slice(5))}</span>`).join('');
+  const rows = data.items.map((item) => {
+    const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
+    const left = Math.max(0, ((item.visibleStart.getTime() - data.windowStart.getTime()) / span) * 100);
+    const width = Math.max(.5, ((item.visibleEnd.getTime() - item.visibleStart.getTime()) / span) * 100);
+    const title = `${item.title} · ${todoStatusLabel(item.status)} · ${fmtHM(item.trackedSeconds)}`;
+    return `<div class="todo-tracker-row">
+      <div class="todo-tracker-label" title="${esc(title)}">
+        <strong>${esc(item.title)}</strong>
+        <span><i style="background:${todoTrackerColor(project)}"></i>${esc(todoStatusLabel(item.status))}</span>
+      </div>
+      <div class="todo-tracker-track">
+        <button type="button" class="todo-tracker-bar todo-tracker-bar-${esc(item.status)}${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
+          data-todo-tracker-id="${esc(item.id)}" aria-label="${esc(title)}"
+          style="--todo-left:${left}%;--todo-width:${width}%;--todo-color:${todoTrackerColor(project)}">
+          <span>${fmtHM(item.trackedSeconds)}</span>
+          <span class="todo-tracker-tooltip"><strong>${esc(item.title)}</strong><br>${esc(todoTrackerDateTime(item.openedAt))} → ${esc(todoTrackerDateTime(item.endedAt))}<br>區間工時 ${fmtHM(item.trackedSeconds)}</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  mount.innerHTML = `<div class="todo-tracker" style="--todo-tracker-days:${data.dates.length}">
+    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="cap">${esc(data.dates[0])} ～ ${esc(data.dates[data.dates.length - 1])}</span></div>
+    <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
+    <div class="todo-tracker-rows">${rows}</div>
+  </div>`;
+  renderTodoTrackerDetail();
+  if (restartTimer) startTodoTrackerRefresh();
+}
+
+function renderProjectTrend(entries, dates, trackerEntries = entries) {
   const data = buildProjectTrendData({
     entries,
     projects: S.projects,
@@ -740,14 +864,29 @@ function renderProjectTrend(entries, dates) {
     <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
     <div class="project-heatmap-title">專案 × 日期</div>
     <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
+    <div id="todoTracker"></div>
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
+    <div id="todoTrackerDetail" hidden></div>
   </div>`;
   applyTrendHighlight();
   setTrendHover(null);
   renderTrendDetails(highlightProjectId);
+  renderTodoTracker(trackerEntries, dates);
 }
 
 $('byProject').addEventListener('click', (e) => {
+  const todoBar = e.target.closest('[data-todo-tracker-id]');
+  if (todoBar) {
+    const id = todoBar.dataset.todoTrackerId || null;
+    todoTrackerSelectedId = todoTrackerSelectedId === id ? null : id;
+    renderTodoTracker(todoTrackerSource.entries, todoTrackerSource.dates, { restartTimer: false });
+    return;
+  }
+  if (e.target.closest('[data-todo-tracker-close]')) {
+    todoTrackerSelectedId = null;
+    renderTodoTrackerDetail();
+    return;
+  }
   const project = e.target.closest('[data-trend-project]');
   if (project) {
     const projectId = project.dataset.trendProject || null;
@@ -781,6 +920,16 @@ $('byProject').addEventListener('focusin', (e) => {
 $('byProject').addEventListener('focusout', (e) => {
   if (e.relatedTarget?.closest?.('[data-trend-date]')) return;
   setTrendHover(null);
+});
+
+$('byProject').addEventListener('pointerover', (e) => {
+  const target = e.target.closest('[data-todo-tracker-id]');
+  if (target) target.classList.add('is-hovered');
+});
+
+$('byProject').addEventListener('pointerout', (e) => {
+  const target = e.target.closest('[data-todo-tracker-id]');
+  if (target && !e.relatedTarget?.closest?.('[data-todo-tracker-id]')) target.classList.remove('is-hovered');
 });
 
 /* ---------------- 專案 ---------------- */
