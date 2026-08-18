@@ -178,6 +178,30 @@ test('counts every calendar day touched by an overnight work entry', () => {
   assert.equal(result.items[0].trackedSeconds, 3600);
 });
 
+test('returns sorted unique worked dates for date-based tracker cells', () => {
+  const result = buildTodoTrackerData({
+    dates: ['2026-08-17', '2026-08-18', '2026-08-19'],
+    now: local('2026-08-20T15:00:00'),
+    tasks: [{
+      id: 'date-cells', title: 'Date cells', status: 'done',
+      openedAt: '2026-08-17T09:00:00', completedAt: '2026-08-19T18:00:00',
+    }],
+    entries: [
+      {
+        id: 'day-19', taskId: 'date-cells', startedAt: '2026-08-19T10:00:00',
+        endedAt: '2026-08-19T11:00:00', notes: '', description: '',
+      },
+      {
+        id: 'overnight', taskId: 'date-cells', startedAt: '2026-08-17T23:30:00',
+        endedAt: '2026-08-18T00:30:00', notes: '', description: '',
+      },
+    ],
+    durationSec,
+  });
+
+  assert.deepEqual(result.items[0].workedDates, ['2026-08-17', '2026-08-18', '2026-08-19']);
+});
+
 test('hides tracker work records that round down to 0m', () => {
   const result = buildTodoTrackerData({
     now: local('2026-08-20T15:00:00'),

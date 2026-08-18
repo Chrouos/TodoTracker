@@ -660,29 +660,29 @@ section[hidden] { display: none; }
 .todo-tracker-label i { width: 7px; height: 7px; border-radius: 50%; }
 .todo-tracker-track {
   position: relative;
-  min-height: calc(20px + var(--todo-tracker-lanes, 1) * 24px);
+  min-height: 34px;
   background-image: linear-gradient(to right, var(--hairline) 1px, transparent 1px);
   background-size: calc(100% / var(--todo-tracker-days)) 100%;
 }
 .todo-tracker-lifecycle {
   position: absolute;
   left: var(--todo-left);
-  top: 10px;
+  top: 17px;
   width: max(var(--todo-width), 2px);
-  height: 4px;
+  height: 2px;
   border-radius: 99px;
   background: var(--todo-color);
-  opacity: .28;
+  opacity: .38;
   pointer-events: none;
 }
 .todo-tracker-work {
   position: absolute;
-  left: var(--todo-left);
-  top: calc(8px + var(--todo-lane) * 24px);
-  width: max(var(--todo-width), 3px);
+  left: calc(var(--todo-day) * (100% / var(--todo-tracker-days)) + 3px);
+  top: 7px;
+  width: calc(100% / var(--todo-tracker-days) - 6px);
   height: 20px;
-  min-width: 3px;
-  padding: 0 7px;
+  min-width: 0;
+  padding: 0;
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--todo-color) 70%, var(--hairline));
   border-radius: 4px;

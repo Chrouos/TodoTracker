@@ -163,6 +163,7 @@ export function buildTodoTrackerData({
         lifecycleSeconds: Math.max(0, Math.round((endedAt - openedAt) / 1000)),
         lifecycleDays: calendarDays(openedAt, endedAt),
         workedDays: workedDateKeys(itemEntries).size,
+        workedDates: [...workedDateKeys(itemEntries)].sort(),
         trackedSeconds: itemEntries.reduce((sum, entry) => sum + entry.seconds, 0),
         entries: itemEntries,
         workSegments,
