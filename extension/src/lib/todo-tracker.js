@@ -2,6 +2,21 @@ function localDayStart(date) {
   return new Date(`${date}T00:00:00`);
 }
 
+function dateKey(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function datesBetween(start, end) {
+  const first = localDayStart(dateKey(start));
+  const last = localDayStart(dateKey(end));
+  const dates = [];
+  for (let cursor = first; cursor <= last; cursor = new Date(cursor.getTime() + 864e5)) {
+    dates.push(dateKey(cursor));
+  }
+  return dates;
+}
+
 function isValidDate(date) {
   return date instanceof Date && !Number.isNaN(date.getTime());
 }
@@ -43,19 +58,57 @@ function entryDetail(entry, windowStart, windowEnd, durationSec) {
   };
 }
 
+function deriveDates(tasks, entries, now) {
+  const validEntries = entries.filter((entry) => entry.taskId && entry.endedAt && !entry.deletedAt);
+  let first = null;
+  let last = null;
+  for (const task of tasks) {
+    if (task.status === 'archived') continue;
+    const taskEntries = validEntries.filter((entry) => entry.taskId === task.id);
+    if (!taskEntries.length) continue;
+    const firstEntryStart = taskEntries
+      .map((entry) => new Date(entry.startedAt))
+      .filter(isValidDate)
+      .sort((left, right) => left - right)[0];
+    const openedAt = new Date(task.openedAt || firstEntryStart);
+    const endedAt = task.completedAt ? new Date(task.completedAt) : new Date(now);
+    if (!isValidDate(openedAt) || !isValidDate(endedAt)) continue;
+    if (!first || openedAt < first) first = openedAt;
+    if (!last || endedAt > last) last = endedAt;
+  }
+  return first && last ? datesBetween(first, last) : [];
+}
+
+function calendarDays(start, end) {
+  return Math.floor((localDayStart(dateKey(end)) - localDayStart(dateKey(start))) / 864e5) + 1;
+}
+
+function workedDateKeys(entries) {
+  const dates = new Set();
+  for (const entry of entries) {
+    const start = new Date(entry.startedAt);
+    const end = new Date(entry.endedAt);
+    if (!isValidDate(start) || !isValidDate(end) || end <= start) continue;
+    for (let cursor = localDayStart(dateKey(start)); cursor < end; cursor = new Date(cursor.getTime() + 864e5)) {
+      dates.add(dateKey(cursor));
+    }
+  }
+  return dates;
+}
+
 export function buildTodoTrackerData({
   tasks = [],
   entries = [],
-  dates = [],
+  dates = null,
   now = new Date(),
   durationSec = null,
 }) {
-  const safeDates = [...dates];
+  const nowDate = new Date(now);
+  const safeDates = dates?.length ? [...dates] : deriveDates(tasks, entries, nowDate);
   if (!safeDates.length) return { dates: safeDates, windowStart: null, windowEnd: null, items: [] };
 
   const windowStart = localDayStart(safeDates[0]);
   const windowEnd = new Date(localDayStart(safeDates[safeDates.length - 1]).getTime() + 864e5);
-  const nowDate = new Date(now);
   const items = tasks
     .filter((task) => task.status !== 'archived')
     .map((task) => {
@@ -68,6 +121,7 @@ export function buildTodoTrackerData({
         .filter((entry) => entry.taskId === task.id && entry.endedAt && !entry.deletedAt)
         .map((entry) => entryDetail(entry, windowStart, windowEnd, durationSec))
         .filter(Boolean);
+      if (!itemEntries.length) return null;
 
       return {
         id: task.id,
@@ -80,6 +134,8 @@ export function buildTodoTrackerData({
         visibleStart: clampStart(openedAt, windowStart),
         visibleEnd: clampEnd(endedAt, windowEnd),
         lifecycleSeconds: Math.max(0, Math.round((endedAt - openedAt) / 1000)),
+        lifecycleDays: calendarDays(openedAt, endedAt),
+        workedDays: workedDateKeys(itemEntries).size,
         trackedSeconds: itemEntries.reduce((sum, entry) => sum + entry.seconds, 0),
         entries: itemEntries,
         openedAtMs: openedAt.getTime(),

@@ -615,17 +615,21 @@ section[hidden] { display: none; }
 
 .todo-tracker {
   --todo-tracker-label-width: 220px;
-  min-width: calc(var(--todo-tracker-label-width) + var(--todo-tracker-days) * 76px);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin-top: 22px;
   padding-top: 16px;
   border-top: 1px solid var(--hairline);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 .todo-tracker-toolbar,
 .todo-tracker-axis,
 .todo-tracker-row {
   display: grid;
   grid-template-columns: var(--todo-tracker-label-width) minmax(0, 1fr);
+  min-width: calc(var(--todo-tracker-label-width) + var(--todo-tracker-days) * 76px);
 }
 .todo-tracker-toolbar { align-items: baseline; gap: var(--md); margin-bottom: 10px; }
 .todo-tracker-toolbar .cap { text-align: right; }

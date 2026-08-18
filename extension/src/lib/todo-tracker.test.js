@@ -30,7 +30,7 @@ test('clamps a completed task lifecycle to the report window', () => {
   assert.equal(result.items[0].entries[0].seconds, 3600);
 });
 
-test('uses now for an active task and keeps a task with no entries', () => {
+test('uses now for an active task and excludes a task with no entries', () => {
   const now = local('2026-08-20T15:00:00');
   const result = buildTodoTrackerData({
     dates: ['2026-08-18', '2026-08-19', '2026-08-20'],
@@ -45,14 +45,16 @@ test('uses now for an active task and keeps a task with no entries', () => {
         openedAt: '2026-08-20T10:00:00', completedAt: null,
       },
     ],
-    entries: [],
+    entries: [{
+      id: 'entry-b', taskId: 'task-b', startedAt: '2026-08-19T10:00:00',
+      endedAt: '2026-08-19T11:00:00', notes: '', description: '',
+    }],
     durationSec,
   });
 
-  assert.deepEqual(result.items.map((item) => item.id), ['task-b', 'task-c']);
+  assert.deepEqual(result.items.map((item) => item.id), ['task-b']);
   assert.equal(result.items[0].visibleEnd.getTime(), now.getTime());
-  assert.equal(result.items[0].trackedSeconds, 0);
-  assert.deepEqual(result.items[1].entries, []);
+  assert.equal(result.items[0].trackedSeconds, 3600);
 });
 
 test('excludes archived tasks and tasks outside the report window', () => {
@@ -113,4 +115,65 @@ test('sorts by opened time and clips entry work at both window boundaries', () =
   assert.equal(result.items[0].trackedSeconds, 3600);
   assert.equal(result.items[1].trackedSeconds, 3600);
   assert.equal(result.items[1].entries.length, 1);
+});
+
+test('derives the full history axis and keeps only tasks with tracked work', () => {
+  const result = buildTodoTrackerData({
+    now: local('2026-08-20T15:00:00'),
+    tasks: [
+      {
+        id: 'task-worked', title: '金福氣', status: 'done',
+        openedAt: '2026-08-17T09:00:00', completedAt: '2026-08-20T18:00:00',
+      },
+      {
+        id: 'task-active', title: '日文', status: 'doing',
+        openedAt: '2026-08-18T09:00:00', completedAt: null,
+      },
+      {
+        id: 'task-empty', title: '沒有時間', status: 'todo',
+        openedAt: '2026-08-17T09:00:00', completedAt: null,
+      },
+    ],
+    entries: [
+      {
+        id: 'worked-1', taskId: 'task-worked', startedAt: '2026-08-17T10:00:00',
+        endedAt: '2026-08-17T11:00:00', notes: '', description: '',
+      },
+      {
+        id: 'worked-2', taskId: 'task-worked', startedAt: '2026-08-19T10:00:00',
+        endedAt: '2026-08-19T11:30:00', notes: '', description: '',
+      },
+      {
+        id: 'active-1', taskId: 'task-active', startedAt: '2026-08-18T14:00:00',
+        endedAt: '2026-08-18T15:00:00', notes: '', description: '',
+      },
+    ],
+    durationSec,
+  });
+
+  assert.deepEqual(result.dates, ['2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20']);
+  assert.deepEqual(result.items.map((item) => item.id), ['task-worked', 'task-active']);
+  assert.equal(result.items[0].lifecycleDays, 4);
+  assert.equal(result.items[0].workedDays, 2);
+  assert.equal(result.items[0].trackedSeconds, 9000);
+  assert.equal(result.items[1].lifecycleDays, 3);
+  assert.equal(result.items[1].workedDays, 1);
+});
+
+test('counts every calendar day touched by an overnight work entry', () => {
+  const result = buildTodoTrackerData({
+    now: local('2026-08-20T15:00:00'),
+    tasks: [{
+      id: 'overnight', title: 'Overnight', status: 'done',
+      openedAt: '2026-08-18T23:00:00', completedAt: '2026-08-19T02:00:00',
+    }],
+    entries: [{
+      id: 'overnight-entry', taskId: 'overnight', startedAt: '2026-08-18T23:30:00',
+      endedAt: '2026-08-19T00:30:00', notes: '', description: '',
+    }],
+    durationSec,
+  });
+
+  assert.equal(result.items[0].workedDays, 2);
+  assert.equal(result.items[0].trackedSeconds, 3600);
 });
