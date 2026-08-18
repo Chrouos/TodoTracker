@@ -30,6 +30,9 @@ assert.match(options, /data-todo-tracker-shift="-7"|data-todo-tracker-shift='-7'
 assert.match(options, /data-todo-tracker-today/, 'Todo tracker should provide a today navigation action');
 assert.match(options, /data-todo-tracker-range/, 'Todo tracker should expose the visible date range');
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');
+assert.match(options, /todoTrackerDateRange\(item\)/, 'Todo tracker rows should expose their lifecycle date range');
+assert.match(options, /class="todo-tracker-label-meta"/, 'Todo tracker labels should expose lifecycle metadata');
+assert.match(options, /\$\{item\.workedDays\} 天 \/ 共 \$\{item\.lifecycleDays\} 天/, 'Todo tracker labels should show worked days against lifecycle days');
 assert.match(options, /todoTrackerHoverTooltip/, 'Todo tracker should use one shared hover tooltip');
 assert.match(options, /getBoundingClientRect\(\)/, 'Todo tracker tooltip should position itself against the viewport');
 assert.match(options, /todoTrackerHoveredTarget/, 'Todo tracker should track one hovered date cell');

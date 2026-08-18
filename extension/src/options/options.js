@@ -738,6 +738,12 @@ function todoTrackerDateTime(value) {
   return value ? `${fmtDate(value)} ${fmtClock(value)}` : '進行中（更新中）';
 }
 
+function todoTrackerDateRange(item) {
+  const start = fmtDate(item.openedAt).slice(5);
+  const end = fmtDate(item.endedAt || new Date()).slice(5);
+  return `${start} ～ ${end}`;
+}
+
 function renderTodoTrackerDetail() {
   const box = $('todoTrackerDetail');
   if (!box || !todoTrackerState) return;
@@ -920,7 +926,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       return lifecycleStart < dayEnd && lifecycleEnd > dayStart ? { date, day } : null;
     }).filter(Boolean);
     const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day};--todo-color:${color}" title="開單 ${todoTrackerDateTime(item.openedAt)} · 結單 ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
-    const title = `${item.title} · ${todoStatusLabel(item.status)} · 跨日 ${item.lifecycleDays} 天 · 實際工作 ${item.workedDays} 天`;
+    const dateRange = todoTrackerDateRange(item);
+    const title = `${item.title} · ${todoStatusLabel(item.status)} · ${dateRange} · 實際工作 ${item.workedDays} 天 / 共 ${item.lifecycleDays} 天`;
     const workDates = item.workedDates
       .map((date) => ({ date, day: visibleDateIndex.get(date) }))
       .filter(({ day }) => day >= 0);
@@ -934,7 +941,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     return `<div class="todo-tracker-row">
       <div class="todo-tracker-label" title="${esc(title)}">
         <strong>${esc(item.title)}</strong>
-        <span><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${item.workedDays} 天</span>
+        <span class="todo-tracker-label-meta"><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${esc(dateRange)}</span>
+        <span class="todo-tracker-label-days">${item.workedDays} 天 / 共 ${item.lifecycleDays} 天</span>
       </div>
       <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
         ${lifecycleCells}
