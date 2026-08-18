@@ -825,10 +825,11 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       const left = Math.max(0, ((entry.visibleStart.getTime() - data.windowStart.getTime()) / span) * 100);
       const width = Math.max(.5, ((entry.visibleEnd.getTime() - entry.visibleStart.getTime()) / span) * 100);
       const entryTitle = `${item.title} · ${fmtDate(entry.startedAt)} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)} · ${fmtHM(entry.seconds)}`;
+      const showSegmentLabel = width >= 8;
       return `<button type="button" class="todo-tracker-work${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
         data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-entry="${esc(entry.id)}" aria-label="${esc(entryTitle)}"
         style="--todo-left:${left}%;--todo-width:${width}%;--todo-lane:${entry.lane};--todo-color:${color}">
-        <span>${fmtHM(entry.seconds)}</span>
+        ${showSegmentLabel ? `<span>${fmtHM(entry.seconds)}</span>` : ''}
         <span class="todo-tracker-tooltip"><strong>${esc(item.title)}</strong><br>${esc(fmtDate(entry.startedAt))} ${esc(fmtClock(entry.startedAt))} → ${esc(fmtDate(entry.endedAt))} ${esc(fmtClock(entry.endedAt))}<br>實際工時 ${fmtHM(entry.seconds)}</span>
       </button>`;
     }).join('');

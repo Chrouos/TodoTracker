@@ -17,9 +17,11 @@ assert.match(options, /data-todo-tracker-id/, 'Todo tracker bars should expose t
 assert.match(options, /todo-tracker-work/, 'Todo tracker should render actual work segments');
 assert.match(options, /todo-tracker-lifecycle/, 'Todo tracker should render the Todo lifecycle separately');
 assert.match(options, /data-todo-tracker-scroll/, 'Todo tracker should expose horizontal navigation');
+assert.match(options, /const showSegmentLabel = width >=/, 'Short work segments should not render overflowing labels');
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');
 assert.match(options, /setInterval\([^\n]*60000|setInterval\([\s\S]{0,160}60000/, 'Todo tracker should refresh every 60 seconds');
 assert.match(css, /\.todo-tracker\s*\{/, 'Todo tracker should have dedicated layout styles');
+assert.match(css, /\.todo-tracker-rows\s*\{[^}]*overflow-y:\s*visible/s, 'Todo tracker rows should not create a nested scroll container');
 assert.match(css, /\.project-heatmap-svg \.heatmap-cell\.is-hovered rect\s*\{[^}]*stroke:\s*(?!var\(--ink\))/s,
   'Heatmap hover should not use the heavy black ink outline');
 

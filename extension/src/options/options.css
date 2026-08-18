@@ -642,7 +642,7 @@ section[hidden] { display: none; }
   text-align: center;
 }
 .todo-tracker-axis > div span { padding-bottom: 7px; }
-.todo-tracker-rows { max-height: min(520px, 60vh); overflow-y: auto; }
+.todo-tracker-rows { max-height: none; overflow-y: visible; }
 .todo-tracker-row { min-height: 46px; border-top: 1px solid var(--hairline); }
 .todo-tracker-label {
   position: sticky;
