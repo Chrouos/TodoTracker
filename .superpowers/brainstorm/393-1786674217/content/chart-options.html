@@ -1,0 +1,90 @@
+<style>
+  .chart-options { display: grid; gap: 18px; }
+  .chart-option { cursor: pointer; }
+  .chart-option .mockup { border: 1px solid #d7d2cc; background: #fff; }
+  .chart-option .mockup-header { display: flex; justify-content: space-between; align-items: center; }
+  .chart-option .mockup-body { padding: 14px; }
+  .chart-option h3 { margin: 0 0 4px; }
+  .chart-option p { margin: 0 0 10px; color: #777; }
+  .chart-svg { width: 100%; height: auto; display: block; }
+  .axis { stroke: #ddd; stroke-width: 1; }
+  .axis-label { fill: #777; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: #555; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 8px; height: 8px; display: inline-block; }
+  .heatmap { display: grid; grid-template-columns: 112px repeat(5, 1fr); gap: 3px; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .heatmap > div { min-height: 31px; display: flex; align-items: center; justify-content: center; border: 1px solid #eee; }
+  .heatmap .name { justify-content: flex-start; padding-left: 8px; border: 0; color: #555; }
+  .heatmap .head { min-height: 22px; border: 0; color: #777; }
+  .heat-0 { background: #fafafa; color: #aaa; }
+  .heat-1 { background: #dfeef5; }
+  .heat-2 { background: #9ccde5; }
+  .heat-3 { background: #5fb5dc; color: #123; }
+  .heat-4 { background: #2d8fbe; color: #fff; }
+  .choice-note { font-size: 12px; color: #666; margin-top: 8px; }
+</style>
+
+<h2>專案時間 × 每日趨勢</h2>
+<p class="subtitle">選一個你覺得最適合放進報表的融合方式。三種方案都可以支援 hover 顯示日期、專案與工時。</p>
+
+<div class="chart-options">
+  <div class="chart-option option" data-choice="stacked-area" onclick="toggleSelect(this)">
+    <div class="mockup">
+      <div class="mockup-header"><strong>A · 堆疊面積圖</strong><span class="label">推薦</span></div>
+      <div class="mockup-body">
+        <h3>每日總工時，同時看專案組成</h3>
+        <p>保留「趨勢」的閱讀方式，顏色直接表達每天是哪個專案佔多少。</p>
+        <svg class="chart-svg" viewBox="0 0 760 230" role="img" aria-label="堆疊面積圖">
+          <line class="axis" x1="52" y1="25" x2="740" y2="25"/><line class="axis" x1="52" y1="70" x2="740" y2="70"/><line class="axis" x1="52" y1="115" x2="740" y2="115"/><line class="axis" x1="52" y1="160" x2="740" y2="160"/><line class="axis" x1="52" y1="205" x2="740" y2="205"/>
+          <text class="axis-label" x="38" y="209">0h</text><text class="axis-label" x="32" y="164">2h</text><text class="axis-label" x="32" y="119">4h</text><text class="axis-label" x="32" y="74">6h</text><text class="axis-label" x="32" y="29">8h</text>
+          <polygon points="52,205 52,55 224,91 396,68 568,49 740,136 740,205" fill="#61b5dc" opacity=".78"/>
+          <polygon points="52,55 224,91 396,68 568,49 740,136 740,153 568,78 396,97 224,119 52,88" fill="#ff9c9f" opacity=".85"/>
+          <polygon points="52,88 224,119 396,97 568,78 740,153 740,174 568,93 396,116 224,142 52,111" fill="#252323" opacity=".88"/>
+          <polygon points="52,111 224,142 396,116 568,93 740,174 740,205 568,205 396,205 224,205 52,205" fill="#ffe08b" opacity=".85"/>
+          <polyline points="52,55 224,91 396,68 568,49 740,136" fill="none" stroke="#222" stroke-width="1.5"/>
+          <text class="axis-label" x="44" y="224">08-10</text><text class="axis-label" x="214" y="224">08-11</text><text class="axis-label" x="386" y="224">08-12</text><text class="axis-label" x="558" y="224">08-13</text><text class="axis-label" x="730" y="224" text-anchor="end">08-14</text>
+          <line x1="568" y1="25" x2="568" y2="205" stroke="#777" stroke-dasharray="3 3"/><rect x="486" y="8" width="142" height="39" fill="#fff" stroke="#bbb"/><text x="496" y="24" font-size="11" fill="#333">08-13 · 7h 48m</text><text x="496" y="39" font-size="10" fill="#777">智慧客服 4h 12m</text>
+        </svg>
+        <div class="legend"><span><i class="dot" style="background:#61b5dc"></i>智慧客服</span><span><i class="dot" style="background:#ff9c9f"></i>Content to Question</span><span><i class="dot" style="background:#252323"></i>工作雜事</span><span><i class="dot" style="background:#ffe08b"></i>祝則</span></div>
+        <div class="choice-note">優點：一張圖同時回答「今天做了多久」和「時間花在哪裡」。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-option option" data-choice="heatmap" onclick="toggleSelect(this)">
+    <div class="mockup">
+      <div class="mockup-header"><strong>B · 專案 × 日期 Heatmap</strong><span class="label">比較導向</span></div>
+      <div class="mockup-body">
+        <h3>快速找到哪個專案在哪天投入最多</h3>
+        <p>每格是該專案當天工時，深淺代表時間；hover 顯示精確時間。</p>
+        <div class="heatmap">
+          <div class="head"></div><div class="head">08-10</div><div class="head">08-11</div><div class="head">08-12</div><div class="head">08-13</div><div class="head">08-14</div>
+          <div class="name">智慧客服</div><div class="heat-4">5h 10m</div><div class="heat-2">2h 40m</div><div class="heat-3">3h 20m</div><div class="heat-4">4h 12m</div><div class="heat-1">48m</div>
+          <div class="name">Content to Question</div><div class="heat-2">2h 10m</div><div class="heat-3">2h 05m</div><div class="heat-2">1h 50m</div><div class="heat-2">1h 45m</div><div class="heat-0">—</div>
+          <div class="name">工作雜事</div><div class="heat-1">50m</div><div class="heat-2">1h 20m</div><div class="heat-3">1h 30m</div><div class="heat-1">30m</div><div class="heat-0">—</div>
+          <div class="name">祝則</div><div class="heat-0">—</div><div class="heat-1">20m</div><div class="heat-0">—</div><div class="heat-1">18m</div><div class="heat-0">—</div>
+        </div>
+        <div class="choice-note">優點：最容易比較「專案」與「日期」的交叉分布；缺點是趨勢線感較弱。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-option option" data-choice="multi-line" onclick="toggleSelect(this)">
+    <div class="mockup">
+      <div class="mockup-header"><strong>C · 多專案折線圖</strong><span class="label">趨勢導向</span></div>
+      <div class="mockup-body">
+        <h3>每個專案一條線，可點圖例聚焦</h3>
+        <p>保留折線圖直覺；hover 某一天時，旁邊列出各專案工時與總和。</p>
+        <svg class="chart-svg" viewBox="0 0 760 230" role="img" aria-label="多專案折線圖">
+          <line class="axis" x1="52" y1="25" x2="740" y2="25"/><line class="axis" x1="52" y1="85" x2="740" y2="85"/><line class="axis" x1="52" y1="145" x2="740" y2="145"/><line class="axis" x1="52" y1="205" x2="740" y2="205"/>
+          <text class="axis-label" x="35" y="209">0h</text><text class="axis-label" x="35" y="149">2h</text><text class="axis-label" x="35" y="89">4h</text><text class="axis-label" x="35" y="29">6h</text>
+          <polyline points="52,50 224,125 396,85 568,65 740,180" fill="none" stroke="#61b5dc" stroke-width="3"/><polyline points="52,155 224,142 396,150 568,152 740,205" fill="none" stroke="#ff9c9f" stroke-width="3"/><polyline points="52,190 224,165 396,160 568,180 740,205" fill="none" stroke="#252323" stroke-width="3"/><polyline points="52,205 224,198 396,205 568,200 740,205" fill="none" stroke="#e3b948" stroke-width="3"/>
+          <line x1="396" y1="25" x2="396" y2="205" stroke="#777" stroke-dasharray="3 3"/><rect x="414" y="39" width="180" height="93" fill="#fff" stroke="#bbb"/><text x="426" y="56" font-size="11" fill="#333">08-12 · 總計 6h 02m</text><text x="426" y="75" font-size="10" fill="#555">智慧客服　3h 20m</text><text x="426" y="92" font-size="10" fill="#555">Content to Question　1h 50m</text><text x="426" y="109" font-size="10" fill="#555">工作雜事　1h 30m</text><text x="426" y="126" font-size="10" fill="#555">祝則　—</text>
+          <text class="axis-label" x="44" y="224">08-10</text><text class="axis-label" x="214" y="224">08-11</text><text class="axis-label" x="386" y="224">08-12</text><text class="axis-label" x="558" y="224">08-13</text><text class="axis-label" x="730" y="224" text-anchor="end">08-14</text>
+        </svg>
+        <div class="legend"><span><i class="dot" style="background:#61b5dc"></i>智慧客服</span><span><i class="dot" style="background:#ff9c9f"></i>Content to Question</span><span><i class="dot" style="background:#252323"></i>工作雜事</span><span><i class="dot" style="background:#e3b948"></i>祝則</span></div>
+        <div class="choice-note">優點：最接近現在的每日趨勢圖；缺點是專案多時容易重疊。</div>
+      </div>
+    </div>
+  </div>
+</div>
