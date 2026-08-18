@@ -177,3 +177,60 @@ test('counts every calendar day touched by an overnight work entry', () => {
   assert.equal(result.items[0].workedDays, 2);
   assert.equal(result.items[0].trackedSeconds, 3600);
 });
+
+test('hides tracker work records that round down to 0m', () => {
+  const result = buildTodoTrackerData({
+    now: local('2026-08-20T15:00:00'),
+    tasks: [{
+      id: 'short-work', title: 'Short work', status: 'done',
+      openedAt: '2026-08-18T09:00:00', completedAt: '2026-08-18T12:00:00',
+    }],
+    entries: [
+      {
+        id: 'zero-minute', taskId: 'short-work', startedAt: '2026-08-18T09:00:00',
+        endedAt: '2026-08-18T09:00:20', notes: '', description: '',
+      },
+      {
+        id: 'visible-minute', taskId: 'short-work', startedAt: '2026-08-18T10:00:00',
+        endedAt: '2026-08-18T10:00:30', notes: '', description: '',
+      },
+    ],
+    durationSec,
+  });
+
+  assert.deepEqual(result.items[0].entries.map((entry) => entry.id), ['visible-minute']);
+  assert.equal(result.items[0].trackedSeconds, 30);
+});
+
+test('lays out actual work segments in separate lanes when they overlap', () => {
+  const result = buildTodoTrackerData({
+    now: local('2026-08-20T15:00:00'),
+    tasks: [{
+      id: 'overlap', title: 'Overlap', status: 'done',
+      openedAt: '2026-08-17T09:00:00', completedAt: '2026-08-19T18:00:00',
+    }],
+    entries: [
+      {
+        id: 'work-a', taskId: 'overlap', startedAt: '2026-08-17T09:00:00',
+        endedAt: '2026-08-17T10:00:00', notes: '', description: '',
+      },
+      {
+        id: 'work-b', taskId: 'overlap', startedAt: '2026-08-17T09:30:00',
+        endedAt: '2026-08-17T10:30:00', notes: '', description: '',
+      },
+      {
+        id: 'work-c', taskId: 'overlap', startedAt: '2026-08-18T12:00:00',
+        endedAt: '2026-08-18T13:00:00', notes: '', description: '',
+      },
+    ],
+    durationSec,
+  });
+
+  assert.equal(result.items[0].laneCount, 2);
+  assert.deepEqual(
+    result.items[0].workSegments.map((segment) => [segment.id, segment.lane]),
+    [['work-a', 0], ['work-b', 1], ['work-c', 0]],
+  );
+  assert.equal(result.items[0].workSegments[0].visibleStart.getTime(), local('2026-08-17T09:00:00').getTime());
+  assert.equal(result.items[0].workSegments[2].visibleEnd.getTime(), local('2026-08-18T13:00:00').getTime());
+});

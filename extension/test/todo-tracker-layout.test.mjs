@@ -14,6 +14,9 @@ assert.match(options, /renderProjectTrend\(trendEntries, trendDates, trackerEntr
 assert.match(options, /renderTodoTracker\(trackerEntries\)/, 'Todo tracker should derive its own full-history range');
 assert.match(options, /lifecycleDays|workedDays/, 'Todo tracker should expose cross-day work statistics');
 assert.match(options, /data-todo-tracker-id/, 'Todo tracker bars should expose their Todo id');
+assert.match(options, /todo-tracker-work/, 'Todo tracker should render actual work segments');
+assert.match(options, /todo-tracker-lifecycle/, 'Todo tracker should render the Todo lifecycle separately');
+assert.match(options, /data-todo-tracker-scroll/, 'Todo tracker should expose horizontal navigation');
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');
 assert.match(options, /setInterval\([^\n]*60000|setInterval\([\s\S]{0,160}60000/, 'Todo tracker should refresh every 60 seconds');
 assert.match(css, /\.todo-tracker\s*\{/, 'Todo tracker should have dedicated layout styles');

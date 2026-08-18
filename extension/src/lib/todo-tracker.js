@@ -36,6 +36,16 @@ function overlapSeconds(start, end, windowStart, windowEnd) {
   return Math.max(0, Math.round((clippedEnd - clippedStart) / 1000));
 }
 
+const MIN_TRACKER_SECONDS = 30;
+
+function rawEntrySeconds(entry, durationSec) {
+  const startedAt = new Date(entry.startedAt);
+  const endedAt = new Date(entry.endedAt);
+  if (!isValidDate(startedAt) || !isValidDate(endedAt) || endedAt <= startedAt) return 0;
+  if (durationSec) return Math.max(0, Number(durationSec(entry)) || 0);
+  return Math.max(0, Math.round((endedAt - startedAt) / 1000));
+}
+
 function entryDetail(entry, windowStart, windowEnd, durationSec) {
   const startedAt = new Date(entry.startedAt);
   const endedAt = new Date(entry.endedAt);
@@ -52,14 +62,17 @@ function entryDetail(entry, windowStart, windowEnd, durationSec) {
     id: entry.id,
     startedAt: entry.startedAt,
     endedAt: entry.endedAt,
+    visibleStart: clippedStart,
+    visibleEnd: clippedEnd,
     seconds,
     notes: entry.notes || '',
     description: entry.description || '',
   };
 }
 
-function deriveDates(tasks, entries, now) {
-  const validEntries = entries.filter((entry) => entry.taskId && entry.endedAt && !entry.deletedAt);
+function deriveDates(tasks, entries, now, durationSec) {
+  const validEntries = entries.filter((entry) => entry.taskId && entry.endedAt && !entry.deletedAt
+    && rawEntrySeconds(entry, durationSec) >= MIN_TRACKER_SECONDS);
   let first = null;
   let last = null;
   for (const task of tasks) {
@@ -96,6 +109,19 @@ function workedDateKeys(entries) {
   return dates;
 }
 
+function layoutWorkSegments(entries) {
+  const laneEnds = [];
+  const segments = [...entries]
+    .sort((left, right) => left.visibleStart - right.visibleStart || left.visibleEnd - right.visibleEnd)
+    .map((entry) => {
+      const lane = laneEnds.findIndex((end) => end <= entry.visibleStart);
+      const resolvedLane = lane === -1 ? laneEnds.length : lane;
+      laneEnds[resolvedLane] = entry.visibleEnd;
+      return { ...entry, lane: resolvedLane };
+    });
+  return segments.map((segment) => ({ ...segment, laneCount: laneEnds.length }));
+}
+
 export function buildTodoTrackerData({
   tasks = [],
   entries = [],
@@ -104,7 +130,7 @@ export function buildTodoTrackerData({
   durationSec = null,
 }) {
   const nowDate = new Date(now);
-  const safeDates = dates?.length ? [...dates] : deriveDates(tasks, entries, nowDate);
+  const safeDates = dates?.length ? [...dates] : deriveDates(tasks, entries, nowDate, durationSec);
   if (!safeDates.length) return { dates: safeDates, windowStart: null, windowEnd: null, items: [] };
 
   const windowStart = localDayStart(safeDates[0]);
@@ -120,8 +146,9 @@ export function buildTodoTrackerData({
       const itemEntries = entries
         .filter((entry) => entry.taskId === task.id && entry.endedAt && !entry.deletedAt)
         .map((entry) => entryDetail(entry, windowStart, windowEnd, durationSec))
-        .filter(Boolean);
+        .filter((entry) => entry && entry.seconds >= MIN_TRACKER_SECONDS);
       if (!itemEntries.length) return null;
+      const workSegments = layoutWorkSegments(itemEntries);
 
       return {
         id: task.id,
@@ -138,6 +165,8 @@ export function buildTodoTrackerData({
         workedDays: workedDateKeys(itemEntries).size,
         trackedSeconds: itemEntries.reduce((sum, entry) => sum + entry.seconds, 0),
         entries: itemEntries,
+        workSegments,
+        laneCount: workSegments[0].laneCount,
         openedAtMs: openedAt.getTime(),
       };
     })

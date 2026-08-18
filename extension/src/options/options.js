@@ -751,10 +751,10 @@ function renderTodoTrackerDetail() {
   const entries = item.entries.length
     ? item.entries.map((entry) => `<div class="todo-tracker-entry">
         <span class="num mute">${fmtDate(entry.startedAt)}<br>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
-        <div class="grow"><strong>${esc(entry.description || '工作紀錄')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div>
+        <div class="grow"><strong>${esc(entry.description || '工作紀錄')}</strong><div class="sub">${fmtDate(entry.startedAt)} → ${fmtDate(entry.endedAt)}</div>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div>
         <span class="num">${fmtHM(entry.seconds)}</span>
       </div>`).join('')
-    : '<div class="empty">這個日期區間沒有實際計時紀錄</div>';
+    : '<div class="empty">沒有可顯示的實際工作紀錄</div>';
 
   box.hidden = false;
   box.innerHTML = `<div class="todo-tracker-detail-head">
@@ -763,13 +763,14 @@ function renderTodoTrackerDetail() {
   </div>
   <div class="todo-tracker-detail-kpis">
     <span class="badge">${esc(todoStatusLabel(item.status))}</span>
-    <span class="badge">開始 ${esc(todoTrackerDateTime(item.openedAt))}</span>
-    <span class="badge">結束 ${esc(todoTrackerDateTime(item.endedAt))}</span>
+    <span class="badge">開單 ${esc(todoTrackerDateTime(item.openedAt))}</span>
+    <span class="badge">結單 ${esc(todoTrackerDateTime(item.endedAt))}</span>
     <span class="badge">跨日 ${item.lifecycleDays} 天</span>
     <span class="badge">實際工作 ${item.workedDays} 天</span>
     <span class="badge">累積工時 ${fmtHM(item.trackedSeconds)}</span>
   </div>
   ${task?.notes ? `<div class="todo-tracker-detail-notes">${renderMarkdownPreview(task.notes)}</div>` : ''}
+  <div class="todo-tracker-detail-section"><strong>實際工作紀錄（${item.entries.length} 筆）</strong></div>
   <div class="todo-tracker-entry-list">${entries}</div>`;
   initializeMarkdownPreviews(box);
 }
@@ -816,27 +817,35 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   const dateHeaders = data.dates.map((date) => `<span>${esc(date.slice(5))}</span>`).join('');
   const rows = data.items.map((item) => {
     const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
-    const left = Math.max(0, ((item.visibleStart.getTime() - data.windowStart.getTime()) / span) * 100);
-    const width = Math.max(.5, ((item.visibleEnd.getTime() - item.visibleStart.getTime()) / span) * 100);
-    const title = `${item.title} · ${todoStatusLabel(item.status)} · ${item.workedDays} 天 · ${fmtHM(item.trackedSeconds)}`;
+    const color = todoTrackerColor(project);
+    const lifecycleLeft = Math.max(0, ((item.visibleStart.getTime() - data.windowStart.getTime()) / span) * 100);
+    const lifecycleWidth = Math.max(.5, ((item.visibleEnd.getTime() - item.visibleStart.getTime()) / span) * 100);
+    const title = `${item.title} · ${todoStatusLabel(item.status)} · 跨日 ${item.lifecycleDays} 天 · 實際工作 ${item.workedDays} 天 · ${fmtHM(item.trackedSeconds)}`;
+    const workSegments = item.workSegments.map((entry) => {
+      const left = Math.max(0, ((entry.visibleStart.getTime() - data.windowStart.getTime()) / span) * 100);
+      const width = Math.max(.5, ((entry.visibleEnd.getTime() - entry.visibleStart.getTime()) / span) * 100);
+      const entryTitle = `${item.title} · ${fmtDate(entry.startedAt)} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)} · ${fmtHM(entry.seconds)}`;
+      return `<button type="button" class="todo-tracker-work${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
+        data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-entry="${esc(entry.id)}" aria-label="${esc(entryTitle)}"
+        style="--todo-left:${left}%;--todo-width:${width}%;--todo-lane:${entry.lane};--todo-color:${color}">
+        <span>${fmtHM(entry.seconds)}</span>
+        <span class="todo-tracker-tooltip"><strong>${esc(item.title)}</strong><br>${esc(fmtDate(entry.startedAt))} ${esc(fmtClock(entry.startedAt))} → ${esc(fmtDate(entry.endedAt))} ${esc(fmtClock(entry.endedAt))}<br>實際工時 ${fmtHM(entry.seconds)}</span>
+      </button>`;
+    }).join('');
     return `<div class="todo-tracker-row">
       <div class="todo-tracker-label" title="${esc(title)}">
         <strong>${esc(item.title)}</strong>
-        <span><i style="background:${todoTrackerColor(project)}"></i>${esc(todoStatusLabel(item.status))}</span>
+        <span><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${item.workedDays} 天 · ${fmtHM(item.trackedSeconds)}</span>
       </div>
-      <div class="todo-tracker-track">
-        <button type="button" class="todo-tracker-bar todo-tracker-bar-${esc(item.status)}${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
-          data-todo-tracker-id="${esc(item.id)}" aria-label="${esc(title)}"
-          style="--todo-left:${left}%;--todo-width:${width}%;--todo-color:${todoTrackerColor(project)}">
-          <span>${fmtHM(item.trackedSeconds)}</span>
-          <span class="todo-tracker-tooltip"><strong>${esc(item.title)}</strong><br>${esc(todoTrackerDateTime(item.openedAt))} → ${esc(todoTrackerDateTime(item.endedAt))}<br>跨日 ${item.lifecycleDays} 天 · 實際工作 ${item.workedDays} 天<br>累積工時 ${fmtHM(item.trackedSeconds)}</span>
-        </button>
+      <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
+        <div class="todo-tracker-lifecycle" style="--todo-left:${lifecycleLeft}%;--todo-width:${lifecycleWidth}%;--todo-color:${color}" title="開單 ${todoTrackerDateTime(item.openedAt)} · 結單 ${todoTrackerDateTime(item.endedAt)}"></div>
+        ${workSegments}
       </div>
     </div>`;
   }).join('');
 
   mount.innerHTML = `<div class="todo-tracker" style="--todo-tracker-days:${data.dates.length}">
-    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="cap">${esc(data.dates[0])} ～ ${esc(data.dates[data.dates.length - 1])}</span></div>
+    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="cap">${esc(data.dates[0])} ～ ${esc(data.dates[data.dates.length - 1])}</span><span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-scroll="-1" aria-label="往前 7 天">←</button><button type="button" class="btn-sm" data-todo-tracker-scroll="1" aria-label="往後 7 天">→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rows}</div>
   </div>`;
@@ -882,6 +891,12 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
 }
 
 $('byProject').addEventListener('click', (e) => {
+  const trackerScroll = e.target.closest('[data-todo-tracker-scroll]');
+  if (trackerScroll) {
+    const tracker = $('todoTracker')?.querySelector('.todo-tracker');
+    if (tracker) tracker.scrollBy({ left: Number(trackerScroll.dataset.todoTrackerScroll || 0) * 7 * 76, behavior: 'smooth' });
+    return;
+  }
   const todoBar = e.target.closest('[data-todo-tracker-id]');
   if (todoBar) {
     const id = todoBar.dataset.todoTrackerId || null;
