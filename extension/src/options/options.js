@@ -958,7 +958,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   }
 
   if (!data.items.length) {
-    mount.innerHTML = '<div class="todo-tracker-empty">目前沒有實際工時的 Todo</div>';
+    mount.innerHTML = `<div class="todo-tracker-empty"><strong>Todo Tracker</strong><span class="todo-tracker-summary">今日結案 ${data.completedTodayCount} 個</span><div>目前沒有實際工時的 Todo</div></div>`;
     renderTodoTrackerDetail();
     if (restartTimer) startTodoTrackerRefresh();
     return;
@@ -1008,7 +1008,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   const rowMarkup = rows || '<div class="todo-tracker-filter-empty">這個篩選沒有符合的 Todo</div>';
 
   mount.innerHTML = `<div class="todo-tracker" style="--todo-tracker-days:${visibleDates.length}">
-    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="前一天" aria-label="前一天">←1天</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="前一週" aria-label="前一週">←1週</button><button type="button" class="btn-sm" data-todo-tracker-today>今天</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="後一週" aria-label="後一週">1週→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="後一天" aria-label="後一天">1天→</button></span></div>
+    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="todo-tracker-summary">今日結案 ${data.completedTodayCount} 個</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="前一天" aria-label="前一天">←1天</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="前一週" aria-label="前一週">←1週</button><button type="button" class="btn-sm" data-todo-tracker-today>今天</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="後一週" aria-label="後一週">1週→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="後一天" aria-label="後一天">1天→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rowMarkup}</div>
   </div><div id="todoTrackerHoverTooltip" class="todo-tracker-tooltip" role="tooltip" hidden></div>

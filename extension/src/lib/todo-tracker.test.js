@@ -6,6 +6,69 @@ const local = (value) => new Date(value);
 const durationSec = (entry) => Math.max(0,
   Math.round((new Date(entry.endedAt) - new Date(entry.startedAt)) / 1000));
 
+test('counts today completions and prioritizes recent completed and active work', () => {
+  const now = local('2026-08-18T12:00:00');
+  const completed = Array.from({ length: 6 }, (_, index) => {
+    const day = 13 + index;
+    const date = `2026-08-${day}`;
+    return {
+      id: `done-${day}`, title: `Done ${day}`, status: 'done',
+      openedAt: `${date}T08:00:00`, completedAt: `${date}T09:00:00`,
+    };
+  });
+  const tasks = [
+    ...completed,
+    {
+      id: 'done-today-no-work', title: 'Done today without work', status: 'done',
+      openedAt: '2026-08-18T08:00:00', completedAt: '2026-08-18T11:30:00',
+    },
+    {
+      id: 'archived-today', title: 'Archived today', status: 'archived',
+      openedAt: '2026-08-18T08:00:00', completedAt: '2026-08-18T11:45:00',
+    },
+    {
+      id: 'active-recent', title: 'Active recent', status: 'doing',
+      openedAt: '2026-08-10T08:00:00', completedAt: null,
+    },
+    {
+      id: 'active-old', title: 'Active old', status: 'todo',
+      openedAt: '2026-08-01T08:00:00', completedAt: null,
+    },
+  ];
+  const entries = [
+    ...completed.map((task) => ({
+      id: `entry-${task.id}`, taskId: task.id,
+      startedAt: task.openedAt, endedAt: task.completedAt,
+    })),
+    {
+      id: 'entry-active-recent', taskId: 'active-recent',
+      startedAt: '2026-08-18T10:00:00', endedAt: '2026-08-18T11:00:00',
+    },
+    {
+      id: 'entry-active-old', taskId: 'active-old',
+      startedAt: '2026-08-02T10:00:00', endedAt: '2026-08-02T11:00:00',
+    },
+  ];
+
+  const result = buildTodoTrackerData({
+    tasks,
+    entries,
+    dates: ['2026-08-01', '2026-08-18'],
+    now,
+    durationSec,
+  });
+
+  assert.equal(result.completedTodayCount, 2);
+  assert.deepEqual(
+    result.items.filter((item) => item.status === 'done').map((item) => item.id),
+    ['done-18', 'done-17', 'done-16', 'done-15', 'done-14'],
+  );
+  assert.deepEqual(
+    result.items.filter((item) => item.status !== 'done').map((item) => item.id),
+    ['active-recent', 'active-old'],
+  );
+});
+
 test('clamps a completed task lifecycle to the report window', () => {
   const result = buildTodoTrackerData({
     dates: ['2026-08-18', '2026-08-19', '2026-08-20'],
@@ -78,7 +141,7 @@ test('excludes archived tasks and tasks outside the report window', () => {
   assert.deepEqual(result.items, []);
 });
 
-test('sorts by opened time and clips entry work at both window boundaries', () => {
+test('sorts unfinished todos by latest activity and clips entry work at both window boundaries', () => {
   const result = buildTodoTrackerData({
     dates: ['2026-08-18', '2026-08-19'],
     now: local('2026-08-19T18:00:00'),
@@ -111,7 +174,7 @@ test('sorts by opened time and clips entry work at both window boundaries', () =
     durationSec,
   });
 
-  assert.deepEqual(result.items.map((item) => item.id), ['earlier', 'later']);
+  assert.deepEqual(result.items.map((item) => item.id), ['later', 'earlier']);
   assert.equal(result.items[0].trackedSeconds, 3600);
   assert.equal(result.items[1].trackedSeconds, 3600);
   assert.equal(result.items[1].entries.length, 1);
@@ -259,7 +322,7 @@ test('lays out actual work segments in separate lanes when they overlap', () => 
   assert.equal(result.items[0].workSegments[2].visibleEnd.getTime(), local('2026-08-18T13:00:00').getTime());
 });
 
-test('sorts tracker items by lifecycle duration descending', () => {
+test('sorts tracker items by latest activity descending', () => {
   const result = buildTodoTrackerData({
     now: local('2026-08-20T15:00:00'),
     tasks: [
@@ -285,5 +348,5 @@ test('sorts tracker items by lifecycle duration descending', () => {
     durationSec,
   });
 
-  assert.deepEqual(result.items.map((item) => item.id), ['opened-first', 'worked-longest']);
+  assert.deepEqual(result.items.map((item) => item.id), ['worked-longest', 'opened-first']);
 });

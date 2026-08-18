@@ -24,6 +24,8 @@ assert.doesNotMatch(options, /showSegmentLabel/, 'Date cells should not display 
 assert.match(options, /let todoTrackerFilter = ['"]active['"]/, 'Todo tracker should hide completed items by default');
 assert.match(options, /data-todo-tracker-filter/, 'Todo tracker should expose a status filter');
 assert.match(options, /item\.status !== ['"]done['"]|item\.status === ['"]done['"]/, 'Todo tracker should filter completed items by status');
+assert.match(options, /completedTodayCount/, 'Todo tracker should expose today completion count');
+assert.match(options, /今日結案/, 'Todo tracker toolbar should label today completions');
 assert.match(options, /todoTrackerVisibleDays|visibleDays/, 'Todo tracker should calculate visible dates from the viewport');
 assert.match(options, /data-todo-tracker-shift="-1"|data-todo-tracker-shift='-1'/, 'Todo tracker should navigate one day backward');
 assert.match(options, /data-todo-tracker-shift="-7"|data-todo-tracker-shift='-7'/, 'Todo tracker should navigate one week backward');
