@@ -21,6 +21,9 @@ assert.match(options, /--todo-day/, 'Todo tracker work cells should be positione
 assert.match(options, /todoTrackerColor\(project\)/, 'Todo tracker should use the Todo project color');
 assert.match(options, /--todo-color/, 'Todo tracker should pass the project color to its cells');
 assert.doesNotMatch(options, /showSegmentLabel/, 'Date cells should not display work duration labels');
+assert.match(options, /let todoTrackerFilter = ['"]active['"]/, 'Todo tracker should hide completed items by default');
+assert.match(options, /data-todo-tracker-filter/, 'Todo tracker should expose a status filter');
+assert.match(options, /item\.status !== ['"]done['"]|item\.status === ['"]done['"]/, 'Todo tracker should filter completed items by status');
 assert.match(options, /data-todo-tracker-scroll/, 'Todo tracker should expose horizontal navigation');
 assert.match(options, /previousTracker \? previousScrollLeft : 0/, 'Todo tracker should start at the earliest date');
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');

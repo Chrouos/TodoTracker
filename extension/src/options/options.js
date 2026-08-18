@@ -595,6 +595,7 @@ let projectTrendSource = null;
 let todoTrackerState = null;
 let todoTrackerSource = null;
 let todoTrackerSelectedId = null;
+let todoTrackerFilter = 'active';
 let todoTrackerRefreshTimer = null;
 
 function sameTrendProject(left, right) {
@@ -788,6 +789,12 @@ function startTodoTrackerRefresh() {
   }, 60000);
 }
 
+function todoTrackerFilterItems(items) {
+  if (todoTrackerFilter === 'done') return items.filter((item) => item.status === 'done');
+  if (todoTrackerFilter === 'all') return items;
+  return items.filter((item) => item.status !== 'done');
+}
+
 function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   const mount = $('todoTracker');
   if (!mount) return;
@@ -802,7 +809,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   });
   todoTrackerState = data;
   todoTrackerSource = { entries };
-  if (todoTrackerSelectedId && !data.items.some((item) => item.id === todoTrackerSelectedId)) {
+  const visibleItems = todoTrackerFilterItems(data.items);
+  if (todoTrackerSelectedId && !visibleItems.some((item) => item.id === todoTrackerSelectedId)) {
     todoTrackerSelectedId = null;
   }
 
@@ -815,7 +823,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
 
   const span = data.windowEnd.getTime() - data.windowStart.getTime();
   const dateHeaders = data.dates.map((date) => `<span>${esc(date.slice(5))}</span>`).join('');
-  const rows = data.items.map((item) => {
+  const filterControl = `<label class="todo-tracker-filter"><span>顯示</span><select data-todo-tracker-filter aria-label="Todo Tracker 篩選"><option value="active"${todoTrackerFilter === 'active' ? ' selected' : ''}>未完成</option><option value="all"${todoTrackerFilter === 'all' ? ' selected' : ''}>全部</option><option value="done"${todoTrackerFilter === 'done' ? ' selected' : ''}>已完成</option></select></label>`;
+  const rows = visibleItems.map((item) => {
     const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
     const color = todoTrackerColor(project);
     const lifecycleLeft = Math.max(0, ((item.visibleStart.getTime() - data.windowStart.getTime()) / span) * 100);
@@ -843,11 +852,12 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       </div>
     </div>`;
   }).join('');
+  const rowMarkup = rows || '<div class="todo-tracker-filter-empty">這個篩選沒有符合的 Todo</div>';
 
   mount.innerHTML = `<div class="todo-tracker" style="--todo-tracker-days:${data.dates.length}">
-    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="cap">${esc(data.dates[0])} ～ ${esc(data.dates[data.dates.length - 1])}</span><span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-scroll="-1" aria-label="往前 7 天">←</button><button type="button" class="btn-sm" data-todo-tracker-scroll="1" aria-label="往後 7 天">→</button></span></div>
+    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong>${filterControl}<span class="cap">${esc(data.dates[0])} ～ ${esc(data.dates[data.dates.length - 1])}</span><span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-scroll="-1" aria-label="往前 7 天">←</button><button type="button" class="btn-sm" data-todo-tracker-scroll="1" aria-label="往後 7 天">→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
-    <div class="todo-tracker-rows">${rows}</div>
+    <div class="todo-tracker-rows">${rowMarkup}</div>
   </div>`;
   const tracker = mount.querySelector('.todo-tracker');
   if (tracker) requestAnimationFrame(() => {
@@ -889,6 +899,14 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
   renderTrendDetails(highlightProjectId);
   renderTodoTracker(trackerEntries);
 }
+
+$('byProject').addEventListener('change', (e) => {
+  const filter = e.target.closest('[data-todo-tracker-filter]');
+  if (!filter) return;
+  todoTrackerFilter = filter.value;
+  todoTrackerSelectedId = null;
+  renderTodoTracker(todoTrackerSource.entries, undefined, { restartTimer: false });
+});
 
 $('byProject').addEventListener('click', (e) => {
   const trackerScroll = e.target.closest('[data-todo-tracker-scroll]');

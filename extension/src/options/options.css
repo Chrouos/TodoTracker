@@ -631,9 +631,11 @@ section[hidden] { display: none; }
   grid-template-columns: var(--todo-tracker-label-width) minmax(0, 1fr);
   min-width: calc(var(--todo-tracker-label-width) + var(--todo-tracker-days) * 76px);
 }
-.todo-tracker-toolbar { align-items: baseline; gap: var(--md); margin-bottom: 10px; }
+.todo-tracker-toolbar { align-items: center; gap: var(--md); margin-bottom: 10px; }
 .todo-tracker-toolbar .cap { text-align: right; }
 .todo-tracker-nav { display: flex; gap: 4px; margin-left: auto; }
+.todo-tracker-filter { display: inline-flex; align-items: center; gap: 5px; color: var(--text-mute); font-size: 11px; }
+.todo-tracker-filter select { height: 28px; padding: 0 24px 0 7px; border: 1px solid var(--hairline); border-radius: var(--r); background: var(--canvas); color: var(--text-body); font-size: 11px; }
 .todo-tracker-axis { color: var(--text-mute); font: 11px var(--font-mono); }
 .todo-tracker-axis > span { position: sticky; left: 0; z-index: 2; background: var(--canvas); }
 .todo-tracker-axis > div {
@@ -758,6 +760,7 @@ section[hidden] { display: none; }
 .todo-tracker-work:focus-visible .todo-tracker-tooltip,
 .todo-tracker-work.is-hovered .todo-tracker-tooltip { display: block; }
 .todo-tracker-empty { margin-top: 18px; padding: 18px; border-top: 1px solid var(--hairline); color: var(--text-mute); }
+.todo-tracker-filter-empty { padding: 18px 0 6px; color: var(--text-mute); font-size: 12px; }
 #todoTrackerDetail { margin-top: 16px; }
 .todo-tracker-detail-head { display: flex; align-items: start; justify-content: space-between; gap: var(--md); }
 .todo-tracker-detail-head .sub { margin-top: 3px; }
