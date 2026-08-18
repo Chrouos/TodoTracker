@@ -172,7 +172,7 @@ export function buildTodoTrackerData({
       };
     })
     .filter(Boolean)
-    .sort((left, right) => right.trackedSeconds - left.trackedSeconds
+    .sort((left, right) => right.lifecycleSeconds - left.lifecycleSeconds
       || left.openedAtMs - right.openedAtMs
       || left.title.localeCompare(right.title))
     .map(({ openedAtMs, ...item }) => item);
