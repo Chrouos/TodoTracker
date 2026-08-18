@@ -33,6 +33,9 @@ assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a d
 assert.match(options, /todoTrackerDateRange\(item\)/, 'Todo tracker rows should expose their lifecycle date range');
 assert.match(options, /class="todo-tracker-label-meta"/, 'Todo tracker labels should expose lifecycle metadata');
 assert.match(options, /\$\{item\.workedDays\} 天 \/ 共 \$\{item\.lifecycleDays\} 天/, 'Todo tracker labels should show worked days against lifecycle days');
+assert.match(options, /todoTrackerCollapsedIds/, 'Todo tracker should preserve per-row collapsed state');
+assert.match(options, /data-todo-tracker-collapse/, 'Todo tracker rows should expose a collapse control');
+assert.match(options, /<details class="todo-tracker-label-details"/, 'Todo tracker labels should use a native disclosure control');
 assert.match(options, /todoTrackerHoverTooltip/, 'Todo tracker should use one shared hover tooltip');
 assert.match(options, /getBoundingClientRect\(\)/, 'Todo tracker tooltip should position itself against the viewport');
 assert.match(options, /todoTrackerHoveredTarget/, 'Todo tracker should track one hovered date cell');
@@ -52,6 +55,7 @@ assert.doesNotMatch(css, /\.todo-tracker-work\s*\{[^}]*var\(--todo-width\)/s, 'T
 assert.match(css, /\.todo-tracker-tooltip\s*\{[^}]*position:\s*fixed/s, 'Todo tracker tooltip should escape the clipped tracker grid');
 assert.match(css, /\.todo-tracker-tooltip\s*\{[^}]*pointer-events:\s*none/s, 'Todo tracker tooltip should not trap the pointer');
 assert.match(css, /\.todo-tracker-work\.is-hovered/, 'Todo tracker should visibly track the current hovered date cell');
+assert.match(css, /\.todo-tracker-label-details/, 'Todo tracker labels should have disclosure styles');
 assert.match(css, /\.project-heatmap-svg \.heatmap-cell\.is-hovered rect\s*\{[^}]*stroke:\s*(?!var\(--ink\))/s,
   'Heatmap hover should not use the heavy black ink outline');
 

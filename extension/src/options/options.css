@@ -645,7 +645,7 @@ section[hidden] { display: none; }
 }
 .todo-tracker-axis > div span { padding-bottom: 7px; }
 .todo-tracker-rows { max-height: none; overflow-y: visible; }
-.todo-tracker-row { min-height: 66px; border-top: 1px solid var(--hairline); }
+.todo-tracker-row { min-height: 46px; border-top: 1px solid var(--hairline); }
 .todo-tracker-label {
   position: sticky;
   left: 0;
@@ -658,6 +658,19 @@ section[hidden] { display: none; }
   white-space: normal;
 }
 .todo-tracker-label strong { display: block; overflow: hidden; text-overflow: ellipsis; }
+.todo-tracker-label-details { min-width: 0; }
+.todo-tracker-label-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  cursor: pointer;
+  list-style: none;
+}
+.todo-tracker-label-details > summary::-webkit-details-marker { display: none; }
+.todo-tracker-label-details > summary::before { content: '▾'; flex: 0 0 10px; color: var(--text-mute); font-size: 11px; }
+.todo-tracker-label-details:not([open]) > summary::before { content: '▸'; }
+.todo-tracker-label-details > summary strong { min-width: 0; }
 .todo-tracker-label span { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: var(--text-mute); font-size: 11px; }
 .todo-tracker-label-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .todo-tracker-label-days { display: block !important; padding-left: 12px; white-space: nowrap; }

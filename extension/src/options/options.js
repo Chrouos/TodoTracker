@@ -599,6 +599,7 @@ let todoTrackerFilter = 'active';
 let todoTrackerViewStart = null;
 let todoTrackerRefreshTimer = null;
 let todoTrackerHoveredTarget = null;
+let todoTrackerCollapsedIds = new Set();
 
 function sameTrendProject(left, right) {
   return (left || null) === (right || null);
@@ -928,6 +929,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day};--todo-color:${color}" title="開單 ${todoTrackerDateTime(item.openedAt)} · 結單 ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
     const dateRange = todoTrackerDateRange(item);
     const title = `${item.title} · ${todoStatusLabel(item.status)} · ${dateRange} · 實際工作 ${item.workedDays} 天 / 共 ${item.lifecycleDays} 天`;
+    const collapsed = todoTrackerCollapsedIds.has(item.id);
     const workDates = item.workedDates
       .map((date) => ({ date, day: visibleDateIndex.get(date) }))
       .filter(({ day }) => day >= 0);
@@ -940,9 +942,11 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     }).join('');
     return `<div class="todo-tracker-row">
       <div class="todo-tracker-label" title="${esc(title)}">
-        <strong>${esc(item.title)}</strong>
-        <span class="todo-tracker-label-meta"><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${esc(dateRange)}</span>
-        <span class="todo-tracker-label-days">${item.workedDays} 天 / 共 ${item.lifecycleDays} 天</span>
+        <details class="todo-tracker-label-details" data-todo-tracker-collapse="${esc(item.id)}"${collapsed ? '' : ' open'}>
+          <summary><strong>${esc(item.title)}</strong></summary>
+          <span class="todo-tracker-label-meta"><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${esc(dateRange)}</span>
+          <span class="todo-tracker-label-days">${item.workedDays} 天 / 共 ${item.lifecycleDays} 天</span>
+        </details>
       </div>
       <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
         ${lifecycleCells}
@@ -958,6 +962,13 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     <div class="todo-tracker-rows">${rowMarkup}</div>
   </div><div id="todoTrackerHoverTooltip" class="todo-tracker-tooltip" role="tooltip" hidden></div>
   `;
+  mount.querySelectorAll('[data-todo-tracker-collapse]').forEach((details) => {
+    details.addEventListener('toggle', () => {
+      const id = details.dataset.todoTrackerCollapse;
+      if (details.open) todoTrackerCollapsedIds.delete(id);
+      else todoTrackerCollapsedIds.add(id);
+    });
+  });
   renderTodoTrackerDetail();
   if (restartTimer) startTodoTrackerRefresh();
 }
