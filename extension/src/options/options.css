@@ -668,13 +668,13 @@ section[hidden] { display: none; }
 }
 .todo-tracker-lifecycle {
   position: absolute;
-  left: var(--todo-left);
-  top: 17px;
-  width: max(var(--todo-width), 2px);
-  height: 2px;
-  border-radius: 99px;
+  left: calc(var(--todo-day) * (100% / var(--todo-tracker-days)) + 3px);
+  top: 7px;
+  width: calc(100% / var(--todo-tracker-days) - 6px);
+  height: 20px;
+  border-radius: 4px;
   background: var(--todo-color);
-  opacity: .38;
+  opacity: .12;
   pointer-events: none;
 }
 .todo-tracker-work {
@@ -688,7 +688,7 @@ section[hidden] { display: none; }
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--todo-color) 70%, var(--hairline));
   border-radius: 4px;
-  background: color-mix(in srgb, var(--todo-color) 48%, var(--canvas));
+  background: var(--todo-color);
   color: var(--text-body);
   text-align: left;
   white-space: nowrap;

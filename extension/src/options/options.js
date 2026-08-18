@@ -851,10 +851,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   if (todoTrackerViewStart === null) todoTrackerViewStart = todoTrackerDefaultStart(data.dates, visibleDays);
   todoTrackerViewStart = Math.max(0, Math.min(data.dates.length - visibleDays, todoTrackerViewStart));
   const visibleDates = data.dates.slice(todoTrackerViewStart, todoTrackerViewStart + visibleDays);
-  const viewStart = new Date(`${visibleDates[0]}T00:00:00`);
   const viewEnd = new Date(`${visibleDates[visibleDates.length - 1]}T00:00:00`);
   viewEnd.setDate(viewEnd.getDate() + 1);
-  const span = viewEnd.getTime() - viewStart.getTime();
   const visibleDateIndex = new Map(visibleDates.map((date, index) => [date, index]));
   const visibleItems = todoTrackerFilterItems(data.items);
   if (todoTrackerSelectedId && !visibleItems.some((item) => item.id === todoTrackerSelectedId)) {
@@ -875,11 +873,13 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     const color = todoTrackerColor(project);
     const lifecycleStart = new Date(item.openedAt);
     const lifecycleEnd = item.endedAt ? new Date(item.endedAt) : new Date();
-    const clippedStart = lifecycleStart > viewStart ? lifecycleStart : viewStart;
-    const clippedEnd = lifecycleEnd < viewEnd ? lifecycleEnd : viewEnd;
-    const lifecycleVisible = clippedEnd > viewStart && clippedStart < viewEnd;
-    const lifecycleLeft = Math.max(0, ((clippedStart.getTime() - viewStart.getTime()) / span) * 100);
-    const lifecycleWidth = Math.max(.5, ((clippedEnd.getTime() - clippedStart.getTime()) / span) * 100);
+    const lifecycleDates = visibleDates.map((date, day) => {
+      const dayStart = new Date(`${date}T00:00:00`);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      return lifecycleStart < dayEnd && lifecycleEnd > dayStart ? { date, day } : null;
+    }).filter(Boolean);
+    const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day};--todo-color:${color}" title="開單 ${todoTrackerDateTime(item.openedAt)} · 結單 ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
     const title = `${item.title} · ${todoStatusLabel(item.status)} · 跨日 ${item.lifecycleDays} 天 · 實際工作 ${item.workedDays} 天`;
     const workDates = item.workedDates
       .map((date) => ({ date, day: visibleDateIndex.get(date) }))
@@ -898,7 +898,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
         <span><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${item.workedDays} 天</span>
       </div>
       <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
-        ${lifecycleVisible ? `<div class="todo-tracker-lifecycle" style="--todo-left:${lifecycleLeft}%;--todo-width:${lifecycleWidth}%;--todo-color:${color}" title="開單 ${todoTrackerDateTime(item.openedAt)} · 結單 ${todoTrackerDateTime(item.endedAt)}"></div>` : ''}
+        ${lifecycleCells}
         ${workSegments}
       </div>
     </div>`;

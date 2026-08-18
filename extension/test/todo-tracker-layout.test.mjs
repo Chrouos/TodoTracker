@@ -36,6 +36,8 @@ assert.match(css, /\.todo-tracker\s*\{[^}]*overflow:\s*hidden/s, 'Todo tracker s
 assert.match(css, /\.todo-tracker-axis\s*>\s*div\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--todo-tracker-days\)/s, 'Todo tracker dates should fit the current viewport');
 assert.match(css, /\.todo-tracker-work\s*\{[^}]*var\(--todo-day\)/s, 'Todo tracker cells should be positioned by day index');
 assert.match(css, /\.todo-tracker-work\s*\{[^}]*width:\s*calc\(100% \/ var\(--todo-tracker-days\)/s, 'Todo tracker cells should fill one date column');
+assert.match(css, /\.todo-tracker-lifecycle\s*\{[^}]*height:\s*20px/s, 'Todo lifecycle should use a full date cell instead of a thin line');
+assert.match(css, /\.todo-tracker-work\s*\{[^}]*background:\s*var\(--todo-color\)/s, 'Worked dates should use a solid project color');
 assert.doesNotMatch(css, /\.todo-tracker-work\s*\{[^}]*var\(--todo-width\)/s, 'Todo tracker cells should not use work duration width');
 assert.match(css, /\.project-heatmap-svg \.heatmap-cell\.is-hovered rect\s*\{[^}]*stroke:\s*(?!var\(--ink\))/s,
   'Heatmap hover should not use the heavy black ink outline');
