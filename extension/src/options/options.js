@@ -598,6 +598,7 @@ let todoTrackerSelectedId = null;
 let todoTrackerFilter = 'active';
 let todoTrackerViewStart = null;
 let todoTrackerRefreshTimer = null;
+let todoTrackerHoveredTarget = null;
 
 function sameTrendProject(left, right) {
   return (left || null) === (right || null);
@@ -825,9 +826,48 @@ function todoTrackerRangeLabel(start, end) {
   return `${start.replaceAll('-', '/')} ～ ${end.replaceAll('-', '/')}`;
 }
 
+function hideTodoTrackerTooltip() {
+  todoTrackerHoveredTarget?.classList.remove('is-hovered');
+  todoTrackerHoveredTarget = null;
+  const tooltip = $('todoTrackerHoverTooltip');
+  if (!tooltip) return;
+  tooltip.hidden = true;
+  tooltip.classList.remove('is-visible');
+}
+
+function showTodoTrackerTooltip(target) {
+  const tooltip = $('todoTrackerHoverTooltip');
+  if (!tooltip || !target) return;
+  if (todoTrackerHoveredTarget && todoTrackerHoveredTarget !== target) {
+    todoTrackerHoveredTarget.classList.remove('is-hovered');
+  }
+  todoTrackerHoveredTarget = target;
+  target.classList.add('is-hovered');
+  tooltip.innerHTML = `<strong>${esc(target.dataset.todoTrackerTitle || '')}</strong><br>${esc(target.dataset.todoTrackerDate || '')} · 有工作紀錄`;
+  tooltip.hidden = false;
+  tooltip.classList.add('is-visible');
+
+  const rect = target.getBoundingClientRect();
+  const gap = 8;
+  const padding = 8;
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const left = Math.max(padding, Math.min(rect.left, window.innerWidth - tooltipRect.width - padding));
+  const fitsBelow = rect.bottom + gap + tooltipRect.height <= window.innerHeight - padding;
+  const top = fitsBelow
+    ? rect.bottom + gap
+    : Math.max(padding, rect.top - gap - tooltipRect.height);
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function repositionTodoTrackerTooltip() {
+  if (todoTrackerHoveredTarget?.isConnected) showTodoTrackerTooltip(todoTrackerHoveredTarget);
+}
+
 function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   const mount = $('todoTracker');
   if (!mount) return;
+  hideTodoTrackerTooltip();
   const initialData = buildTodoTrackerData({
     tasks: S.tasks,
     entries,
@@ -887,9 +927,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     const workSegments = workDates.map(({ date, day }) => {
       const dateTitle = `${item.title} · ${date} · 有工作紀錄`;
       return `<button type="button" class="todo-tracker-work${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
-        data-todo-tracker-id="${esc(item.id)}" aria-label="${esc(dateTitle)}"
+        data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-title="${esc(item.title)}" data-todo-tracker-date="${esc(date)}" aria-label="${esc(dateTitle)}"
         style="--todo-day:${day};--todo-color:${color}">
-        <span class="todo-tracker-tooltip"><strong>${esc(item.title)}</strong><br>${esc(date)} · 有工作紀錄</span>
       </button>`;
     }).join('');
     return `<div class="todo-tracker-row">
@@ -909,7 +948,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="前一天" aria-label="前一天">←1天</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="前一週" aria-label="前一週">←1週</button><button type="button" class="btn-sm" data-todo-tracker-today>今天</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="後一週" aria-label="後一週">1週→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="後一天" aria-label="後一天">1天→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rowMarkup}</div>
-  </div>`;
+  </div><div id="todoTrackerHoverTooltip" class="todo-tracker-tooltip" role="tooltip" hidden></div>
+  `;
   renderTodoTrackerDetail();
   if (restartTimer) startTodoTrackerRefresh();
 }
@@ -1017,13 +1057,39 @@ $('byProject').addEventListener('focusout', (e) => {
 
 $('byProject').addEventListener('pointerover', (e) => {
   const target = e.target.closest('[data-todo-tracker-id]');
-  if (target) target.classList.add('is-hovered');
+  if (!target || e.relatedTarget?.closest?.('[data-todo-tracker-id]') === target) return;
+  showTodoTrackerTooltip(target);
 });
 
 $('byProject').addEventListener('pointerout', (e) => {
   const target = e.target.closest('[data-todo-tracker-id]');
-  if (target && !e.relatedTarget?.closest?.('[data-todo-tracker-id]')) target.classList.remove('is-hovered');
+  if (!target) return;
+  const next = e.relatedTarget?.closest?.('[data-todo-tracker-id]');
+  if (next) {
+    showTodoTrackerTooltip(next);
+    return;
+  }
+  hideTodoTrackerTooltip();
 });
+
+$('byProject').addEventListener('focusin', (e) => {
+  const target = e.target.closest('[data-todo-tracker-id]');
+  if (target) showTodoTrackerTooltip(target);
+});
+
+$('byProject').addEventListener('focusout', (e) => {
+  const target = e.target.closest('[data-todo-tracker-id]');
+  if (!target) return;
+  const next = e.relatedTarget?.closest?.('[data-todo-tracker-id]');
+  if (next) {
+    showTodoTrackerTooltip(next);
+    return;
+  }
+  hideTodoTrackerTooltip();
+});
+
+window.addEventListener('resize', repositionTodoTrackerTooltip);
+window.addEventListener('scroll', repositionTodoTrackerTooltip, true);
 
 /* ---------------- 專案 ---------------- */
 function renderProjects() {

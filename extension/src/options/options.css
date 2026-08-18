@@ -699,6 +699,7 @@ section[hidden] { display: none; }
 }
 .todo-tracker-work:hover,
 .todo-tracker-work:focus-visible,
+.todo-tracker-work.is-hovered,
 .todo-tracker-work.is-selected {
   z-index: 3;
   background: var(--todo-color);
@@ -737,11 +738,11 @@ section[hidden] { display: none; }
   outline: none;
 }
 .todo-tracker-tooltip {
-  position: absolute;
+  position: fixed;
   left: 0;
-  top: calc(100% + 6px);
+  top: 0;
   z-index: 5;
-  display: none;
+  display: block;
   width: max-content;
   max-width: 280px;
   padding: 8px 10px;
@@ -754,13 +755,9 @@ section[hidden] { display: none; }
   font-weight: 400;
   line-height: 1.6;
   white-space: normal;
+  pointer-events: none;
 }
-.todo-tracker-bar:hover .todo-tracker-tooltip,
-.todo-tracker-bar:focus-visible .todo-tracker-tooltip,
-.todo-tracker-bar.is-hovered .todo-tracker-tooltip,
-.todo-tracker-work:hover .todo-tracker-tooltip,
-.todo-tracker-work:focus-visible .todo-tracker-tooltip,
-.todo-tracker-work.is-hovered .todo-tracker-tooltip { display: block; }
+.todo-tracker-tooltip[hidden] { display: none; }
 .todo-tracker-empty { margin-top: 18px; padding: 18px; border-top: 1px solid var(--hairline); color: var(--text-mute); }
 .todo-tracker-filter-empty { padding: 18px 0 6px; color: var(--text-mute); font-size: 12px; }
 #todoTrackerDetail { margin-top: 16px; }

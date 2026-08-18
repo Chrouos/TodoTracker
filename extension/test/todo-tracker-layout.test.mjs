@@ -30,6 +30,11 @@ assert.match(options, /data-todo-tracker-shift="-7"|data-todo-tracker-shift='-7'
 assert.match(options, /data-todo-tracker-today/, 'Todo tracker should provide a today navigation action');
 assert.match(options, /data-todo-tracker-range/, 'Todo tracker should expose the visible date range');
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');
+assert.match(options, /todoTrackerHoverTooltip/, 'Todo tracker should use one shared hover tooltip');
+assert.match(options, /getBoundingClientRect\(\)/, 'Todo tracker tooltip should position itself against the viewport');
+assert.match(options, /todoTrackerHoveredTarget/, 'Todo tracker should track one hovered date cell');
+assert.doesNotMatch(options, /if \(target && !e\.relatedTarget\?\.closest\?\.\('\[data-todo-tracker-id\]'\)\) target\.classList\.remove\('is-hovered'\)/,
+  'Todo tracker should not leave previous date cells hovered');
 assert.match(options, /setInterval\([^\n]*60000|setInterval\([\s\S]{0,160}60000/, 'Todo tracker should refresh every 60 seconds');
 assert.match(css, /\.todo-tracker\s*\{/, 'Todo tracker should have dedicated layout styles');
 assert.match(css, /\.todo-tracker\s*\{[^}]*overflow:\s*hidden/s, 'Todo tracker should not display a horizontal scrollbar');
@@ -41,6 +46,9 @@ assert.match(css, /\.todo-tracker-work\s*\{[^}]*background:\s*var\(--todo-color\
 assert.match(css, /\.todo-tracker-work\s*\{[^}]*height:\s*100%/s, 'Worked dates should fill the whole grid cell');
 assert.doesNotMatch(css, /\.todo-tracker-(?:lifecycle|work)\s*\{[^}]*\+ 3px/s, 'Tracker cells should not have inner horizontal padding');
 assert.doesNotMatch(css, /\.todo-tracker-work\s*\{[^}]*var\(--todo-width\)/s, 'Todo tracker cells should not use work duration width');
+assert.match(css, /\.todo-tracker-tooltip\s*\{[^}]*position:\s*fixed/s, 'Todo tracker tooltip should escape the clipped tracker grid');
+assert.match(css, /\.todo-tracker-tooltip\s*\{[^}]*pointer-events:\s*none/s, 'Todo tracker tooltip should not trap the pointer');
+assert.match(css, /\.todo-tracker-work\.is-hovered/, 'Todo tracker should visibly track the current hovered date cell');
 assert.match(css, /\.project-heatmap-svg \.heatmap-cell\.is-hovered rect\s*\{[^}]*stroke:\s*(?!var\(--ink\))/s,
   'Heatmap hover should not use the heavy black ink outline');
 
