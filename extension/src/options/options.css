@@ -203,6 +203,61 @@ section[hidden] { display: none; }
 .row-item[data-workspace-p] .act { opacity: 1; }
 .row-item[data-workspace-p] { cursor: pointer; }
 
+/* Project list hierarchy and readable workload columns. */
+.project-list-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 110px auto;
+  align-items: center;
+  gap: var(--md);
+  padding: 0 var(--md) var(--xs);
+  color: var(--text-mute);
+  font-size: 11px;
+}
+.project-list-head span:nth-child(2),
+.project-list-head span:nth-child(3),
+.project-list-head span:nth-child(4) { text-align: right; }
+.project-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 110px auto;
+  align-items: center;
+  gap: var(--md);
+  min-height: 72px;
+  padding: 12px var(--md);
+  border-left: 4px solid var(--project-color);
+  background: color-mix(in srgb, var(--project-color) 5%, var(--canvas));
+}
+.project-row:hover,
+.project-row:focus-within {
+  background: color-mix(in srgb, var(--project-color) 10%, var(--canvas));
+}
+.project-info {
+  display: grid;
+  grid-template-columns: 16px 10px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sm);
+  min-width: 0;
+  padding-left: calc(var(--project-depth, 0) * 24px);
+}
+.project-info .main { min-width: 0; }
+.project-color {
+  width: 10px;
+  height: 32px;
+  border-radius: 3px;
+  background: var(--project-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--project-color) 45%, var(--canvas));
+}
+.project-info .tree-branch { color: var(--project-color); font-weight: 700; }
+.project-hours { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.project-hours-label { color: var(--text-mute); font-size: 11px; }
+.project-hours .num { font-weight: 700; }
+.project-actions { align-items: center; justify-content: flex-end; }
+.project-secondary-actions { display: flex; gap: var(--xs); opacity: 0; pointer-events: none; }
+.project-row:hover .project-secondary-actions,
+.project-row:focus-within .project-secondary-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Todo 清單：以卡片呈現，讓優先級、截止日與提醒一眼可見 */
 #todoList { display: grid; gap: 12px; }
 .todo-card > .swatch { display: none; }

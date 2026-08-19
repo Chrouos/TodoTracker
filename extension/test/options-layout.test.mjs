@@ -29,6 +29,17 @@ assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selectio
 assert.match(options, /tasksForProject/, 'Manual entry Todo options should use the selected project');
 assert.match(options, /sortTasksForManualEntry/, 'Manual entry Todo options should prioritize recent activity');
 assert.match(options, /enProject.*addEventListener\('change'/, 'Manual entry project changes should refresh Todo options');
+assert.match(options, /class="project-list-head"/, 'Project list should expose readable column labels');
+assert.match(options, /class="row-item project-row"/, 'Project list rows should have a dedicated layout class');
+assert.match(options, /class="project-color"/, 'Project rows should show a prominent color marker');
+assert.match(options, /class="project-hours"/, 'Project hours should have readable labels');
+assert.match(options, /class="project-secondary-actions"/, 'Secondary project actions should be visually quieter');
+assert.match(css, /\.project-color\s*\{[^}]*width:\s*10px[^}]*height:\s*32px/s,
+  'Project color marker should be easy to see');
+assert.match(css, /\.project-row\s*\{[^}]*grid-template-columns:/s,
+  'Project rows should align project, hours, and actions into columns');
+assert.match(css, /\.project-list-head\s*\{[^}]*grid-template-columns:/s,
+  'Project list should align its column labels with project rows');
 assert.match(options, /from ['"]\.\.\/lib\/report-range\.js['"]/, 'Report should import trend date bounds');
 assert.match(options, /trendDateBounds\(range, new Date\(\), S\.settings\.weekStartsOn\)/, 'Report should derive quick-range trend bounds');
 assert.match(options, /const trendEndExclusive = new Date\(lineTo\.getTime\(\) \+ 864e5\)/, 'Report should cap trend entries at the inclusive axis end');
