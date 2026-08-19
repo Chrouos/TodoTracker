@@ -50,7 +50,10 @@
       <label class="field timer-notes-field"><span>當下紀錄</span>
         <textarea id="mgTimerNotes" placeholder="邊做邊記，停止時會一起保存"></textarea></label>
       <div class="timer-notes-preview-actions">
-        <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" aria-pressed="false">預覽 Markdown</button>
+        <div class="timer-notes-mode" role="group" aria-label="工作紀錄模式">
+          <button id="mgTimerNotesEditToggle" type="button" class="btn-sm active" aria-pressed="true">編輯</button>
+          <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" aria-pressed="false">預覽</button>
+        </div>
       </div>
       <div id="mgTimerNotesPreview" class="timer-notes-preview" hidden></div>
 

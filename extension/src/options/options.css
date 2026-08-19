@@ -59,7 +59,21 @@ section[hidden] { display: none; }
 .timer-tags-field,
 .timer-notes-field { margin-top: var(--md); }
 .timer-notes-field textarea { min-height: 180px; max-height: 360px; overflow-y: auto !important; }
-.timer-notes-preview-actions { margin-top: var(--xs); }
+.timer-notes-preview-actions { display: flex; margin-top: var(--xs); }
+.timer-notes-mode {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r);
+}
+.timer-notes-mode .btn-sm {
+  min-width: 58px;
+  border: 0;
+  border-right: 1px solid var(--hairline-strong);
+  border-radius: 0;
+}
+.timer-notes-mode .btn-sm:last-child { border-right: 0; }
+.timer-notes-mode .btn-sm.active { background: var(--ink); color: var(--canvas); }
 .timer-notes-preview {
   min-height: 180px;
   max-height: 360px;

@@ -42,13 +42,14 @@ function setMarkdownPreviewExpanded(preview, expanded) {
   });
 }
 
-function measureMarkdownPreview(preview, preserveExpanded = false) {
+function measureMarkdownPreview(preview, preserveExpanded = false, alwaysExpanded = false) {
   const content = preview.querySelector('[data-markdown-content]');
   const wasExpanded = preview.classList.contains('is-expanded');
   const collapsedHeight = Number.parseFloat(
     getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
   );
-  const isLong = shouldShowMarkdownToggle(content.textContent, content.scrollHeight, collapsedHeight);
+  const isLong = !alwaysExpanded
+    && shouldShowMarkdownToggle(content.textContent, content.scrollHeight, collapsedHeight);
   preview.classList.toggle('is-collapsible', isLong);
   let button = preview.querySelector('[data-markdown-toggle]');
   if (isLong && !button) {
@@ -60,8 +61,9 @@ function measureMarkdownPreview(preview, preserveExpanded = false) {
   setMarkdownPreviewExpanded(preview, preserveExpanded && wasExpanded && isLong);
 }
 
-function initializeMarkdownPreviews(container, preserveExpanded = false) {
-  container.querySelectorAll('[data-markdown-preview]').forEach((preview) => measureMarkdownPreview(preview, preserveExpanded));
+function initializeMarkdownPreviews(container, preserveExpanded = false, alwaysExpanded = false) {
+  container.querySelectorAll('[data-markdown-preview]').forEach((preview) =>
+    measureMarkdownPreview(preview, preserveExpanded, alwaysExpanded));
 }
 
 let markdownPreviewResizeTimer;
@@ -230,16 +232,24 @@ function startTimerTicker(timer) {
 function renderTimerNotesPreview() {
   const container = $('mgTimerNotesPreview');
   container.innerHTML = renderMarkdownPreview($('mgTimerNotes').value, 'timer-notes-markdown');
-  initializeMarkdownPreviews(container);
+  initializeMarkdownPreviews(container, false, true);
+}
+
+function syncTimerNotesMode() {
+  const editing = !timerNotesPreviewOpen;
+  const edit = $('mgTimerNotesEditToggle');
+  const preview = $('mgTimerNotesPreviewToggle');
+  edit.classList.toggle('active', editing);
+  preview.classList.toggle('active', !editing);
+  edit.setAttribute('aria-pressed', String(editing));
+  preview.setAttribute('aria-pressed', String(!editing));
 }
 
 function setTimerNotesPreviewOpen(open) {
   timerNotesPreviewOpen = open;
   $('mgTimerNotes').hidden = open;
   $('mgTimerNotesPreview').hidden = !open;
-  const toggle = $('mgTimerNotesPreviewToggle');
-  toggle.textContent = open ? '編輯 Markdown' : '預覽 Markdown';
-  toggle.setAttribute('aria-pressed', String(open));
+  syncTimerNotesMode();
   if (open) renderTimerNotesPreview();
   else growTimerNotes();
 }
@@ -253,6 +263,7 @@ function renderTimer() {
   const projectId = current.projectId || '';
   const taskId = current.taskId || '';
 
+  syncTimerNotesMode();
   panel.classList.toggle('is-running', Boolean(timer));
   $('mgTimerStatus').textContent = timer ? '計時中' : '尚未開始';
   $('mgTimerToggle').textContent = timer ? '停止並儲存' : '開始計時';
@@ -346,9 +357,8 @@ $('mgTimerNotes').addEventListener('input', () => {
   clearTimeout(timerNotesSaveTimer);
   timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(), 500);
 });
-$('mgTimerNotesPreviewToggle').addEventListener('click', () => {
-  setTimerNotesPreviewOpen(!timerNotesPreviewOpen);
-});
+$('mgTimerNotesEditToggle').addEventListener('click', () => setTimerNotesPreviewOpen(false));
+$('mgTimerNotesPreviewToggle').addEventListener('click', () => setTimerNotesPreviewOpen(true));
 $('mgTimerComplete').addEventListener('change', (event) => {
   timerCompleteChoice = event.target.checked;
 });
