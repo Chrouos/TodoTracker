@@ -13,7 +13,7 @@ import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
-import { projectIdForTask } from '../lib/entry-relations.js';
+import { projectIdForTask, tasksForProject } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData } from '../lib/todo-tracker.js';
@@ -83,6 +83,14 @@ document.addEventListener('click', (event) => {
 });
 
 let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
+function renderEntryTasks(selectedTaskId = '') {
+  const projectId = $('enProject').value;
+  const tasks = tasksForProject(S.tasks, projectId);
+  $('enTask').innerHTML = '<option value="">— 無 —</option>' +
+    tasks.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
+  $('enTask').value = tasks.some((task) => task.id === selectedTaskId) ? selectedTaskId : '';
+}
+$('enProject').addEventListener('change', () => renderEntryTasks());
 $('enTask').addEventListener('change', (event) => {
   $('enProject').value = projectIdForTask(event.target.value, S.tasks, $('enProject').value);
 });
@@ -2000,9 +2008,7 @@ function openEntryDialog(e) {
     flattenTree(S.projects).map((p) =>
       `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   $('enProject').value = e.projectId || '';
-  $('enTask').innerHTML = '<option value="">— 無 —</option>' +
-    S.tasks.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
-  $('enTask').value = e.taskId || '';
+  renderEntryTasks(e.taskId || '');
   $('enStart').value = toLocalInput(e.startedAt);
   $('enEnd').value = toLocalInput(e.endedAt);
   $('enNotes').value = e.notes || '';

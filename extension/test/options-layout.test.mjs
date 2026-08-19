@@ -26,6 +26,8 @@ for (const id of [
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
 assert.match(options, /projectIdForTask/, 'Entry Todo selection should synchronize its project');
 assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selection should update the project selector');
+assert.match(options, /tasksForProject/, 'Manual entry Todo options should use the selected project');
+assert.match(options, /enProject.*addEventListener\('change'/, 'Manual entry project changes should refresh Todo options');
 assert.match(options, /from ['"]\.\.\/lib\/report-range\.js['"]/, 'Report should import trend date bounds');
 assert.match(options, /trendDateBounds\(range, new Date\(\), S\.settings\.weekStartsOn\)/, 'Report should derive quick-range trend bounds');
 assert.match(options, /const trendEndExclusive = new Date\(lineTo\.getTime\(\) \+ 864e5\)/, 'Report should cap trend entries at the inclusive axis end');
