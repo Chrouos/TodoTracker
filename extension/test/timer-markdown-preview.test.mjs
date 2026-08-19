@@ -14,6 +14,7 @@ assert.match(html,
   'Timer notes mode buttons should stay above the note content');
 assert.match(html, /id="mgTimerNotesPreview"[^>]*hidden/,
   'Timer notes should expose a hidden preview container');
+assert.match(html, /id="mgTimerIdleNotice"/, 'Timer should expose a no-running-timer reminder');
 assert.match(options, /function renderTimerNotesPreview\(\)/,
   'Timer should render notes through a dedicated preview function');
 assert.match(options, /renderMarkdownPreview\(\$\('mgTimerNotes'\)\.value/,
@@ -26,11 +27,17 @@ assert.match(options, /mgTimerNotesEditToggle.*addEventListener\('click'/s,
   'Timer notes should provide a direct edit action');
 assert.match(options, /mgTimerNotesPreviewToggle.*addEventListener\('click'/s,
   'Timer notes should provide a direct preview action');
+assert.match(options, /mgTimerIdleNotice.*hidden\s*=\s*Boolean\(timer\)/s,
+  'Timer should show the reminder only when no timer is running');
+assert.doesNotMatch(options, /growTimerNotes/,
+  'Timer notes should not resize the page while typing');
 assert.match(css, /\.timer-notes-mode\s*\{[^}]*display:\s*inline-flex/s,
   'Timer notes mode buttons should be presented as a compact control');
 assert.match(css, /\.timer-notes-head\s*\{[^}]*margin-bottom:\s*var\(--md\)/s,
   'Timer notes heading and mode buttons should have comfortable spacing');
 assert.match(css, /\.timer-notes-preview\s*\{[^}]*max-height:\s*360px[^}]*overflow-y:\s*auto/s,
   'Timer notes preview should have a bounded scrollable height');
+assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*height:\s*240px[^}]*overflow-y:\s*auto/s,
+  'Timer notes editor should scroll internally without changing page height');
 
 console.log('timer markdown preview contract passed');

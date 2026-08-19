@@ -23,7 +23,6 @@ const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 3
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
 autoGrow(document.getElementById('pjNoteDraft'), { min: 72, max: 320 });
 autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
-const growTimerNotes = autoGrow(document.getElementById('mgTimerNotes'), { min: 180, max: 360 });
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -252,7 +251,6 @@ function setTimerNotesPreviewOpen(open) {
   $('mgTimerNotesPreview').hidden = !open;
   syncTimerNotesMode();
   if (open) renderTimerNotesPreview();
-  else growTimerNotes();
 }
 
 function renderTimer() {
@@ -268,6 +266,7 @@ function renderTimer() {
   panel.classList.toggle('is-running', Boolean(timer));
   $('mgTimerStatus').textContent = timer ? '計時中' : '尚未開始';
   $('mgTimerToggle').textContent = timer ? '停止並儲存' : '開始計時';
+  $('mgTimerIdleNotice').hidden = Boolean(timer);
   $('mgTimerDescription').value = current.description || '';
   if ($('mgTimerNotes') !== document.activeElement) $('mgTimerNotes').value = current.notes || '';
 
@@ -300,7 +299,6 @@ function renderTimer() {
     startTimerTicker(timer);
   }
   if (timerNotesPreviewOpen) renderTimerNotesPreview();
-  else growTimerNotes();
 }
 
 async function patchManagementTimer(patch) {
@@ -2145,7 +2143,6 @@ $('tabs').addEventListener('click', (e) => {
   ['report', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
-  if (name === 'timer') requestAnimationFrame(() => growTimerNotes());
 });
 
 $('range').addEventListener('click', (e) => {

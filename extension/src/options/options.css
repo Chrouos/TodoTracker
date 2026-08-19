@@ -55,6 +55,14 @@ section[hidden] { display: none; }
 .timer-panel-head,
 .timer-panel-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--md); }
 .timer-clock { margin-top: var(--xs); font-size: 30px; font-weight: 700; letter-spacing: .04em; }
+.timer-idle-notice {
+  margin-top: var(--md);
+  padding: var(--sm) var(--md);
+  border-left: 3px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, var(--canvas));
+  color: var(--text-body);
+  font-size: 12px;
+}
 .timer-fields { margin-top: var(--lg); grid-template-columns: 2fr 1.5fr 1.5fr; }
 .timer-tags-field,
 .timer-notes-field { margin-top: var(--md); }
@@ -65,7 +73,12 @@ section[hidden] { display: none; }
   gap: var(--md);
   margin-bottom: var(--md);
 }
-.timer-notes-field textarea { min-height: 180px; max-height: 360px; overflow-y: auto !important; }
+.timer-notes-field textarea {
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  overflow-y: auto !important;
+}
 .timer-notes-preview-actions { display: flex; margin-top: 0; }
 .timer-notes-mode {
   display: inline-flex;

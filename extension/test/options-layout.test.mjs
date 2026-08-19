@@ -97,15 +97,15 @@ assert.match(options, /getTimer/, 'Management timer should load the shared timer
 assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
 assert.match(options, /const scrollY = window\.scrollY/, 'Management timer should capture scroll position before reload');
 assert.match(options, /window\.scrollTo\(0, scrollY\)/, 'Management timer should restore scroll position after reload');
-assert.match(options, /name === 'timer'[\s\S]*growTimerNotes\(\)/,
-  'Management timer should recalculate notes height when its tab becomes visible');
+assert.doesNotMatch(options, /growTimerNotes\(/,
+  'Management timer should not resize the page while typing notes');
 assert.match(options, /if \(\$\('mgTimerNotes'\) !== document\.activeElement\) \$\('mgTimerNotes'\)\.value = current\.notes \|\| '';/,
   'Management timer should clear notes after stopping when the draft is empty');
 assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
   'Management timer should give project and Todo selectors enough width');
-assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*180px[^}]*overflow-y:\s*auto\s*!important/s,
+assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*240px[^}]*overflow-y:\s*auto\s*!important/s,
   'Management timer notes should be larger and scrollable');
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
