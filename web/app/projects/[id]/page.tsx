@@ -16,11 +16,13 @@ import {
   startOfDay, startOfWeek, startOfMonth,
 } from '@/lib/time';
 import { taskMetrics, dueLabel } from '@/lib/tasks';
+import { paginateItems } from '@/lib/projectWorkspace';
 import {
   childrenOf, descendantIds, ancestorIds, pathOf, rollup, secondsByProject,
 } from '@/lib/tree';
 
 type Range = 'all' | 'week' | 'month';
+const PAGE_SIZE = 10;
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +33,8 @@ export default function ProjectDetail() {
   const [includeKids, setIncludeKids] = useState(true);
   const [q, setQ] = useState('');
   const [range, setRange] = useState<Range>('all');
-  const [limit, setLimit] = useState(50);
+  const [taskPage, setTaskPage] = useState(1);
+  const [entryPage, setEntryPage] = useState(1);
   const [editing, setEditing] = useState<EntryDraft | null>(null);
 
   const project = projects.find((p) => p.id === id);
@@ -64,10 +67,15 @@ export default function ProjectDetail() {
     });
   }, [scoped, range, q, settings.weekStartsOn]);
 
+  const pagedEntries = useMemo(
+    () => paginateItems(filtered, entryPage, PAGE_SIZE),
+    [filtered, entryPage],
+  );
+
   /** 依日期分組 */
   const byDay = useMemo(() => {
     const map = new Map<string, typeof filtered>();
-    for (const e of filtered.slice(0, limit)) {
+    for (const e of pagedEntries.items) {
       const d = fmtDate(e.startedAt);
       if (!map.has(d)) map.set(d, []);
       map.get(d)!.push(e);
@@ -77,7 +85,7 @@ export default function ProjectDetail() {
       list,
       seconds: list.reduce((s, e) => s + durationSec(e), 0),
     }));
-  }, [filtered, limit]);
+  }, [pagedEntries]);
 
   if (status === 'disconnected') return <Disconnected />;
   if (!project) {
@@ -100,6 +108,7 @@ export default function ProjectDetail() {
   );
   const doneTasks = scopedTasks.filter((t) => t.status === 'done');
   const openTasks = scopedTasks.filter((t) => t.status !== 'done');
+  const pagedTasks = paginateItems([...openTasks, ...doneTasks], taskPage, PAGE_SIZE);
   const overdue = openTasks.filter((t) => taskMetrics(t, entries).isLate);
   const pct = scopedTasks.length ? Math.round((doneTasks.length / scopedTasks.length) * 100) : null;
 
@@ -260,7 +269,7 @@ export default function ProjectDetail() {
       </Section>
 
       <Section id={`pd-todo-${project.id}`} title={`Todo（${openTasks.length} 個未完成）`}>
-        {scopedTasks.length ? [...openTasks, ...doneTasks].map((t) => {
+        {scopedTasks.length ? pagedTasks.items.map((t) => {
           const m = taskMetrics(t, entries);
           const done = t.status === 'done';
           const dl = dueLabel(m, done);
@@ -285,6 +294,11 @@ export default function ProjectDetail() {
             </div>
           );
         }) : <div className="empty">這個專案還沒有 todo</div>}
+        {pagedTasks.pageCount > 1 && <nav className="workspace-pagination" aria-label="Todo分頁">
+          <button type="button" className="btn-sm" onClick={() => setTaskPage(pagedTasks.page - 1)} disabled={pagedTasks.page === 1}>上一頁</button>
+          <span>第 {pagedTasks.page} / {pagedTasks.pageCount} 頁</span>
+          <button type="button" className="btn-sm" onClick={() => setTaskPage(pagedTasks.page + 1)} disabled={pagedTasks.page === pagedTasks.pageCount}>下一頁</button>
+        </nav>}
       </Section>
 
       {/* ── 紀錄：這個專案做過的每一段時間 ── */}
@@ -296,17 +310,17 @@ export default function ProjectDetail() {
           <input
             value={q}
             placeholder="搜尋描述與工作紀錄…"
-            onChange={(e) => { setQ(e.target.value); setLimit(50); }}
+            onChange={(e) => { setQ(e.target.value); setEntryPage(1); }}
             style={{ width: 240 }}
           />
           <div className="seg">
             {([['all', '全部'], ['month', '本月'], ['week', '本週']] as const).map(([k, label]) => (
               <button key={k} className={range === k ? 'active' : ''}
-                onClick={() => { setRange(k); setLimit(50); }}>{label}</button>
+                onClick={() => { setRange(k); setEntryPage(1); }}>{label}</button>
             ))}
           </div>
           {kids.length > 0 && (
-            <button onClick={() => { setIncludeKids((v) => !v); setLimit(50); }}>
+            <button onClick={() => { setIncludeKids((v) => !v); setEntryPage(1); }}>
               {includeKids ? '[x] 含子專案' : '[ ] 含子專案'}
             </button>
           )}
@@ -361,13 +375,11 @@ export default function ProjectDetail() {
               </div>
             ))}
 
-            {filtered.length > limit && (
-              <div style={{ textAlign: 'center', paddingTop: 8 }}>
-                <button onClick={() => setLimit((n) => n + 50)}>
-                  載入更多（還有 {filtered.length - limit} 筆）
-                </button>
-              </div>
-            )}
+            {pagedEntries.pageCount > 1 && <nav className="workspace-pagination" aria-label="工作紀錄分頁">
+              <button type="button" className="btn-sm" onClick={() => setEntryPage(pagedEntries.page - 1)} disabled={pagedEntries.page === 1}>上一頁</button>
+              <span>第 {pagedEntries.page} / {pagedEntries.pageCount} 頁</span>
+              <button type="button" className="btn-sm" onClick={() => setEntryPage(pagedEntries.page + 1)} disabled={pagedEntries.page === pagedEntries.pageCount}>下一頁</button>
+            </nav>}
           </>
         ) : (
           <div className="empty">

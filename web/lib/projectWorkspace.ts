@@ -13,6 +13,22 @@ export type ProjectWorkspaceData = {
   cycle: { openedAt: string | null; dueDate: string | null; completedAt: string | null; lastActivityAt: string | null };
 };
 
+export type PaginatedItems<T> = {
+  items: T[];
+  page: number;
+  pageCount: number;
+};
+
+export function paginateItems<T>(items: ReadonlyArray<T>, requestedPage: number, pageSize: number): PaginatedItems<T> {
+  const safePageSize = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : 1;
+  const pageCount = Math.max(1, Math.ceil(items.length / safePageSize));
+  const page = Number.isFinite(requestedPage)
+    ? Math.min(pageCount, Math.max(1, Math.floor(requestedPage)))
+    : 1;
+  const start = (page - 1) * safePageSize;
+  return { items: items.slice(start, start + safePageSize), page, pageCount };
+}
+
 export function buildProjectWorkspace(projectId: string, projects: Project[], tasks: Task[], entries: Entry[]): ProjectWorkspaceData | null {
   const project = projects.find((item) => item.id === projectId);
   if (!project) return null;

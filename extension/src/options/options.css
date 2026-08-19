@@ -992,10 +992,12 @@ dialog .field { margin-bottom: var(--md); }
 }
 .markdown-preview p { margin: 0 0 8px; }
 .markdown-preview hr {
-  width: 72px;
-  margin: 14px 0;
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin: 16px 0;
   border: 0;
-  border-top: 1px solid var(--hairline);
+  background: var(--hairline);
 }
 .markdown-preview h1,
 .markdown-preview h2,
