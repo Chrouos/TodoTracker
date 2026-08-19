@@ -40,6 +40,16 @@ assert.match(css, /\.project-row\s*\{[^}]*grid-template-columns:/s,
   'Project rows should align project, hours, and actions into columns');
 assert.match(css, /\.project-list-head\s*\{[^}]*grid-template-columns:/s,
   'Project list should align its column labels with project rows');
+assert.match(css, /\.project-list-head\s*\{[^}]*color:\s*var\(--text-body\)/s,
+  'Project list column labels should remain readable on light backgrounds');
+assert.match(css, /\.project-row\s*\{[^}]*color:\s*var\(--text-ink\)/s,
+  'Project rows should use dark primary text on tinted backgrounds');
+assert.match(css, /\.project-row \.sub\s*\{[^}]*color:\s*var\(--text-body\)/s,
+  'Project metadata should use readable secondary text');
+assert.match(css, /\.project-hours-label\s*\{[^}]*color:\s*var\(--text-body\)/s,
+  'Project hour labels should use readable secondary text');
+assert.match(css, /\.project-hours \.num\s*\{[^}]*color:\s*var\(--text-ink\)/s,
+  'Project hour values should use dark primary text');
 assert.match(options, /from ['"]\.\.\/lib\/report-range\.js['"]/, 'Report should import trend date bounds');
 assert.match(options, /trendDateBounds\(range, new Date\(\), S\.settings\.weekStartsOn\)/, 'Report should derive quick-range trend bounds');
 assert.match(options, /const trendEndExclusive = new Date\(lineTo\.getTime\(\) \+ 864e5\)/, 'Report should cap trend entries at the inclusive axis end');
