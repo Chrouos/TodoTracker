@@ -978,6 +978,12 @@ dialog .field { margin-bottom: var(--md); }
   outline-offset: 3px;
 }
 .markdown-preview p { margin: 0 0 8px; }
+.markdown-preview hr {
+  width: 72px;
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+}
 .markdown-preview h1,
 .markdown-preview h2,
 .markdown-preview h3,

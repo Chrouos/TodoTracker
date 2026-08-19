@@ -57,6 +57,10 @@ assert.match(css, /\.project-hours-label\s*\{[^}]*color:\s*var\(--text-body\)/s,
   'Project hour labels should use readable secondary text');
 assert.match(css, /\.project-hours \.num\s*\{[^}]*color:\s*var\(--text-ink\)/s,
   'Project hour values should use dark primary text');
+assert.match(css, /\.markdown-preview hr\s*\{[^}]*width:\s*72px[^}]*margin:\s*14px 0/s,
+  'Markdown separators should be short and softly spaced');
+assert.match(css, /\.markdown-preview hr\s*\{[^}]*border-top:\s*1px solid var\(--hairline\)/s,
+  'Markdown separators should use a subtle hairline');
 assert.match(css, /\.project-info \.tree-branch\s*\{[^}]*font-size:\s*16px/s,
   'Project hierarchy branches should be large enough to see');
 assert.match(css, /\.project-info \.tree-branch\s*\{[^}]*color:\s*color-mix\(/s,

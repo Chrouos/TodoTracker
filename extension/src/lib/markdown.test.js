@@ -24,6 +24,10 @@ test('renders blockquotes as blockquote elements', () => {
   assert.equal(markdownToHTML('> Quoted text'), '<blockquote>Quoted text</blockquote>');
 });
 
+test('renders a markdown thematic break as a horizontal rule', () => {
+  assert.equal(markdownToHTML('Before\n\n---\n\nAfter'), '<p>Before</p><hr /><p>After</p>');
+});
+
 test('renders fenced code and escapes code content', () => {
   assert.equal(
     markdownToHTML('```js\nconst value = <tag>;\n```'),

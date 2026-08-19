@@ -111,6 +111,11 @@ export function markdownToHTML(markdown) {
       result.push(renderTable(tableLines));
       continue;
     }
+    if (/^ {0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+      flushParagraph(); flushQuote();
+      result.push('<hr />');
+      continue;
+    }
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) { flushParagraph(); flushQuote(); const level = heading[1].length; result.push(`<h${level}>${inline(heading[2])}</h${level}>`); continue; }
     if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
