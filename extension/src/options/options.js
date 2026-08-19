@@ -13,7 +13,7 @@ import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
-import { projectIdForTask, tasksForProject } from '../lib/entry-relations.js';
+import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData } from '../lib/todo-tracker.js';
@@ -85,7 +85,7 @@ document.addEventListener('click', (event) => {
 let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
 function renderEntryTasks(selectedTaskId = '') {
   const projectId = $('enProject').value;
-  const tasks = tasksForProject(S.tasks, projectId);
+  const tasks = sortTasksForManualEntry(tasksForProject(S.tasks, projectId), S.entries);
   $('enTask').innerHTML = '<option value="">— 無 —</option>' +
     tasks.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
   $('enTask').value = tasks.some((task) => task.id === selectedTaskId) ? selectedTaskId : '';

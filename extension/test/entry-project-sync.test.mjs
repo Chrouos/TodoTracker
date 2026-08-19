@@ -23,4 +23,19 @@ assert.deepEqual(
   ['task-project', 'task-unclassified'],
 );
 
+assert.equal(typeof entryRelations.sortTasksForManualEntry, 'function');
+assert.deepEqual(
+  entryRelations.sortTasksForManualEntry([
+    { id: 'done-old', status: 'done', updatedAt: '2026-08-01T09:00:00Z' },
+    { id: 'active-old', status: 'todo', updatedAt: '2026-08-01T09:00:00Z' },
+    { id: 'active-entry-recent', status: 'todo', updatedAt: '2026-07-01T09:00:00Z' },
+    { id: 'never', status: 'todo' },
+    { id: 'done-recent', status: 'done', updatedAt: '2026-08-19T09:00:00Z' },
+    { id: 'active-task-recent', status: 'doing', updatedAt: '2026-08-18T09:00:00Z' },
+  ], [
+    { id: 'entry-recent', taskId: 'active-entry-recent', endedAt: '2026-08-20T09:00:00Z' },
+  ]).map((task) => task.id),
+  ['active-entry-recent', 'active-task-recent', 'active-old', 'never', 'done-recent', 'done-old'],
+);
+
 console.log('Extension Todo project sync contract passed');
