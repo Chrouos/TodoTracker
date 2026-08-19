@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
+  TODO_STATUSES,
   TODO_PRIORITIES,
   filterTasks,
   normalizePriority,
+  normalizeStatus,
   priorityLabel,
+  statusLabel,
   taskCountLabel,
 } from '../src/lib/todo-filter.js';
 
@@ -23,10 +26,15 @@ assert.equal(normalizePriority('urgent'), 'urgent');
 assert.equal(normalizePriority('not-a-priority'), 'normal');
 assert.equal(priorityLabel('high'), '高');
 assert.equal(priorityLabel('not-a-priority'), '一般');
+assert.deepEqual(TODO_STATUSES.map(({ value }) => value), ['active', 'doing', 'todo', 'done', 'all']);
+assert.equal(normalizeStatus('doing'), 'doing');
+assert.equal(normalizeStatus('not-a-status'), 'active');
+assert.equal(statusLabel('doing'), '進行中');
 
 const tasks = [
   { id: 'urgent-a', projectId: 'project-a', status: 'todo', priority: 'urgent' },
   { id: 'normal-a', projectId: 'project-a', status: 'todo' },
+  { id: 'doing-a', projectId: 'project-a', status: 'doing', priority: 'low' },
   { id: 'done-high', projectId: 'project-a', status: 'done', priority: 'high' },
   { id: 'low-b', projectId: 'project-b', status: 'todo', priority: 'low' },
   { id: 'archived', projectId: 'project-a', status: 'archived', priority: 'urgent' },
@@ -45,6 +53,18 @@ assert.deepEqual(
 assert.deepEqual(
   filterTasks(tasks, { projectScope: null, priority: 'high', showDone: true })
     .map((task) => task.id),
+  ['done-high'],
+);
+assert.deepEqual(
+  filterTasks(tasks, { status: 'doing' }).map((task) => task.id),
+  ['doing-a'],
+);
+assert.deepEqual(
+  filterTasks(tasks, { status: 'todo' }).map((task) => task.id),
+  ['urgent-a', 'normal-a', 'low-b'],
+);
+assert.deepEqual(
+  filterTasks(tasks, { status: 'done' }).map((task) => task.id),
   ['done-high'],
 );
 

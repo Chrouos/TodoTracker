@@ -34,6 +34,13 @@ assert.match(options, /class="row-item project-row"/, 'Project list rows should 
 assert.match(options, /class="project-color"/, 'Project rows should show a prominent color marker');
 assert.match(options, /class="project-hours"/, 'Project hours should have readable labels');
 assert.match(options, /class="project-secondary-actions"/, 'Secondary project actions should be visually quieter');
+assert.match(html, /id="tdStatusFilter"/, 'Options Todo should expose a status filter');
+assert.doesNotMatch(html, /id="tdToggleDone"/, 'Options Todo should replace the completed toggle with a status filter');
+assert.match(options, /statusFilter/, 'Options Todo should pass the selected status to filtering');
+const popupHtml = await readFile(new URL('../src/popup/popup.html', import.meta.url), 'utf8');
+const popup = await readFile(new URL('../src/popup/popup.js', import.meta.url), 'utf8');
+assert.match(popupHtml, /id="todoStatusFilter"/, 'Popup Todo should expose a status filter');
+assert.match(popup, /statusFilter/, 'Popup Todo should pass the selected status to filtering');
 assert.match(css, /\.project-color\s*\{[^}]*width:\s*10px[^}]*height:\s*32px/s,
   'Project color marker should be easy to see');
 assert.match(css, /\.project-row\s*\{[^}]*grid-template-columns:/s,

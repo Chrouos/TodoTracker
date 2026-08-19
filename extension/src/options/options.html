@@ -221,8 +221,14 @@
 
     <div class="toolbar">
       <select id="tdFilter" style="width:260px"></select>
+      <select id="tdStatusFilter" style="width:150px">
+        <option value="active">未完成</option>
+        <option value="doing">進行中</option>
+        <option value="todo">待辦</option>
+        <option value="done">已完成</option>
+        <option value="all">全部</option>
+      </select>
       <select id="tdPriorityFilter" style="width:150px"></select>
-      <button id="tdToggleDone">[ ] 顯示已完成</button>
       <div class="grow"></div>
       <span class="cap" id="tdCount"></span>
     </div>

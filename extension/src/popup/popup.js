@@ -8,7 +8,7 @@ const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 2
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
 import { fmtHMS, fmtHM, fmtClock, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
-import { filterTasks, normalizePriority, priorityLabel } from '../lib/todo-filter.js';
+import { filterTasks, normalizePriority, normalizeStatus, priorityLabel } from '../lib/todo-filter.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -189,10 +189,12 @@ function renderRecent() {
 function renderTodo() {
   const filterSelect = $('todoFilter');
   const priorityFilter = $('todoPriorityFilter');
+  const statusFilter = $('todoStatusFilter');
   const createProject = $('todoCreateProject');
   const parentSelect = $('todoParent');
   const keepFilter = filterSelect.value;
   const keepPriorityFilter = priorityFilter.value;
+  const keepStatusFilter = normalizeStatus(statusFilter.value || 'all');
   const keepCreateProject = createProject.value;
   const keepParent = parentSelect.value;
   const projectOptions = flattenTree(state.projects, { includeArchived: false });
@@ -201,6 +203,7 @@ function renderTodo() {
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   filterSelect.value = keepFilter;
   priorityFilter.value = keepPriorityFilter;
+  statusFilter.value = keepStatusFilter;
 
   createProject.innerHTML = '<option value="">— 未指定專案 —</option>' +
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
@@ -223,10 +226,11 @@ function renderTodo() {
 
   const filter = filterSelect.value;
   const priority = priorityFilter.value;
+  const status = keepStatusFilter;
   const list = filterTasks(state.tasks, {
     projectScope: filter ? new Set([filter]) : null,
     priority,
-    showDone: true,
+    status,
   })
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
 
@@ -378,6 +382,7 @@ $('todoMore').addEventListener('click', () => {
 });
 $('todoFilter').addEventListener('change', renderTodo);
 $('todoPriorityFilter').addEventListener('change', renderTodo);
+$('todoStatusFilter').addEventListener('change', renderTodo);
 $('todoCreateProject').addEventListener('change', renderTodo);
 
 $('todoList').addEventListener('click', async (e) => {

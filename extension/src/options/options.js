@@ -11,7 +11,8 @@ import { autoGrow } from '../lib/autogrow.js';
 import { taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
-  TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
+  TODO_PRIORITIES, TODO_STATUSES, filterTasks, normalizePriority, normalizeStatus,
+  priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
@@ -1466,8 +1467,6 @@ $('projList').addEventListener('click', async (e) => {
 
 /* ---------------- Todo ---------------- */
 
-let showDone = false;
-
 function flattenTodoTree(tasks) {
   const children = new Map();
   tasks.forEach((task) => {
@@ -1499,6 +1498,8 @@ function renderTodos() {
     tree.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   const priorityOpts = (blank = null) => (blank === null ? '' : `<option value="">${blank}</option>`) +
     TODO_PRIORITIES.map((p) => `<option value="${p.value}">${p.label}</option>`).join('');
+  const statusOpts = TODO_STATUSES
+    .map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
 
   const keepP = $('tdProject').value;
   $('tdProject').innerHTML = opts('— 未分類 —');
@@ -1531,8 +1532,9 @@ function renderTodos() {
   const keepPriorityFilter = $('tdPriorityFilter').value;
   $('tdPriorityFilter').innerHTML = priorityOpts('— 全部優先級 —');
   $('tdPriorityFilter').value = keepPriorityFilter;
-
-  $('tdToggleDone').textContent = showDone ? '[x] 顯示已完成' : '[ ] 顯示已完成';
+  const statusFilter = normalizeStatus($('tdStatusFilter').value);
+  $('tdStatusFilter').innerHTML = statusOpts;
+  $('tdStatusFilter').value = statusFilter;
 
   // 選了父專案時，子專案的 todo 也一起列出來
   const scope = keepF ? new Set([keepF, ...descendantSet(keepF)]) : null;
@@ -1540,7 +1542,7 @@ function renderTodos() {
   const list = filterTasks(S.tasks, {
     projectScope: scope,
     priority: keepPriorityFilter,
-    showDone,
+    status: statusFilter,
   })
     .sort((a, b) =>
       Number(a.status === 'done') - Number(b.status === 'done')
@@ -1552,7 +1554,7 @@ function renderTodos() {
     flattenTodoTree(list.filter((task) => task.projectId === project.id))
   ).concat(flattenTodoTree(list.filter((task) => !task.projectId)));
 
-  $('tdCount').textContent = taskCountLabel(list, showDone);
+  $('tdCount').textContent = taskCountLabel(list, statusFilter === 'all', statusFilter);
 
   $('todoList').innerHTML = list.length
     ? orderedTasks.map((t, index) => {
@@ -1650,8 +1652,8 @@ $('todoForm').addEventListener('submit', async (e) => {
 $('tdCancel').addEventListener('click', resetTodoForm);
 $('tdProject').addEventListener('change', renderTodos);
 $('tdFilter').addEventListener('change', renderTodos);
+$('tdStatusFilter').addEventListener('change', renderTodos);
 $('tdPriorityFilter').addEventListener('change', renderTodos);
-$('tdToggleDone').addEventListener('click', () => { showDone = !showDone; renderTodos(); });
 
 $('todoList').addEventListener('click', async (e) => {
   const check = e.target.closest('[data-check]')?.dataset.check;
