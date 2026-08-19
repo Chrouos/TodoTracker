@@ -386,6 +386,32 @@ export async function patchTimer(patch) {
 }
 
 /**
+ * 處理閒置提示但繼續計時。
+ * 保留時只清除 idleSince；扣除時把計時起點往後移，避免結束 timer。
+ */
+export async function resolveIdleTimer(discardSeconds = 0) {
+  const t = await getTimer();
+  if (!t || !t.idleSince) return t;
+
+  const idleSince = new Date(t.idleSince).getTime();
+  const now = Date.now();
+  const requested = Number(discardSeconds);
+  const idleElapsed = Number.isFinite(idleSince)
+    ? Math.max(0, (now - idleSince) / 1000)
+    : 0;
+  const seconds = Math.min(Math.max(0, Number.isFinite(requested) ? requested : 0), idleElapsed);
+
+  let startedAt = t.startedAt;
+  const start = new Date(t.startedAt).getTime();
+  if (seconds > 0 && Number.isFinite(start)) {
+    const adjustedStart = Math.min(now - 1000, start + seconds * 1000);
+    startedAt = new Date(adjustedStart).toISOString();
+  }
+
+  return patchTimer({ startedAt, idleSince: null });
+}
+
+/**
  * 停止計時並落地成一筆 entry。
  * @param {string|null} endedAt ISO 字串；不給就用現在
  * @param {number} discardSeconds 要從尾端扣掉的秒數（閒置扣除用）

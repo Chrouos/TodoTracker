@@ -290,13 +290,13 @@ $('tagRow').addEventListener('click', (e) => {
 });
 
 $('idleKeep').addEventListener('click', async () => {
-  await db.patchTimer({ idleSince: null });
+  await db.resolveIdleTimer(0);
   await load();
 });
 $('idleDrop').addEventListener('click', async () => {
   const t = state.timer;
   const sec = (Date.now() - new Date(t.idleSince).getTime()) / 1000;
-  await db.stopTimer(null, sec);
+  await db.resolveIdleTimer(sec);
   await load();
 });
 
