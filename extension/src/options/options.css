@@ -58,8 +58,15 @@ section[hidden] { display: none; }
 .timer-fields { margin-top: var(--lg); grid-template-columns: 2fr 1.5fr 1.5fr; }
 .timer-tags-field,
 .timer-notes-field { margin-top: var(--md); }
+.timer-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--md);
+  margin-bottom: var(--md);
+}
 .timer-notes-field textarea { min-height: 180px; max-height: 360px; overflow-y: auto !important; }
-.timer-notes-preview-actions { display: flex; margin-top: var(--xs); }
+.timer-notes-preview-actions { display: flex; margin-top: 0; }
 .timer-notes-mode {
   display: inline-flex;
   overflow: hidden;
@@ -78,7 +85,7 @@ section[hidden] { display: none; }
   min-height: 180px;
   max-height: 360px;
   overflow-y: auto;
-  margin-top: var(--xs);
+  margin-top: var(--md);
   padding: var(--sm);
   border: 1px solid var(--hairline);
   background: var(--surface-soft);
