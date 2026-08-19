@@ -73,7 +73,9 @@ globalThis.chrome = {
     },
   },
 };
-const { listTasks, upsertTask, listSchedules, upsertSchedule, runDueSchedules } = await import('../src/lib/db.js');
+const {
+  listTasks, upsertEntry, upsertTask, listSchedules, upsertSchedule, runDueSchedules,
+} = await import('../src/lib/db.js');
 const created = await upsertTask({ id: 'priority-default', title: 'Default priority' });
 assert.equal(created.priority, 'normal');
 
@@ -90,6 +92,33 @@ assert.equal((await listSchedules())[0].priority, 'high');
 const generated = await runDueSchedules(new Date('2026-08-10T09:01:00'));
 assert.equal(generated[0].priority, 'high');
 assert.equal((await listTasks()).find((task) => task.scheduleId === 'schedule-priority').priority, 'high');
+
+taskStorage.tasks = [
+  { id: 'task-with-history', title: 'Has history', status: 'todo' },
+  { id: 'task-deleted-history', title: 'Deleted history', status: 'todo' },
+  { id: 'task-done-history', title: 'Done history', status: 'done' },
+  { id: 'task-archived-history', title: 'Archived history', status: 'archived' },
+];
+taskStorage.entries = [
+  { id: 'entry-history', taskId: 'task-with-history', startedAt: '2026-08-19T09:00:00.000Z' },
+  { id: 'entry-deleted-history', taskId: 'task-deleted-history', deletedAt: '2026-08-19T10:00:00.000Z' },
+  { id: 'entry-done-history', taskId: 'task-done-history' },
+  { id: 'entry-archived-history', taskId: 'task-archived-history' },
+];
+assert.equal((await listTasks()).find((task) => task.id === 'task-with-history').status, 'doing');
+assert.equal((await listTasks()).find((task) => task.id === 'task-deleted-history').status, 'todo');
+assert.equal((await listTasks()).find((task) => task.id === 'task-done-history').status, 'done');
+assert.equal((await listTasks()).find((task) => task.id === 'task-archived-history').status, 'archived');
+
+taskStorage.tasks = [{ id: 'task-new-history', title: 'New history', status: 'todo' }];
+taskStorage.entries = [];
+await upsertEntry({
+  id: 'entry-new-history',
+  taskId: 'task-new-history',
+  startedAt: '2026-08-19T11:00:00.000Z',
+  endedAt: '2026-08-19T12:00:00.000Z',
+});
+assert.equal((await listTasks()).find((task) => task.id === 'task-new-history').status, 'doing');
 
 const legacySchedule = await upsertSchedule({
   id: 'schedule-default', title: '預設排程', weekdays: [2], createTime: '09:00', priority: 'invalid',

@@ -16,6 +16,18 @@ export function entriesForTask(task, entries) {
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
+export function promoteTodoTasksWithEntries(tasks, entries) {
+  const recordedTaskIds = new Set(
+    entries.filter((entry) => entry.taskId && !entry.deletedAt).map((entry) => entry.taskId),
+  );
+
+  return tasks.map((task) => (
+    task.status === 'todo' && recordedTaskIds.has(task.id)
+      ? { ...task, status: 'doing' }
+      : task
+  ));
+}
+
 export function todoHealth(tasks, today = fmtDate(new Date().toISOString())) {
   const current = tasks.filter((task) => task.status !== 'archived');
   const total = current.length;

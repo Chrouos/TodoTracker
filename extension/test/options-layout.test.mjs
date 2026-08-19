@@ -50,6 +50,10 @@ assert.match(css, /\.project-hours-label\s*\{[^}]*color:\s*var\(--text-body\)/s,
   'Project hour labels should use readable secondary text');
 assert.match(css, /\.project-hours \.num\s*\{[^}]*color:\s*var\(--text-ink\)/s,
   'Project hour values should use dark primary text');
+assert.match(css, /\.project-info \.tree-branch\s*\{[^}]*font-size:\s*16px/s,
+  'Project hierarchy branches should be large enough to see');
+assert.match(css, /\.project-info \.tree-branch\s*\{[^}]*color:\s*color-mix\(/s,
+  'Project hierarchy branches should use a darker mixed project color');
 assert.match(options, /from ['"]\.\.\/lib\/report-range\.js['"]/, 'Report should import trend date bounds');
 assert.match(options, /trendDateBounds\(range, new Date\(\), S\.settings\.weekStartsOn\)/, 'Report should derive quick-range trend bounds');
 assert.match(options, /const trendEndExclusive = new Date\(lineTo\.getTime\(\) \+ 864e5\)/, 'Report should cap trend entries at the inclusive axis end');

@@ -22,6 +22,7 @@ const K = {
 
 import { wouldCycle } from './tree.js';
 import { removeProjectData } from './relations.js';
+import { promoteTodoTasksWithEntries } from './tasks.js';
 import { normalizePriority } from './todo-filter.js';
 
 export const uid = () => crypto.randomUUID();
@@ -150,6 +151,12 @@ export async function deleteTag(id) {
 
 export async function listTasks({ projectId = null, includeDone = true } = {}) {
   let all = await read(K.tasks, []);
+  const entries = await read(K.entries, []);
+  const promoted = promoteTodoTasksWithEntries(all, entries);
+  if (promoted.some((task, index) => task.status !== all[index].status)) {
+    await write(K.tasks, promoted);
+    all = promoted;
+  }
   if (projectId) all = all.filter((t) => t.projectId === projectId);
   if (!includeDone) all = all.filter((t) => t.status !== 'done');
   return all.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
@@ -346,6 +353,11 @@ export async function upsertEntry(e) {
   };
   if (i >= 0) all[i] = { ...all[i], ...row }; else all.push(row);
   await write(K.entries, all);
+  if (row.taskId && !row.deletedAt) {
+    const tasks = await read(K.tasks, []);
+    const task = tasks.find((item) => item.id === row.taskId);
+    if (task?.status === 'todo') await upsertTask({ ...task, status: 'doing' });
+  }
   return row;
 }
 

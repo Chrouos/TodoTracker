@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entriesForTask, todoHealth } from './tasks.js';
+import { entriesForTask, promoteTodoTasksWithEntries, todoHealth } from './tasks.js';
 
 test('returns completed work records for a todo, newest first', () => {
   const result = entriesForTask(
@@ -32,6 +32,30 @@ test('todoHealth counts active, completed, and overdue todos', () => {
     active: 1,
     overdue: 1,
   });
+});
+
+test('promotes todo tasks with non-deleted work records to doing', () => {
+  const result = promoteTodoTasksWithEntries([
+    { id: 'worked', status: 'todo' },
+    { id: 'already-doing', status: 'doing' },
+    { id: 'done', status: 'done' },
+    { id: 'archived', status: 'archived' },
+    { id: 'deleted-only', status: 'todo' },
+  ], [
+    { id: 'work-1', taskId: 'worked' },
+    { id: 'work-2', taskId: 'done' },
+    { id: 'work-3', taskId: 'already-doing' },
+    { id: 'work-4', taskId: 'archived' },
+    { id: 'work-5', taskId: 'deleted-only', deletedAt: '2026-08-19T10:00:00.000Z' },
+  ]);
+
+  assert.deepEqual(result.map((task) => [task.id, task.status]), [
+    ['worked', 'doing'],
+    ['already-doing', 'doing'],
+    ['done', 'done'],
+    ['archived', 'archived'],
+    ['deleted-only', 'todo'],
+  ]);
 });
 
 test('todoHealth handles empty todos without division by zero', () => {

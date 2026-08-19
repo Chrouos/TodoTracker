@@ -250,7 +250,12 @@ section[hidden] { display: none; }
   background: var(--project-color);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--project-color) 45%, var(--canvas));
 }
-.project-info .tree-branch { color: var(--project-color); font-weight: 700; }
+.project-info .tree-branch {
+  color: color-mix(in srgb, var(--project-color) 65%, var(--text-ink));
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+}
 .project-hours { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .project-hours-label { color: var(--text-body); font-size: 11px; font-weight: 500; }
 .project-hours .num { color: var(--text-ink); font-weight: 700; }
