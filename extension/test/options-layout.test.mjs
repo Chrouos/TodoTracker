@@ -44,6 +44,7 @@ assert.match(css, /\.project-trend-tooltip\s*>\s*(?:strong|span)[^{]*\{[^}]*text
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
 assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');
+assert.match(html, /id="reportInsights"/, 'Report should expose data quality and Todo performance insights');
 assert.match(html, /data-collapse="rep-todo-tracker"[\s\S]*data-collapse-default="closed"/, 'Todo Tracker should default to collapsed');
 assert.match(html, /data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should have a collapsible body');
 assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
@@ -55,6 +56,8 @@ assert.match(options, /trendOverview/, 'Report should show a useful summary befo
 assert.doesNotMatch(options, /focusId/, 'Report should not retain the removed drill-down state');
 assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'Report should not use a meaningless hover placeholder');
 assert.match(options, /buildProjectDetailData/, 'Project selection should render project detail data');
+assert.match(options, /buildReportQuality/, 'Report should render data quality metrics');
+assert.match(options, /buildProjectTaskMetrics/, 'Report should render project Todo performance metrics');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
 assert.match(options, /let reviewMode = 'calendar'/, 'Report should initialize the review in calendar mode');

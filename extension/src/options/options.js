@@ -17,6 +17,7 @@ import { projectIdForTask } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData } from '../lib/todo-tracker.js';
+import { buildProjectTaskMetrics, buildReportQuality } from '../lib/report-metrics.js';
 import { formatMarkdownSelection, normalizeMarkdownEditorMode } from '../lib/markdown-editor.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
@@ -446,6 +447,7 @@ function renderReport() {
   $('kAvg').textContent = rows.length ? fmtHM(sec / rows.length) : '—';
   $('kDays').textContent = dayKeys.size;
   renderTodoHealth();
+  renderReportInsights(rows);
 
   // 融合專案分配與每日趨勢：區間太短就往前補，才看得出趨勢
   const today = startOfDay();
@@ -780,6 +782,34 @@ function renderTrendDetails(projectId) {
 
 function todoStatusLabel(status) {
   return status === 'done' ? '已完成' : status === 'doing' ? '進行中' : '待辦';
+}
+
+function renderReportInsights(rows) {
+  const mount = $('reportInsights');
+  if (!mount) return;
+  const quality = buildReportQuality(S.entries.filter((entry) => rows.includes(entry)), S.tasks, fmtDate(new Date().toISOString()));
+  const metrics = buildProjectTaskMetrics(S.tasks, rows, fmtDate(new Date().toISOString()));
+  const metricRows = metrics.slice(0, 8).map((metric) => {
+    const project = metric.projectId && S.projects.find((item) => item.id === metric.projectId);
+    return `<tr>
+      <td>${esc(project ? pathOf(S.projects, project.id).join(' / ') : '未分類')}</td>
+      <td>${metric.done} / ${metric.total}</td>
+      <td>${Math.round(metric.completionRate * 100)}%</td>
+      <td class="${metric.overdue ? 'report-warning-text' : ''}">${metric.overdue}</td>
+      <td>${fmtHM(metric.workedSeconds)}</td>
+      <td>${metric.averageLeadMs === null ? '—' : fmtHM(metric.averageLeadMs / 1000)}</td>
+    </tr>`;
+  }).join('');
+  mount.innerHTML = `<div class="report-insights-grid">
+    <div><span class="cap">未分類工時</span><strong>${fmtHM(quality.unclassifiedSeconds)}</strong></div>
+    <div><span class="cap">沒有 notes</span><strong>${quality.missingNotesCount} 筆</strong></div>
+    <div><span class="cap">未綁定 Todo</span><strong>${fmtHM(quality.unlinkedTaskSeconds)}</strong></div>
+    <div class="report-warning"><span class="cap">逾期 Todo</span><strong>${quality.overdueTodoCount}</strong></div>
+  </div>
+  <div class="report-metrics-table-wrap">
+    <table class="report-metrics-table"><thead><tr><th>專案</th><th>Todo</th><th>完成率</th><th>逾期</th><th>實際工時</th><th>平均完成週期</th></tr></thead>
+    <tbody>${metricRows || '<tr><td colspan="6" class="mute">目前沒有 Todo 績效資料</td></tr>'}</tbody></table>
+  </div>`;
 }
 
 function todoTrackerColor(project) {
