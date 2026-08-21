@@ -60,7 +60,7 @@
             </div>
           </div>
         </div>
-        <textarea id="mgTimerNotes" placeholder="邊做邊記，停止時會一起保存"></textarea>
+        <textarea id="mgTimerNotes" data-markdown-editor-input placeholder="邊做邊記，停止時會一起保存"></textarea>
         <div id="mgTimerNotesPreview" class="timer-notes-preview" hidden></div>
       </div>
 
@@ -155,7 +155,7 @@
       <div class="row" style="margin-bottom:8px">
         <span class="h" id="pjNotesTitle">目標與筆記</span>
       </div>
-      <textarea id="pjNoteDraft" placeholder="這個專案要達成什麼？有什麼決定或轉折？Ctrl+Enter 送出"></textarea>
+      <textarea id="pjNoteDraft" data-markdown-editor-input placeholder="這個專案要達成什麼？有什麼決定或轉折？Ctrl+Enter 送出"></textarea>
       <div class="actions">
         <button type="button" id="pjNoteAdd" class="btn-primary">新增一則</button>
         <span class="cap" style="align-self:center">會記下寫入當下的時間，之後還能修改</span>
@@ -220,7 +220,7 @@
         </label>
       </div>
       <label class="field" style="margin-top:12px"><span>備註</span>
-        <textarea id="tdNotes" placeholder="細節、連結、驗收條件…"></textarea></label>
+        <textarea id="tdNotes" data-markdown-editor-input placeholder="細節、連結、驗收條件…"></textarea></label>
       <div class="actions">
         <button type="submit" class="btn-primary">儲存 Todo</button>
         <button type="button" id="tdCancel" hidden>取消編輯</button>
@@ -303,7 +303,7 @@
       </div>
 
       <label class="field" style="margin-top:12px"><span>備註</span>
-        <textarea id="scNotes" placeholder="會一併寫進產生的 Todo"></textarea></label>
+        <textarea id="scNotes" data-markdown-editor-input placeholder="會一併寫進產生的 Todo"></textarea></label>
 
       <div class="actions">
         <button type="submit" class="btn-primary">儲存排程</button>
@@ -379,6 +379,14 @@
           </select>
           <span class="hint">每筆紀錄長度往上湊到這個倍數。設 15 的話，8 分鐘會記成 15 分鐘。想要精確時數就留「不進位」。</span>
         </label>
+        <label class="field">
+          <span>筆記編輯方式</span>
+          <select id="stNotesEditor">
+            <option value="toolbar">工具列編輯器</option>
+            <option value="source">Markdown 原始碼</option>
+          </select>
+          <span class="hint">工具列會幫你插入粗體、斜體、標題、清單等 Markdown；資料仍以 Markdown 儲存。</span>
+        </label>
       </div>
       <div class="actions"><button id="saveSettings" class="btn-primary">儲存設定</button></div>
     </div>
@@ -411,7 +419,7 @@
       <label class="field"><span>結束</span><input id="enEnd" type="datetime-local" /></label>
     </div>
     <label class="field"><span>工作紀錄</span>
-      <textarea id="enNotes" placeholder="這段時間做了什麼？"></textarea></label>
+      <textarea id="enNotes" data-markdown-editor-input placeholder="這段時間做了什麼？"></textarea></label>
     <div class="actions">
       <button value="cancel">取消</button>
       <button value="save" class="btn-primary">儲存</button>

@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS = {
   idleThresholdMin: 15,  // 閒置多久後提醒
   weekStartsOn: 1,       // 1 = 星期一
   roundToMin: 0,         // 0 = 不進位；設 15 就是每筆進位到 15 分
+  notesEditor: 'toolbar',
 };
 
 const K = {

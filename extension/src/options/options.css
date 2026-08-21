@@ -94,6 +94,32 @@ section[hidden] { display: none; }
 }
 .timer-notes-mode .btn-sm:last-child { border-right: 0; }
 .timer-notes-mode .btn-sm.active { background: var(--ink); color: var(--canvas); }
+.markdown-editor { margin-top: var(--xs); }
+.markdown-editor textarea { width: 100%; box-sizing: border-box; }
+.markdown-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.markdown-editor-toolbar [data-markdown-command] {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  background: var(--surface-soft);
+  color: var(--text-mute);
+  font-size: 12px;
+}
+.markdown-editor-toolbar [data-markdown-command]:hover,
+.markdown-editor-toolbar [data-markdown-command]:focus-visible {
+  border-color: var(--ink);
+  color: var(--text-ink);
+}
+.markdown-editor-toolbar [data-markdown-command="bold"] { font-weight: 700; }
+.markdown-editor-toolbar [data-markdown-command="italic"] { font-style: italic; }
+.markdown-editor.is-source .markdown-editor-toolbar { display: none; }
 .timer-notes-preview {
   min-height: 180px;
   max-height: 360px;
