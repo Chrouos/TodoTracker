@@ -17,6 +17,7 @@ import { projectIdForTask } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData } from '../lib/todo-tracker.js';
+import { formatMarkdownSelection, normalizeMarkdownEditorMode } from '../lib/markdown-editor.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -32,6 +33,40 @@ function renderMarkdownPreview(markdown, className = '') {
   return `<div class="${className} markdown-preview" data-markdown-preview>
     <div data-markdown-content>${markdownToHTML(markdown)}</div>
   </div>`;
+}
+
+const MARKDOWN_TOOLBAR_BUTTONS = [
+  ['bold', 'B', '粗體'],
+  ['italic', 'I', '斜體'],
+  ['heading', 'H2', '標題'],
+  ['unordered-list', '•', '無序清單'],
+  ['ordered-list', '1.', '編號清單'],
+  ['quote', '❞', '引用'],
+  ['code', '</>', '程式碼'],
+  ['link', '↗', '連結'],
+];
+
+function markdownEditorToolbar() {
+  return `<div class="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯工具列">
+    ${MARKDOWN_TOOLBAR_BUTTONS.map(([command, label, title]) =>
+      `<button type="button" data-markdown-command="${command}" title="${title}" aria-label="${title}">${label}</button>`).join('')}
+  </div>`;
+}
+
+function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
+  const editorMode = normalizeMarkdownEditorMode(mode);
+  document.querySelectorAll('[data-markdown-editor-input]').forEach((textarea) => {
+    let editor = textarea.closest('.markdown-editor');
+    if (!editor) {
+      editor = document.createElement('div');
+      editor.className = 'markdown-editor';
+      textarea.parentNode.insertBefore(editor, textarea);
+      editor.appendChild(textarea);
+      editor.insertAdjacentHTML('afterbegin', markdownEditorToolbar());
+    }
+    editor.dataset.editorMode = editorMode;
+    editor.classList.toggle('is-source', editorMode === 'source');
+  });
 }
 
 function setMarkdownPreviewExpanded(preview, expanded) {
@@ -75,6 +110,23 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('click', (event) => {
+  const editorButton = event.target.closest('[data-markdown-command]');
+  if (editorButton) {
+    event.preventDefault();
+    const textarea = editorButton.closest('.markdown-editor')?.querySelector('[data-markdown-editor-input]');
+    if (!textarea) return;
+    const result = formatMarkdownSelection(
+      textarea.value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      editorButton.dataset.markdownCommand,
+    );
+    textarea.value = result.value;
+    textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.focus();
+    return;
+  }
   const button = event.target.closest('[data-markdown-toggle]');
   if (!button) return;
   const preview = button.closest('[data-markdown-preview]');
@@ -227,6 +279,8 @@ function renderTimerNotesPreview() {
 
 function setTimerNotesPreviewOpen(open) {
   timerNotesPreviewOpen = open;
+  const editor = $('mgTimerNotes').closest('.markdown-editor');
+  if (editor) editor.hidden = open;
   $('mgTimerNotes').hidden = open;
   $('mgTimerNotesPreview').hidden = !open;
   const toggle = $('mgTimerNotesPreviewToggle');
@@ -1844,11 +1898,14 @@ $('entryForm').addEventListener('submit', async (ev) => {
 function renderSettings() {
   $('stIdle').value = S.settings.idleThresholdMin;
   $('stRound').value = String(S.settings.roundToMin);
+  $('stNotesEditor').value = normalizeMarkdownEditorMode(S.settings.notesEditor);
+  initializeMarkdownEditors(S.settings.notesEditor);
 }
 $('saveSettings').addEventListener('click', async () => {
   await db.saveSettings({
     idleThresholdMin: Math.max(1, Number($('stIdle').value) || 15),
     roundToMin: Number($('stRound').value) || 0,
+    notesEditor: normalizeMarkdownEditorMode($('stNotesEditor').value),
   });
   await load();
   alert('已儲存');

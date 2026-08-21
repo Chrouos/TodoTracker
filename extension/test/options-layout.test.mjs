@@ -24,8 +24,13 @@ for (const id of [
 ]) {
   assert.match(html, new RegExp(`id="${id}"`), `Management timer should have ${id}`);
 }
+assert.match(html, /id="stNotesEditor"/, 'Settings should expose the Markdown editor mode');
+for (const id of ['mgTimerNotes', 'tdNotes', 'enNotes', 'pjNoteDraft', 'scNotes']) {
+  assert.match(html, new RegExp(`id="${id}"[^>]*data-markdown-editor-input`), `${id} should use the shared Markdown editor`);
+}
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
 assert.match(options, /projectIdForTask/, 'Entry Todo selection should synchronize its project');
+assert.match(options, /normalizeMarkdownEditorMode/, 'Options should normalize the shared Markdown editor setting');
 assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selection should update the project selector');
 assert.match(options, /from ['"]\.\.\/lib\/report-range\.js['"]/, 'Report should import trend date bounds');
 assert.match(options, /trendDateBounds\(range, new Date\(\), S\.settings\.weekStartsOn\)/, 'Report should derive quick-range trend bounds');
@@ -74,4 +79,6 @@ assert.match(options, /'› '\.repeat\(p\.depth\)/,
 assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar should scroll horizontally');
 assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');
 assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
+assert.match(css, /\.markdown-editor-toolbar\s*\{/, 'Markdown fields should render an editor toolbar');
+assert.match(css, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
 console.log('options layout contract passed');
