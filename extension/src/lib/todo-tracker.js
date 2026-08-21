@@ -21,6 +21,16 @@ function isValidDate(date) {
   return date instanceof Date && !Number.isNaN(date.getTime());
 }
 
+export function countCompletedToday(tasks = [], now = new Date()) {
+  const nowDate = new Date(now);
+  if (!isValidDate(nowDate)) return 0;
+  const today = dateKey(nowDate);
+  return tasks.filter((task) => task.status === 'done'
+    && task.status !== 'archived'
+    && task.completedAt
+    && dateKey(new Date(task.completedAt)) === today).length;
+}
+
 function clampStart(left, right) {
   return left > right ? left : right;
 }
@@ -128,10 +138,16 @@ export function buildTodoTrackerData({
   dates = null,
   now = new Date(),
   durationSec = null,
+  completedLimit = 5,
 }) {
   const nowDate = new Date(now);
+  const completedTodayCount = countCompletedToday(tasks, nowDate);
   const safeDates = dates?.length ? [...dates] : deriveDates(tasks, entries, nowDate, durationSec);
-  if (!safeDates.length) return { dates: safeDates, windowStart: null, windowEnd: null, items: [] };
+  if (!safeDates.length) {
+    return {
+      dates: safeDates, windowStart: null, windowEnd: null, items: [], completedTodayCount,
+    };
+  }
 
   const windowStart = localDayStart(safeDates[0]);
   const windowEnd = new Date(localDayStart(safeDates[safeDates.length - 1]).getTime() + 864e5);
@@ -149,6 +165,11 @@ export function buildTodoTrackerData({
         .filter((entry) => entry && entry.seconds >= MIN_TRACKER_SECONDS);
       if (!itemEntries.length) return null;
       const workSegments = layoutWorkSegments(itemEntries);
+      const lastActivityAtMs = Math.max(
+        ...itemEntries.map((entry) => new Date(entry.endedAt).getTime()).filter(Number.isFinite),
+        -Infinity,
+      );
+      const completedAtMs = task.completedAt ? new Date(task.completedAt).getTime() : -Infinity;
 
       return {
         id: task.id,
@@ -169,13 +190,32 @@ export function buildTodoTrackerData({
         workSegments,
         laneCount: workSegments[0].laneCount,
         openedAtMs: openedAt.getTime(),
+        completedAtMs,
+        lastActivityAtMs,
       };
     })
     .filter(Boolean)
-    .sort((left, right) => right.trackedSeconds - left.trackedSeconds
-      || left.openedAtMs - right.openedAtMs
-      || left.title.localeCompare(right.title))
-    .map(({ openedAtMs, ...item }) => item);
+    .sort((left, right) => {
+      if (left.status === 'done' && right.status !== 'done') return -1;
+      if (left.status !== 'done' && right.status === 'done') return 1;
+      if (left.status === 'done') {
+        return right.completedAtMs - left.completedAtMs
+          || right.lastActivityAtMs - left.lastActivityAtMs
+          || right.trackedSeconds - left.trackedSeconds
+          || left.title.localeCompare(right.title);
+      }
+      return right.lastActivityAtMs - left.lastActivityAtMs
+        || right.trackedSeconds - left.trackedSeconds
+        || right.openedAtMs - left.openedAtMs
+        || left.title.localeCompare(right.title);
+    });
 
-  return { dates: safeDates, windowStart, windowEnd, items };
+  const completedItems = items
+    .filter((item) => item.status === 'done')
+    .slice(0, Math.max(0, Number.isFinite(completedLimit) ? completedLimit : 5));
+  const activeItems = items.filter((item) => item.status !== 'done');
+  const visibleItems = [...completedItems, ...activeItems]
+    .map(({ openedAtMs, completedAtMs, lastActivityAtMs, ...item }) => item);
+
+  return { dates: safeDates, windowStart, windowEnd, items: visibleItems, completedTodayCount };
 }

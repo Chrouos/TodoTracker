@@ -1,0 +1,155 @@
+<div id="gantt-layout-v2">
+  <style>
+    #gantt-layout-v2 {
+      color: var(--foreground, #202124);
+    }
+    #gantt-layout-v2 .compare {
+      display: grid;
+      gap: 18px;
+    }
+    #gantt-layout-v2 .option {
+      border: 1px solid var(--border, #d8dbe0);
+      border-radius: 12px;
+      background: var(--card, #fff);
+      overflow: hidden;
+      cursor: pointer;
+    }
+    #gantt-layout-v2 .option:hover,
+    #gantt-layout-v2 .option.is-selected {
+      border-color: var(--primary, #5b5bd6);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary, #5b5bd6) 18%, transparent);
+    }
+    #gantt-layout-v2 .option-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border, #d8dbe0);
+    }
+    #gantt-layout-v2 .option-head strong { font-size: 14px; }
+    #gantt-layout-v2 .option-head span { color: var(--muted-foreground, #687080); font-size: 11px; }
+    #gantt-layout-v2 .gantt {
+      padding: 14px 16px 16px;
+      background: var(--background, #f7f8fa);
+    }
+    #gantt-layout-v2 .gantt-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    #gantt-layout-v2 .gantt-title { font-size: 12px; font-weight: 500; }
+    #gantt-layout-v2 .gantt-controls { display: flex; gap: 4px; }
+    #gantt-layout-v2 .gantt-controls button {
+      padding: 4px 7px;
+      border: 1px solid var(--border, #d8dbe0);
+      border-radius: 5px;
+      background: var(--card, #fff);
+      color: var(--foreground, #202124);
+      font-size: 10px;
+    }
+    #gantt-layout-v2 .axis,
+    #gantt-layout-v2 .row {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 10px;
+    }
+    #gantt-layout-v2 .axis {
+      color: var(--muted-foreground, #687080);
+      font-size: 10px;
+    }
+    #gantt-layout-v2 .axis-days {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      text-align: center;
+    }
+    #gantt-layout-v2 .axis-days span { padding-bottom: 7px; }
+    #gantt-layout-v2 .rows { display: grid; gap: 8px; }
+    #gantt-layout-v2 .row-label { min-width: 0; }
+    #gantt-layout-v2 .row-label strong { display: block; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #gantt-layout-v2 .row-label span { color: var(--muted-foreground, #687080); font-size: 9px; }
+    #gantt-layout-v2 .track {
+      position: relative;
+      min-height: 34px;
+      border-bottom: 1px solid var(--border, #d8dbe0);
+      background: repeating-linear-gradient(90deg, transparent 0 calc(14.285% - 1px), color-mix(in srgb, var(--border, #d8dbe0) 70%, transparent) calc(14.285% - 1px) 14.285%);
+    }
+    #gantt-layout-v2 .lifecycle {
+      position: absolute;
+      top: 8px;
+      left: var(--left);
+      width: var(--width);
+      height: 3px;
+      border-radius: 99px;
+      background: var(--muted-foreground, #8a91a0);
+      opacity: .32;
+    }
+    #gantt-layout-v2 .work {
+      position: absolute;
+      top: 4px;
+      left: var(--left);
+      width: max(var(--width), 9px);
+      height: 22px;
+      box-sizing: border-box;
+      padding: 4px 6px;
+      overflow: hidden;
+      border: 1px solid var(--viz-series-1, #6d79dc);
+      border-radius: 5px;
+      background: color-mix(in srgb, var(--viz-series-1, #6d79dc) 32%, var(--card, #fff));
+      color: var(--foreground, #202124);
+      font-size: 9px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    #gantt-layout-v2 .work.alt { top: 10px; background: color-mix(in srgb, var(--viz-series-2, #54a68a) 32%, var(--card, #fff)); border-color: var(--viz-series-2, #54a68a); }
+    #gantt-layout-v2 .legend { display: flex; gap: 12px; margin-top: 10px; color: var(--muted-foreground, #687080); font-size: 10px; }
+    #gantt-layout-v2 .legend i { display: inline-block; width: 18px; height: 3px; margin-right: 4px; vertical-align: middle; border-radius: 99px; background: var(--muted-foreground, #8a91a0); opacity: .4; }
+    #gantt-layout-v2 .legend b { display: inline-block; width: 9px; height: 9px; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--viz-series-1, #6d79dc); border-radius: 3px; background: color-mix(in srgb, var(--viz-series-1, #6d79dc) 32%, var(--card, #fff)); }
+    #gantt-layout-v2 .day-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    #gantt-layout-v2 .day-column { min-width: 0; padding: 8px; background: var(--card, #fff); }
+    #gantt-layout-v2 .day-column header { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 8px; font-size: 10px; }
+    #gantt-layout-v2 .day-column header span { color: var(--muted-foreground, #687080); }
+    #gantt-layout-v2 .day-entry { display: grid; gap: 3px; padding: 7px 0; border-top: 1px solid var(--border, #d8dbe0); }
+    #gantt-layout-v2 .day-entry strong { font-size: 10px; }
+    #gantt-layout-v2 .day-entry span { color: var(--muted-foreground, #687080); font-size: 9px; }
+    #gantt-layout-v2 .selected-detail { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border, #d8dbe0); }
+    #gantt-layout-v2 .selected-detail strong { font-size: 11px; }
+    #gantt-layout-v2 .selected-detail span { color: var(--muted-foreground, #687080); font-size: 10px; text-align: right; }
+    @media (max-width: 680px) {
+      #gantt-layout-v2 .axis, #gantt-layout-v2 .row { grid-template-columns: 120px minmax(0, 1fr); }
+      #gantt-layout-v2 .day-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+
+  <div class="compare">
+    <div class="option" data-choice="gantt-compact" onclick="toggleSelect(this)">
+      <div class="option-head"><strong>A｜緊湊時間軸</strong><span>生命週期淡線・工作紀錄實體區段</span></div>
+      <div class="gantt">
+        <div class="gantt-toolbar"><span class="gantt-title">Todo 工作跨度</span><span class="gantt-controls"><button>←</button><button>今天</button><button>→</button></span></div>
+        <div class="axis"><span></span><div class="axis-days"><span>08/17</span><span>08/18</span><span>08/19</span><span>08/20</span><span>08/21</span><span>08/22</span><span>08/23</span></div></div>
+        <div class="rows">
+          <div class="row"><div class="row-label"><strong>金福氣</strong><span>6h 20m・跨 4 天</span></div><div class="track"><i class="lifecycle" style="--left:2%;--width:82%"></i><i class="work" style="--left:6%;--width:8%">1h 30m</i><i class="work alt" style="--left:42%;--width:5%">40m</i><i class="work" style="--left:72%;--width:12%">2h</i></div></div>
+          <div class="row"><div class="row-label"><strong>日文</strong><span>4h 45m・跨 2 天</span></div><div class="track"><i class="lifecycle" style="--left:28%;--width:42%"></i><i class="work alt" style="--left:32%;--width:13%">2h 10m</i><i class="work" style="--left:57%;--width:7%">1h 05m</i></div></div>
+          <div class="row"><div class="row-label"><strong>研究 doc2json</strong><span>2h・實際 1 天</span></div><div class="track"><i class="lifecycle" style="--left:57%;--width:15%"></i><i class="work" style="--left:60%;--width:12%">2h</i></div></div>
+        </div>
+        <div class="legend"><span><i></i>開單～結單</span><span><b></b>實際工作紀錄</span></div>
+      </div>
+    </div>
+
+    <div class="option" data-choice="gantt-day-groups" onclick="toggleSelect(this)">
+      <div class="option-head"><strong>B｜按日期分組的甘特圖</strong><span>減少長距離空白</span></div>
+      <div class="gantt">
+        <div class="gantt-toolbar"><span class="gantt-title">實際工作日</span><span class="gantt-controls"><button>←</button><button>→</button></span></div>
+        <div class="day-board">
+          <section class="day-column"><header><strong>08/17</strong><span>3h 40m</span></header><div class="day-entry"><strong>金福氣</strong><span>10:00–11:30・1h 30m</span></div><div class="day-entry"><strong>日文</strong><span>14:00–16:10・2h 10m</span></div></section>
+          <section class="day-column"><header><strong>08/18</strong><span>2h 40m</span></header><div class="day-entry"><strong>金福氣</strong><span>09:20–10:00・40m</span></div><div class="day-entry"><strong>研究 doc2json</strong><span>13:00–15:00・2h</span></div></section>
+          <section class="day-column"><header><strong>08/19</strong><span>1h 20m</span></header><div class="day-entry"><strong>金福氣</strong><span>11:00–12:20・1h 20m</span></div></section>
+          <section class="day-column"><header><strong>08/20</strong><span>1h 05m</span></header><div class="day-entry"><strong>日文</strong><span>15:00–16:05・1h 05m</span></div></section>
+        </div>
+        <div class="selected-detail"><strong>點選 Todo 可展開跨日生命週期與所有紀錄</strong><span>不需要把整段歷史壓在同一條軸上</span></div>
+      </div>
+    </div>
+  </div>
+</div>

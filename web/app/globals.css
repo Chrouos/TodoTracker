@@ -49,6 +49,7 @@
 .workspace-task, .workspace-log { display: flex; gap: var(--md); justify-content: space-between; padding: var(--md) 0; border-bottom: 1px solid var(--hairline); }
 .workspace-task > div:first-child, .workspace-log > div:nth-child(2) { flex: 1; min-width: 0; }
 .workspace-log > div:first-child { width: 120px; flex: 0 0 120px; }
+.workspace-pagination { display: flex; align-items: center; justify-content: center; gap: var(--md); margin-top: var(--lg); color: var(--text-mute); font-size: 12px; }
 .workspace-report { margin-top: var(--sm); }
 .workspace-report > span:first-child { width: 110px; flex: 0 0 110px; }
 .workspace-report > span:last-child { width: 70px; flex: 0 0 70px; text-align: right; }
@@ -56,6 +57,7 @@
 .bar i { display: block; height: 100%; background: var(--text-ink); }
 .markdown-preview { color: var(--text-body); line-height: 1.65; margin-top: 8px; overflow-wrap: anywhere; }
 .markdown-preview p { margin: 0 0 8px; }
+.markdown-preview hr { display: block; width: 100%; height: 1px; margin: 16px 0; border: 0; background: var(--hairline); }
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3, .markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { margin: 12px 0 6px; font-family: var(--font); }
 .markdown-preview ul, .markdown-preview ol { margin: 6px 0 8px 22px; }
 .markdown-preview blockquote { border-left: 3px solid var(--hairline-strong); margin: 8px 0; padding-left: 12px; color: var(--text-ash); }

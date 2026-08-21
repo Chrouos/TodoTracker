@@ -26,6 +26,11 @@ export function markdownToHtml(markdown: string): string {
   for (const line of lines) {
     if (line.trim().startsWith('```')) { if (code) flushCode(); else { flushParagraph(); flushList(); code = []; } continue; }
     if (code) { code.push(line); continue; }
+    if (/^\s{0,3}(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$/.test(line)) {
+      flushParagraph(); flushList();
+      output.push('<hr />');
+      continue;
+    }
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) { flushParagraph(); flushList(); const level = heading[1].length; output.push(`<h${level}>${inline(heading[2])}</h${level}>`); continue; }
     const unordered = /^\s*[-*+]\s+(.+)$/.exec(line);

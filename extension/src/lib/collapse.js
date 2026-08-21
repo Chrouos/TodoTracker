@@ -11,13 +11,20 @@
  */
 
 const KEY = 'uiCollapsed';
+const INIT_KEY = 'uiCollapseInitialized';
 
-async function readClosed() {
-  const r = await chrome.storage.local.get(KEY);
-  return new Set(r[KEY] || []);
+async function readState() {
+  const r = await chrome.storage.local.get([KEY, INIT_KEY]);
+  return {
+    closed: new Set(r[KEY] || []),
+    initialized: new Set(r[INIT_KEY] || []),
+  };
 }
-async function writeClosed(set) {
-  await chrome.storage.local.set({ [KEY]: [...set] });
+async function writeState({ closed, initialized }) {
+  await chrome.storage.local.set({
+    [KEY]: [...closed],
+    [INIT_KEY]: [...initialized],
+  });
 }
 
 function paint(id, closed) {
@@ -32,10 +39,16 @@ function paint(id, closed) {
 }
 
 export async function initCollapse() {
-  const closed = await readClosed();
+  const state = await readState();
+  let changed = false;
 
   for (const head of document.querySelectorAll('[data-collapse]')) {
     const id = head.dataset.collapse;
+    if (head.dataset.collapseDefault === 'closed' && !state.initialized.has(id)) {
+      state.closed.add(id);
+      state.initialized.add(id);
+      changed = true;
+    }
     // 標題整塊可點，marker 一定要有
     if (!head.querySelector('.mark')) {
       head.insertAdjacentHTML('afterbegin', '<span class="mark">[-]</span> ');
@@ -43,14 +56,16 @@ export async function initCollapse() {
     head.setAttribute('role', 'button');
     head.setAttribute('tabindex', '0');
     head.classList.add('collapsible');
-    paint(id, closed.has(id));
+    paint(id, state.closed.has(id));
   }
+  if (changed) await writeState(state);
 
   const toggle = async (id) => {
-    const set = await readClosed();
-    if (set.has(id)) set.delete(id); else set.add(id);
-    await writeClosed(set);
-    paint(id, set.has(id));
+    const next = await readState();
+    if (next.closed.has(id)) next.closed.delete(id); else next.closed.add(id);
+    next.initialized.add(id);
+    await writeState(next);
+    paint(id, next.closed.has(id));
   };
 
   document.addEventListener('click', (e) => {

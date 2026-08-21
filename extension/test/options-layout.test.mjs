@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../src/options/options.html', import.meta.url), 'utf8');
 const css = await readFile(new URL('../src/options/options.css', import.meta.url), 'utf8');
+const collapse = await readFile(new URL('../src/lib/collapse.js', import.meta.url), 'utf8');
 
 assert.match(html, /<div class="grid4 todo-form-main">/,
   'Todo 主表單應使用可調整專案欄寬的 grid class');
@@ -38,6 +39,9 @@ assert.match(css, /\.project-trend-tooltip\s*>\s*(?:strong|span)[^{]*\{[^}]*text
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
 assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');
+assert.match(html, /data-collapse="rep-todo-tracker"[\s\S]*data-collapse-default="closed"/, 'Todo Tracker should default to collapsed');
+assert.match(html, /data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should have a collapsible body');
+assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
 assert.doesNotMatch(html, /id="byDay"/, 'Report should not render a separate daily trend panel');
 assert.match(options, /buildProjectTrendData/, 'Report should build the fused project trend data');
 assert.match(options, /data-trend-date/, 'Report should wire date hover interaction');
@@ -48,6 +52,8 @@ assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'R
 assert.match(options, /buildProjectDetailData/, 'Project selection should render project detail data');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
+assert.match(options, /let reviewMode = 'calendar'/, 'Report should initialize the review in calendar mode');
+assert.doesNotMatch(options, /groups\.length\s*<=\s*7/, 'Calendar should remain available for ranges longer than one week');
 assert.doesNotMatch(options, /data-tooltip="\$\{esc\(tooltip\)\}"/, 'Calendar hover should not render tooltip content through attr()');
 assert.match(options, /getTimer/, 'Management timer should load the shared timer');
 assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
@@ -65,4 +71,7 @@ assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*180px[^}]
   'Management timer notes should be larger and scrollable');
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
+assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar should scroll horizontally');
+assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');
+assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
 console.log('options layout contract passed');

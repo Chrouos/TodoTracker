@@ -12,6 +12,11 @@ assert.match(options, /from ['"]\.\.\/lib\/todo-tracker\.js['"]/, 'Report should
 assert.match(options, /const trackerEntries = S\.entries\.filter/, 'Todo tracker should receive complete ended entries');
 assert.match(options, /renderProjectTrend\(trendEntries, trendDates, trackerEntries\)/, 'Project trend and Todo tracker should use separate entry ranges');
 assert.match(options, /renderTodoTracker\(trackerEntries\)/, 'Todo tracker should derive its own full-history range');
+assert.match(options, /completedTodayCount/, 'Todo tracker should expose today completion count');
+assert.match(options, /今日結案/, 'Todo tracker toolbar should label today completions');
+assert.match(options, /let todoTrackerFilter = ['"]active['"]/, 'Todo tracker should hide completed items by default');
+assert.match(options, /data-todo-tracker-filter/, 'Todo tracker should expose a status filter');
+assert.match(options, /item\.status !== ['"]done['"]|item\.status === ['"]done['"]/, 'Todo tracker should filter completed items by status');
 assert.match(options, /lifecycleDays|workedDays/, 'Todo tracker should expose cross-day work statistics');
 assert.match(options, /data-todo-tracker-id/, 'Todo tracker bars should expose their Todo id');
 assert.match(options, /todo-tracker-work/, 'Todo tracker should render actual work segments');

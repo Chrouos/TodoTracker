@@ -377,6 +377,20 @@ section[hidden] { display: none; }
 .review-mode .btn-sm { border-color: var(--hairline); background: var(--surface-soft); color: var(--text-mute); }
 .review-mode .btn-sm.active { background: var(--ink); border-color: var(--ink); color: var(--canvas); }
 .review-mode .btn-sm:disabled { opacity: .45; }
+.todo-tracker-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  margin: 22px 20px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-ink);
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.todo-tracker-section-head:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
+.todo-tracker-section-head .mark { color: var(--text-mute); font-weight: 400; }
 
 #p-report > .report-panel-review > #dailyReview {
   border: 1px solid var(--hairline);
@@ -534,7 +548,7 @@ section[hidden] { display: none; }
 .review-calendar-entry:hover .review-calendar-tooltip,
 .review-calendar-entry:focus-visible .review-calendar-tooltip { opacity: 1; visibility: visible; }
 .review-calendar-title { display: block; margin: 0; font-size: 12px; line-height: 1.35; }
-.review-calendar { overflow: visible; }
+.review-calendar { overflow-x: auto; overflow-y: visible; }
 .review-calendar-title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -631,9 +645,12 @@ section[hidden] { display: none; }
   grid-template-columns: var(--todo-tracker-label-width) minmax(0, 1fr);
   min-width: calc(var(--todo-tracker-label-width) + var(--todo-tracker-days) * 76px);
 }
-.todo-tracker-toolbar { align-items: baseline; gap: var(--md); margin-bottom: 10px; }
+.todo-tracker-toolbar { align-items: center; gap: var(--md); margin-bottom: 10px; }
+.todo-tracker-summary { color: var(--text); font: 12px var(--font-mono); white-space: nowrap; }
 .todo-tracker-toolbar .cap { text-align: right; }
 .todo-tracker-nav { display: flex; gap: 4px; margin-left: auto; }
+.todo-tracker-filter { display: inline-flex; align-items: center; gap: 5px; color: var(--text-mute); font-size: 11px; }
+.todo-tracker-filter select { height: 28px; padding: 0 24px 0 7px; border: 1px solid var(--hairline); border-radius: var(--r); background: var(--canvas); color: var(--text-body); font-size: 11px; }
 .todo-tracker-axis { color: var(--text-mute); font: 11px var(--font-mono); }
 .todo-tracker-axis > span { position: sticky; left: 0; z-index: 2; background: var(--canvas); }
 .todo-tracker-axis > div {
@@ -757,7 +774,9 @@ section[hidden] { display: none; }
 .todo-tracker-work:hover .todo-tracker-tooltip,
 .todo-tracker-work:focus-visible .todo-tracker-tooltip,
 .todo-tracker-work.is-hovered .todo-tracker-tooltip { display: block; }
-.todo-tracker-empty { margin-top: 18px; padding: 18px; border-top: 1px solid var(--hairline); color: var(--text-mute); }
+.todo-tracker-empty { display: flex; align-items: baseline; gap: var(--md); margin-top: 18px; padding: 18px; border-top: 1px solid var(--hairline); color: var(--text-mute); }
+.todo-tracker-empty strong { color: var(--text); }
+.todo-tracker-filter-empty { padding: 18px 0 6px; color: var(--text-mute); font-size: 12px; }
 #todoTrackerDetail { margin-top: 16px; }
 .todo-tracker-detail-head { display: flex; align-items: start; justify-content: space-between; gap: var(--md); }
 .todo-tracker-detail-head .sub { margin-top: 3px; }
@@ -858,6 +877,14 @@ dialog .field { margin-bottom: var(--md); }
   outline-offset: 3px;
 }
 .markdown-preview p { margin: 0 0 8px; }
+.markdown-preview hr {
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin: 16px 0;
+  border: 0;
+  background: var(--hairline, #ddd);
+}
 .markdown-preview h1,
 .markdown-preview h2,
 .markdown-preview h3,
