@@ -475,6 +475,20 @@ section[hidden] { display: none; }
 .review-mode .btn-sm { border-color: var(--hairline); background: var(--surface-soft); color: var(--text-mute); }
 .review-mode .btn-sm.active { background: var(--ink); border-color: var(--ink); color: var(--canvas); }
 .review-mode .btn-sm:disabled { opacity: .45; }
+.todo-tracker-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  margin: 22px 20px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-ink);
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.todo-tracker-section-head:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
+.todo-tracker-section-head .mark { color: var(--text-mute); font-weight: 400; }
 
 #p-report > .report-panel-review > #dailyReview {
   border: 1px solid var(--hairline);
@@ -632,7 +646,7 @@ section[hidden] { display: none; }
 .review-calendar-entry:hover .review-calendar-tooltip,
 .review-calendar-entry:focus-visible .review-calendar-tooltip { opacity: 1; visibility: visible; }
 .review-calendar-title { display: block; margin: 0; font-size: 12px; line-height: 1.35; }
-.review-calendar { overflow: visible; }
+.review-calendar { overflow-x: auto; overflow-y: visible; }
 .review-calendar-title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -890,6 +904,12 @@ section[hidden] { display: none; }
 .todo-tracker-tooltip[hidden] { display: none; }
 .todo-tracker-empty { display: flex; align-items: baseline; gap: var(--md); margin-top: 18px; padding: 18px; border-top: 1px solid var(--hairline); color: var(--text-mute); }
 .todo-tracker-empty strong { color: var(--text-body); }
+.todo-tracker-bar:hover .todo-tracker-tooltip,
+.todo-tracker-bar:focus-visible .todo-tracker-tooltip,
+.todo-tracker-bar.is-hovered .todo-tracker-tooltip,
+.todo-tracker-work:hover .todo-tracker-tooltip,
+.todo-tracker-work:focus-visible .todo-tracker-tooltip,
+.todo-tracker-work.is-hovered .todo-tracker-tooltip { display: block; }
 .todo-tracker-filter-empty { padding: 18px 0 6px; color: var(--text-mute); font-size: 12px; }
 #todoTrackerDetail { margin-top: 16px; }
 .todo-tracker-detail-head { display: flex; align-items: start; justify-content: space-between; gap: var(--md); }

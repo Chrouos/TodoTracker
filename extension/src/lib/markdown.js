@@ -111,7 +111,7 @@ export function markdownToHTML(markdown) {
       result.push(renderTable(tableLines));
       continue;
     }
-    if (/^ {0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+    if (/^\s{0,3}(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$/.test(line)) {
       flushParagraph(); flushQuote();
       result.push('<hr />');
       continue;

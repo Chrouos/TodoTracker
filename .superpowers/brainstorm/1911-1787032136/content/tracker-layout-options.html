@@ -1,0 +1,218 @@
+<div id="tracker-redesign-options">
+  <style>
+    #tracker-redesign-options {
+      color: var(--foreground, #202124);
+    }
+    #tracker-redesign-options .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    #tracker-redesign-options .choice {
+      min-width: 0;
+      border: 1px solid var(--border, #d8dbe0);
+      border-radius: 12px;
+      background: var(--card, #fff);
+      overflow: hidden;
+      cursor: pointer;
+    }
+    #tracker-redesign-options .choice:hover,
+    #tracker-redesign-options .choice.is-selected {
+      border-color: var(--primary, #5b5bd6);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary, #5b5bd6) 18%, transparent);
+    }
+    #tracker-redesign-options .choice-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border, #d8dbe0);
+    }
+    #tracker-redesign-options .choice-head strong { font-size: 14px; }
+    #tracker-redesign-options .choice-head span,
+    #tracker-redesign-options .muted {
+      color: var(--muted-foreground, #687080);
+      font-size: 11px;
+    }
+    #tracker-redesign-options .mock {
+      min-height: 310px;
+      padding: 14px;
+      background: var(--background, #f7f8fa);
+    }
+    #tracker-redesign-options .mock-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    #tracker-redesign-options .mock-title { font-size: 12px; font-weight: 500; }
+    #tracker-redesign-options .mock-button {
+      padding: 4px 7px;
+      border: 1px solid var(--border, #d8dbe0);
+      border-radius: 5px;
+      background: var(--card, #fff);
+      color: var(--foreground, #202124);
+      font-size: 10px;
+    }
+    #tracker-redesign-options .timeline {
+      display: grid;
+      gap: 10px;
+    }
+    #tracker-redesign-options .timeline-row {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+    }
+    #tracker-redesign-options .timeline-name {
+      overflow: hidden;
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #tracker-redesign-options .timeline-track {
+      position: relative;
+      height: 25px;
+      border-bottom: 1px solid var(--border, #d8dbe0);
+      background: repeating-linear-gradient(90deg, transparent 0 24%, color-mix(in srgb, var(--border, #d8dbe0) 60%, transparent) 24.5% 25%);
+    }
+    #tracker-redesign-options .life {
+      position: absolute;
+      top: 5px;
+      left: 4%;
+      width: 90%;
+      height: 3px;
+      border-radius: 99px;
+      background: var(--muted-foreground, #8a91a0);
+      opacity: .35;
+    }
+    #tracker-redesign-options .work {
+      position: absolute;
+      top: 2px;
+      width: 13px;
+      height: 17px;
+      border: 1px solid var(--viz-series-1, #6d79dc);
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--viz-series-1, #6d79dc) 35%, var(--card, #fff));
+    }
+    #tracker-redesign-options .work.two { top: 9px; }
+    #tracker-redesign-options .work.a { left: 15%; }
+    #tracker-redesign-options .work.b { left: 44%; }
+    #tracker-redesign-options .work.c { left: 78%; }
+    #tracker-redesign-options .days {
+      display: grid;
+      grid-template-columns: 74px repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 5px;
+      color: var(--muted-foreground, #687080);
+      font-size: 9px;
+      text-align: center;
+    }
+    #tracker-redesign-options .days span:first-child { text-align: left; }
+    #tracker-redesign-options .daily-list { display: grid; gap: 8px; }
+    #tracker-redesign-options .daily-day {
+      padding: 8px;
+      border-left: 3px solid var(--viz-series-1, #6d79dc);
+      background: var(--card, #fff);
+    }
+    #tracker-redesign-options .daily-day header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 10px;
+    }
+    #tracker-redesign-options .daily-entry {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      padding-top: 4px;
+      color: var(--muted-foreground, #687080);
+      font-size: 10px;
+    }
+    #tracker-redesign-options .focus-list { display: grid; gap: 8px; }
+    #tracker-redesign-options .focus-item {
+      padding: 9px;
+      border: 1px solid var(--border, #d8dbe0);
+      border-radius: 8px;
+      background: var(--card, #fff);
+    }
+    #tracker-redesign-options .focus-item.selected { border-color: var(--primary, #5b5bd6); }
+    #tracker-redesign-options .focus-head,
+    #tracker-redesign-options .focus-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #tracker-redesign-options .focus-head { font-size: 11px; }
+    #tracker-redesign-options .focus-meta { margin-top: 5px; color: var(--muted-foreground, #687080); font-size: 9px; }
+    #tracker-redesign-options .focus-bar {
+      position: relative;
+      height: 8px;
+      margin-top: 8px;
+      border-radius: 99px;
+      background: color-mix(in srgb, var(--muted, #e7e9ee) 80%, transparent);
+    }
+    #tracker-redesign-options .focus-bar::after {
+      position: absolute;
+      top: 0;
+      left: 8%;
+      width: 56%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--viz-series-1, #6d79dc);
+      content: "";
+    }
+    #tracker-redesign-options .detail {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border, #d8dbe0);
+      font-size: 9px;
+    }
+    @media (max-width: 760px) {
+      #tracker-redesign-options .choice-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <div class="choice-grid" data-multiselect>
+    <div class="choice" data-choice="compact-gantt" onclick="toggleSelect(this)">
+      <div class="choice-head"><strong>A｜緊湊甘特圖</strong><span>保留時間軸</span></div>
+      <div class="mock">
+        <div class="mock-top"><span class="mock-title">Todo 工作跨度</span><button class="mock-button">← →</button></div>
+        <div class="days"><span></span><span>08/17</span><span>08/18</span><span>08/19</span><span>08/20</span></div>
+        <div class="timeline">
+          <div class="timeline-row"><span class="timeline-name">金福氣</span><div class="timeline-track"><i class="life"></i><i class="work a"></i><i class="work b"></i><i class="work c"></i></div></div>
+          <div class="timeline-row"><span class="timeline-name">日文</span><div class="timeline-track"><i class="life"></i><i class="work two a"></i><i class="work two c"></i></div></div>
+          <div class="timeline-row"><span class="timeline-name">研究 doc2json</span><div class="timeline-track"><i class="life"></i><i class="work b"></i></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="choice" data-choice="daily-board" onclick="toggleSelect(this)">
+      <div class="choice-head"><strong>B｜每日工作板</strong><span>減少空白</span></div>
+      <div class="mock">
+        <div class="mock-top"><span class="mock-title">實際工作紀錄</span><button class="mock-button">日期</button></div>
+        <div class="daily-list">
+          <section class="daily-day"><header><strong>08/17・週一</strong><span>3h 40m</span></header><div class="daily-entry"><span>金福氣・10:00–11:30</span><strong>1h 30m</strong></div><div class="daily-entry"><span>日文・14:00–16:10</span><strong>2h 10m</strong></div></section>
+          <section class="daily-day"><header><strong>08/18・週二</strong><span>2h 40m</span></header><div class="daily-entry"><span>金福氣・09:20–10:00</span><strong>40m</strong></div><div class="daily-entry"><span>研究 doc2json・13:00–15:00</span><strong>2h</strong></div></section>
+          <section class="daily-day"><header><strong>08/19・週三</strong><span>1h 20m</span></header><div class="daily-entry"><span>金福氣・11:00–12:20</span><strong>1h 20m</strong></div></section>
+        </div>
+      </div>
+    </div>
+
+    <div class="choice" data-choice="focus-detail" onclick="toggleSelect(this)">
+      <div class="choice-head"><strong>C｜摘要＋展開明細</strong><span>最容易閱讀</span></div>
+      <div class="mock">
+        <div class="mock-top"><span class="mock-title">Todo Tracker</span><button class="mock-button">最近工作</button></div>
+        <div class="focus-list">
+          <div class="focus-item selected"><div class="focus-head"><strong>金福氣</strong><strong>6h 20m</strong></div><div class="focus-meta"><span>跨 4 天・實際 3 天</span><span>進行中</span></div><div class="focus-bar"></div><div class="detail"><span>開單<br>08/17 09:10</span><span>最近<br>08/20 14:30</span><span>紀錄<br>5 筆</span></div></div>
+          <div class="focus-item"><div class="focus-head"><strong>日文</strong><strong>4h 45m</strong></div><div class="focus-meta"><span>跨 2 天・實際 2 天</span><span>已完成</span></div><div class="focus-bar"></div></div>
+          <div class="focus-item"><div class="focus-head"><strong>研究 doc2json</strong><strong>2h</strong></div><div class="focus-meta"><span>跨 1 天・實際 1 天</span><span>已完成</span></div><div class="focus-bar"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

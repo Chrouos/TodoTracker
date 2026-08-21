@@ -100,7 +100,7 @@ let range = 'week';
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;
 const customReturnRange = { report: 'week', entries: 'all' };
-let reviewMode = 'list';
+let reviewMode = 'calendar';
 let reviewGroups = [];
 let timerTicker = null;
 let timerNotesSaveTimer = null;
@@ -514,7 +514,7 @@ function renderReport() {
 
 function renderDailyReview(groups) {
   reviewGroups = groups;
-  const canCalendar = groups.length > 0 && groups.length <= 7;
+  const canCalendar = groups.length > 0;
   if (!canCalendar && reviewMode === 'calendar') reviewMode = 'list';
   document.querySelectorAll('#reviewMode [data-review-mode]').forEach((button) => {
     button.classList.toggle('active', button.dataset.reviewMode === reviewMode);
@@ -1042,6 +1042,9 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
 }
 
 function renderProjectTrend(entries, dates, trackerEntries = entries) {
+  const report = $('byProject');
+  const todoTrackerHead = report.querySelector('[data-collapse="rep-todo-tracker"]');
+  const todoTrackerBody = report.querySelector('[data-collapse-body="rep-todo-tracker"]');
   const data = buildProjectTrendData({
     entries,
     projects: S.projects,
@@ -1064,10 +1067,12 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
     <div class="project-heatmap-title">專案 × 日期</div>
     <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
-    <div id="todoTracker"></div>
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
-    <div id="todoTrackerDetail" hidden></div>
   </div>`;
+  const trendDetail = report.querySelector('#projectTrendDetail');
+  if (todoTrackerHead && todoTrackerBody && trendDetail) {
+    trendDetail.before(todoTrackerHead, todoTrackerBody);
+  }
   wrapReportChartContent();
   applyTrendHighlight();
   setTrendHover(null);

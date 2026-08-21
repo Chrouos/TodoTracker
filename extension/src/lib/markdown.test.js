@@ -24,7 +24,7 @@ test('renders blockquotes as blockquote elements', () => {
   assert.equal(markdownToHTML('> Quoted text'), '<blockquote>Quoted text</blockquote>');
 });
 
-test('renders a markdown thematic break as a horizontal rule', () => {
+test('renders Markdown horizontal rules as full-width hr elements', () => {
   assert.equal(markdownToHTML('Before\n\n---\n\nAfter'), '<p>Before</p><hr /><p>After</p>');
 });
 

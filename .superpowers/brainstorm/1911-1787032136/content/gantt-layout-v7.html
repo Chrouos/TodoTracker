@@ -1,0 +1,54 @@
+<div id="gantt-layout-v7">
+  <style>
+    #gantt-layout-v7 { color: var(--foreground, #202124); }
+    #gantt-layout-v7 .surface { max-width: 760px; border: 1px solid var(--border, #d8dbe0); border-radius: 10px; background: var(--card, #fff); overflow: hidden; }
+    #gantt-layout-v7 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border, #d8dbe0); }
+    #gantt-layout-v7 .toolbar strong { font-size: 13px; }
+    #gantt-layout-v7 .toolbar span { margin-left: 7px; color: var(--muted-foreground, #687080); font-size: 10px; }
+    #gantt-layout-v7 .controls { display: flex; gap: 3px; }
+    #gantt-layout-v7 .controls button { min-width: 27px; padding: 4px 7px; border: 1px solid var(--border, #d8dbe0); border-radius: 5px; background: var(--card, #fff); color: var(--foreground, #202124); font-size: 10px; }
+    #gantt-layout-v7 .chart { padding: 12px 14px 10px; background: var(--background, #f7f8fa); }
+    #gantt-layout-v7 .chart-head, #gantt-layout-v7 .chart-row { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 10px; }
+    #gantt-layout-v7 .chart-head { align-items: end; margin-bottom: 5px; }
+    #gantt-layout-v7 .range-label, #gantt-layout-v7 .label span, #gantt-layout-v7 .detail-meta { color: var(--muted-foreground, #687080); font-size: 9px; }
+    #gantt-layout-v7 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    #gantt-layout-v7 .day { padding: 0 0 5px; border-bottom: 1px solid var(--border, #d8dbe0); color: var(--muted-foreground, #687080); font-size: 9px; text-align: center; white-space: nowrap; }
+    #gantt-layout-v7 .rows { display: grid; gap: 5px; }
+    #gantt-layout-v7 .label { min-width: 0; padding: 5px 0; }
+    #gantt-layout-v7 .label strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    #gantt-layout-v7 .label span { display: block; margin-top: 2px; }
+    #gantt-layout-v7 .track { position: relative; min-height: 34px; border-bottom: 1px solid var(--border, #d8dbe0); background-image: linear-gradient(to right, color-mix(in srgb, var(--border, #d8dbe0) 70%, transparent) 1px, transparent 1px); background-size: calc(100% / 7) 100%; }
+    #gantt-layout-v7 .row-selected .label { color: var(--primary, #5b5bd6); }
+    #gantt-layout-v7 .life { position: absolute; z-index: 1; top: 17px; left: var(--left); width: var(--width); height: 2px; border-radius: 99px; background: var(--muted-foreground, #8a91a0); opacity: .38; }
+    #gantt-layout-v7 .life::before, #gantt-layout-v7 .life::after { position: absolute; top: -3px; width: 6px; height: 6px; border: 2px solid var(--muted-foreground, #8a91a0); border-radius: 50%; background: var(--background, #f7f8fa); content: ""; }
+    #gantt-layout-v7 .life::before { left: -3px; }
+    #gantt-layout-v7 .life::after { right: -3px; }
+    #gantt-layout-v7 .work { position: absolute; z-index: 2; top: 7px; left: calc(var(--day) * (100% / 7) + 3px); width: calc(100% / 7 - 6px); height: 20px; box-sizing: border-box; border: 1px solid var(--viz-series-1, #6d79dc); border-radius: 5px; background: color-mix(in srgb, var(--viz-series-1, #6d79dc) 32%, var(--card, #fff)); cursor: pointer; }
+    #gantt-layout-v7 .work:hover, #gantt-layout-v7 .work:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary, #5b5bd6) 28%, transparent); }
+    #gantt-layout-v7 .detail { margin: 10px 0 0 158px; padding: 9px 10px; border-left: 2px solid var(--viz-series-1, #6d79dc); background: var(--card, #fff); }
+    #gantt-layout-v7 .detail-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    #gantt-layout-v7 .detail-head strong { font-size: 10px; }
+    #gantt-layout-v7 .detail-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 7px; }
+    #gantt-layout-v7 .detail-entry { padding-top: 5px; border-top: 1px solid var(--border, #d8dbe0); }
+    #gantt-layout-v7 .detail-entry strong { display: block; font-size: 9px; }
+    #gantt-layout-v7 .detail-entry span { display: block; margin-top: 2px; color: var(--muted-foreground, #687080); font-size: 8px; }
+    #gantt-layout-v7 .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 9px 0 0 158px; color: var(--muted-foreground, #687080); font-size: 9px; }
+    #gantt-layout-v7 .legend i { display: inline-block; width: 16px; height: 2px; margin-right: 4px; vertical-align: middle; border-radius: 99px; background: var(--muted-foreground, #8a91a0); opacity: .45; }
+    #gantt-layout-v7 .legend b { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -2px; border: 1px solid var(--viz-series-1, #6d79dc); border-radius: 3px; background: color-mix(in srgb, var(--viz-series-1, #6d79dc) 32%, var(--card, #fff)); }
+    @media (max-width: 700px) { #gantt-layout-v7 .chart-head, #gantt-layout-v7 .chart-row { grid-template-columns: 116px minmax(0, 1fr); gap: 8px; } #gantt-layout-v7 .detail, #gantt-layout-v7 .legend { margin-left: 124px; } #gantt-layout-v7 .detail-list { grid-template-columns: 1fr; } }
+  </style>
+
+  <div class="surface">
+    <div class="toolbar"><div><strong>Todo 工作日期</strong><span>同一種顏色代表實際工作日</span></div><div class="controls"><button>←</button><button>今天</button><button>→</button></div></div>
+    <div class="chart">
+      <div class="chart-head"><span class="range-label">開單／結單<br>工作日期</span><div class="days"><span class="day">08/17</span><span class="day">08/18</span><span class="day">08/19</span><span class="day">08/20</span><span class="day">08/21</span><span class="day">08/22</span><span class="day">08/23</span></div></div>
+      <div class="rows">
+        <div class="chart-row row-selected"><div class="label"><strong>金福氣</strong><span>跨 4 天・4 個工作日</span></div><div class="track"><i class="life" style="--left:4%;--width:72%"></i><button class="work" style="--day:0" data-tooltip="金福氣｜08/17 有工作紀錄"></button><button class="work" style="--day:1" data-tooltip="金福氣｜08/18 有工作紀錄"></button><button class="work" style="--day:2" data-tooltip="金福氣｜08/19 有工作紀錄"></button></div></div>
+        <div class="chart-row"><div class="label"><strong>日文</strong><span>跨 2 天・2 個工作日</span></div><div class="track"><i class="life" style="--left:28%;--width:40%"></i><button class="work" style="--day:2" data-tooltip="日文｜08/19 有工作紀錄"></button><button class="work" style="--day:3" data-tooltip="日文｜08/20 有工作紀錄"></button></div></div>
+        <div class="chart-row"><div class="label"><strong>研究 doc2json</strong><span>實際 1 個工作日</span></div><div class="track"><i class="life" style="--left:57%;--width:13%"></i><button class="work" style="--day:4" data-tooltip="研究 doc2json｜08/21 有工作紀錄"></button></div></div>
+      </div>
+      <div class="detail"><div class="detail-head"><strong>金福氣・日期明細</strong><span class="detail-meta">開單 08/17　結單 08/20　實際工作 08/17、08/18、08/19</span></div><div class="detail-list"><div class="detail-entry"><strong>08/17</strong><span>有工作紀錄</span></div><div class="detail-entry"><strong>08/18</strong><span>有工作紀錄</span></div><div class="detail-entry"><strong>08/19</strong><span>有工作紀錄</span></div></div></div>
+      <div class="legend"><span><i></i>開單到結單的日期跨度</span><span><b></b>實際有工作的日期（hover 看明細）</span></div>
+    </div>
+  </div>
+</div>
