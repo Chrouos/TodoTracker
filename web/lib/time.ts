@@ -1,4 +1,5 @@
 import type { Entry, Project } from './types';
+import { splitEntryByDay } from './report';
 
 export function fmtHMS(sec: number): string {
   sec = Math.max(0, Math.floor(sec));
@@ -143,8 +144,9 @@ export function dailySeries(
     bucket.set(fmtDate(d), 0);
   }
   for (const e of entries) {
-    const k = fmtDate(e.startedAt);
-    if (bucket.has(k)) bucket.set(k, bucket.get(k)! + durationSec(e));
+    for (const part of splitEntryByDay(e)) {
+      if (bucket.has(part.date)) bucket.set(part.date, bucket.get(part.date)! + part.seconds);
+    }
   }
   return [...bucket.entries()].map(([date, seconds]) => ({ date, seconds }));
 }

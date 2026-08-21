@@ -13,10 +13,9 @@ export type Project = {
   /** 上層專案；null = 最上層。可以一直往下掛 */
   parentId: string | null;
   name: string;
-  notes?: string;
   color: string;
   /** 目標／筆記時間軸，舊的在前 */
-  notes: ProjectNote[];
+  notes?: ProjectNote[];
   archivedAt: string | null;
   createdAt: string;
 };
@@ -53,9 +52,9 @@ export type Task = {
   dueDate: string | null;
   reminderAt?: string | null;
   /** 截止時間 HH:MM，排程產生的才會有 */
-  dueTime: string | null;
+  dueTime?: string | null;
   /** 由哪一條排程產生的 */
-  scheduleId: string | null;
+  scheduleId?: string | null;
   remindedAt?: string | null;
   /** 結案時間戳，按下完成的當下；重新打開就清掉 */
   completedAt: string | null;

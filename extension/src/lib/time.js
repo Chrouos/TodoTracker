@@ -92,8 +92,28 @@ export function dailySeries(entries, from, to, durationOf) {
     bucket.set(fmtDate(d), 0);
   }
   for (const e of entries) {
-    const k = fmtDate(e.startedAt);
-    if (bucket.has(k)) bucket.set(k, bucket.get(k) + durationOf(e));
+    if (!e.endedAt) continue;
+    const start = new Date(e.startedAt);
+    const end = new Date(e.endedAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) continue;
+    let cursor = start;
+    let guard = 0;
+    while (cursor < end && guard++ < 400) {
+      const dayStart = startOfDay(cursor);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const clippedStart = new Date(Math.max(start.getTime(), dayStart.getTime()));
+      const clippedEnd = new Date(Math.min(end.getTime(), dayEnd.getTime()));
+      const key = fmtDate(dayStart);
+      if (bucket.has(key) && clippedEnd > clippedStart) {
+        bucket.set(key, bucket.get(key) + durationOf({
+          ...e,
+          startedAt: clippedStart.toISOString(),
+          endedAt: clippedEnd.toISOString(),
+        }));
+      }
+      cursor = dayEnd;
+    }
   }
   return [...bucket.entries()].map(([date, seconds]) => ({ date, seconds }));
 }
