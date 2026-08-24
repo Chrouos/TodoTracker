@@ -80,7 +80,9 @@ function descend(container, blockIndex, path, parent) {
   if (block?.type === 'quote') {
     const quotedIndex = path[0];
     if (!block.blocks?.[quotedIndex]) throw new RangeError('Path does not reference a quoted block');
-    return descendBlock(block.blocks[quotedIndex], block.blocks, quotedIndex, path.slice(1), parent);
+    // A quote is a container boundary: outdent may not cross it into an
+    // ancestor list that happens to contain the quote block.
+    return descendBlock(block.blocks[quotedIndex], block.blocks, quotedIndex, path.slice(1), null);
   }
   return descendBlock(block, container, blockIndex, path, parent);
 }

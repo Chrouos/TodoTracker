@@ -97,6 +97,20 @@ test('indents and outdents an item through more than one nested level', () => {
   assert.equal(source[0].items[0].children[0].items.length, 2);
 });
 
+test('outdents quote-nested list items only within the quote', () => {
+  const source = [{ type: 'list', ordered: false, items: [item('outer', [
+    { type: 'quote', blocks: [{ type: 'list', ordered: false, items: [item('quote parent', [
+      { type: 'list', ordered: false, items: [item('nested'), item('target')] },
+    ])] }] },
+  ]), item('outside')] }];
+  const next = indentListItem(source, [0, 0, 0, 0, 1], 'out');
+  const quoteList = next[0].items[0].children[0].blocks[0];
+  assert.equal(quoteList.items[0].children[0].items[0].inlines[0].value, 'nested');
+  assert.deepEqual(quoteList.items.map((entry) => entry.inlines[0].value), ['quote parent', 'target']);
+  assert.deepEqual(next[0].items.map((entry) => entry.inlines[0].value), ['outer', 'outside']);
+  assert.equal(source[0].items[0].children[0].blocks[0].items[0].children[0].items.length, 2);
+});
+
 test('toggles only the selected task checkbox', () => {
   const source = [{ type: 'taskList', items: [task('one'), task('two')] }];
   const next = toggleTaskItem(source, [0, 1]);
