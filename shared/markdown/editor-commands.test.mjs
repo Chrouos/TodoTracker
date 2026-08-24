@@ -111,6 +111,18 @@ test('outdents quote-nested list items only within the quote', () => {
   assert.equal(source[0].items[0].children[0].blocks[0].items[0].children[0].items.length, 2);
 });
 
+test('does not outdent a quote-contained list item across the quote boundary', () => {
+  const source = [{ type: 'list', ordered: false, items: [item('outer', [
+    { type: 'quote', blocks: [{ type: 'list', ordered: false, items: [item('first'), item('target')] }] },
+  ]), item('outside')] }];
+  const next = indentListItem(source, [0, 0, 0, 1], 'out');
+  const quoteList = next[0].items[0].children[0].blocks[0];
+  assert.deepEqual(quoteList.items.map((entry) => entry.inlines[0].value), ['first', 'target']);
+  assert.deepEqual(next[0].items.map((entry) => entry.inlines[0].value), ['outer', 'outside']);
+  assert.notStrictEqual(next, source);
+  assert.deepEqual(source[0].items[0].children[0].blocks[0].items.map((entry) => entry.inlines[0].value), ['first', 'target']);
+});
+
 test('toggles only the selected task checkbox', () => {
   const source = [{ type: 'taskList', items: [task('one'), task('two')] }];
   const next = toggleTaskItem(source, [0, 1]);
