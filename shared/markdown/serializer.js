@@ -36,10 +36,14 @@ function serializeList(block, task) {
 }
 
 function serializeTable(table) {
-  const header = table.header.map((cell) => serializeInlines(cell));
+  const header = table.header.map(serializeTableCell);
   const separator = table.alignments.map(tableSeparator);
-  const rows = table.rows.map((row) => row.map((cell) => serializeInlines(cell)));
+  const rows = table.rows.map((row) => row.map(serializeTableCell));
   return [header, separator, ...rows].map((row) => `| ${row.join(' | ')} |`).join('\n');
+}
+
+function serializeTableCell(inlines) {
+  return serializeInlines(inlines).replace(/\|/g, '\\|');
 }
 
 function tableSeparator(alignment) {

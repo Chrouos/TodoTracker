@@ -6,6 +6,8 @@ export type Inline =
 export type TaskItem = { checked: boolean; inlines: Inline[]; children: Block[] };
 export type ListItem = { inlines: Inline[]; children: Block[] };
 export type TableAlignment = 'left' | 'center' | 'right';
+/** Numeric AST path: top-level block, list item indexes, and quote block indexes. */
+export type TaskPath = number[];
 export type Block =
   | { type: 'paragraph' | 'heading'; inlines: Inline[]; level?: number }
   | { type: 'quote' | 'codeBlock'; blocks?: Block[]; value?: string; language?: string }
@@ -16,8 +18,8 @@ export type Block =
 export type MarkdownEditorMode = 'edit' | 'preview';
 
 export function cloneBlocks(blocks: Block[]): Block[];
-export function pathToItem(blocks: Block[], path: number[]): TaskItem;
-export function updateAtPath(blocks: Block[], path: number[], updater: (item: TaskItem) => TaskItem): Block[];
+export function pathToItem(blocks: Block[], path: TaskPath): TaskItem;
+export function updateAtPath(blocks: Block[], path: TaskPath, updater: (item: TaskItem) => TaskItem): Block[];
 export function parseMarkdown(markdown: string): Block[];
 export function serializeMarkdown(blocks: Block[]): string;
 export function renderMarkdown(markdown: string, options?: { interactiveTasks?: boolean }): string;

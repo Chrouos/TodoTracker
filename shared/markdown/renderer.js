@@ -17,7 +17,7 @@ function renderBlock(block, options, taskPath) {
     case 'paragraph':
       return `<p>${renderInlines(block.inlines)}</p>`;
     case 'quote':
-      return `<blockquote>${renderBlocks(block.blocks ?? [], options)}</blockquote>`;
+      return `<blockquote>${renderQuoteBlocks(block.blocks ?? [], options, taskPath)}</blockquote>`;
     case 'codeBlock': {
       const language = block.language ? ` class="language-${escapeHtml(block.language)}"` : '';
       return `<pre><code${language}>${escapeHtml(block.value ?? '')}</code></pre>`;
@@ -37,7 +37,7 @@ function renderBlock(block, options, taskPath) {
 
 function renderList(block, options, taskPath) {
   const tag = block.ordered ? 'ol' : 'ul';
-  const items = block.items.map((item) => `<li>${renderInlines(item.inlines)}${renderChildBlocks(item.children, options, taskPath)}</li>`).join('');
+  const items = block.items.map((item, index) => `<li>${renderInlines(item.inlines)}${renderChildBlocks(item.children, options, [...taskPath, index])}</li>`).join('');
   return `<${tag}>${items}</${tag}>`;
 }
 
@@ -50,9 +50,11 @@ function renderTaskList(block, options, taskPath) {
 }
 
 function renderChildBlocks(children, options, taskPath) {
-  return children.map((child) => child.type === 'taskList'
-    ? renderTaskList(child, options, taskPath)
-    : renderBlock(child, options, taskPath)).join('');
+  return children.map((child) => renderBlock(child, options, taskPath)).join('');
+}
+
+function renderQuoteBlocks(blocks, options, taskPath) {
+  return blocks.map((block, index) => renderBlock(block, options, [...taskPath, index])).join('');
 }
 
 function renderTaskInput(item, options, path) {
@@ -74,11 +76,19 @@ function renderInlines(inlines) {
     if (inline.type === 'text') return escapeHtml(inline.value);
     if (inline.type === 'strong') return `<strong>${renderInlines(inline.inlines)}</strong>`;
     if (inline.type === 'emphasis') return `<em>${renderInlines(inline.inlines)}</em>`;
-    if (inline.type === 'code') return `<code>${escapeHtml(typeof inline.inlines === 'string' ? inline.inlines : renderInlines(inline.inlines))}</code>`;
+    if (inline.type === 'code') return `<code>${escapeHtml(typeof inline.inlines === 'string' ? inline.inlines : inlineText(inline.inlines))}</code>`;
     if (inline.type === 'link') return isSafeUrl(inline.url)
       ? `<a href="${escapeHtml(inline.url)}" target="_blank" rel="noopener noreferrer">${renderInlines(inline.inlines)}</a>`
       : renderInlines(inline.inlines);
     return '';
+  }).join('');
+}
+
+function inlineText(inlines) {
+  return inlines.map((inline) => {
+    if (inline.type === 'text') return inline.value;
+    if (inline.type === 'code') return typeof inline.inlines === 'string' ? inline.inlines : inlineText(inline.inlines);
+    return inlineText(inline.inlines);
   }).join('');
 }
 

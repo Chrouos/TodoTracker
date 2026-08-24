@@ -146,8 +146,30 @@ function parseTable(lines, start) {
 
 function splitTableRow(line) {
   const trimmed = line.trim();
-  const content = trimmed.replace(/^\|/, '').replace(/\|$/, '');
-  return content.split('|').map((cell) => cell.trim());
+  const start = trimmed.startsWith('|') ? 1 : 0;
+  const end = trimmed.endsWith('|') && !isEscapedPipe(trimmed, trimmed.length - 1)
+    ? trimmed.length - 1
+    : trimmed.length;
+  const cells = [];
+  let cell = '';
+
+  for (let index = start; index < end; index += 1) {
+    if (trimmed[index] === '|' && !isEscapedPipe(trimmed, index)) {
+      cells.push(cell.trim());
+      cell = '';
+      continue;
+    }
+    if (trimmed[index] === '|') cell = `${cell.slice(0, -1)}|`;
+    else cell += trimmed[index];
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function isEscapedPipe(value, index) {
+  let backslashes = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\'; cursor -= 1) backslashes += 1;
+  return backslashes % 2 === 1;
 }
 
 function isTableSeparator(line) {
