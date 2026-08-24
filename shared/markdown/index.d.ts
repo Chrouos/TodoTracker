@@ -16,6 +16,10 @@ export type Block =
   | { type: 'table'; header: Inline[][]; alignments: TableAlignment[]; rows: Inline[][][] }
   | { type: 'horizontalRule' };
 export type MarkdownEditorMode = 'edit' | 'preview';
+export type Shortcut =
+  | { type: 'heading'; level: number }
+  | { type: 'task'; checked: boolean }
+  | { type: 'list'; ordered: boolean };
 
 export function cloneBlocks(blocks: Block[]): Block[];
 export function pathToItem(blocks: Block[], path: TaskPath): TaskItem;
@@ -24,3 +28,8 @@ export function parseMarkdown(markdown: string): Block[];
 export function serializeMarkdown(blocks: Block[]): string;
 export function renderMarkdown(markdown: string, options?: { interactiveTasks?: boolean }): string;
 export function renderBlocks(blocks: Block[], options?: { interactiveTasks?: boolean }): string;
+export function detectMarkdownShortcut(text: string): Shortcut | null;
+export function continueBlock(blocks: Block[], path: TaskPath): Block[];
+export function exitEmptyBlock(blocks: Block[], path: TaskPath): Block[];
+export function indentListItem(blocks: Block[], path: TaskPath, direction: 'in' | 'out'): Block[];
+export function toggleTaskItem(blocks: Block[], path: TaskPath): Block[];
