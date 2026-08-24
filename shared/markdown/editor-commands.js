@@ -21,6 +21,7 @@ export function continueBlock(blocks, path) {
 export function exitEmptyBlock(blocks, path) {
   const next = cloneBlocks(blocks);
   const location = resolve(next, path);
+  if (!isEmptyItem(location.item)) return next;
   location.list.splice(location.index, 1);
   const paragraph = { type: 'paragraph', inlines: [] };
   location.container.splice(location.containerIndex + 1, 0, paragraph);
@@ -62,6 +63,13 @@ function emptyItem(item) {
   return item.checked === undefined ? { inlines: [], children: [] } : { checked: false, inlines: [], children: [] };
 }
 
+function isEmptyItem(item) {
+  return item.children.length === 0 && item.inlines.every((inline) => {
+    if (inline.type === 'text' || inline.type === 'code') return !inline.inlines && !inline.value;
+    return Array.isArray(inline.inlines) && inline.inlines.length === 0;
+  });
+}
+
 function resolve(blocks, path) {
   if (!Array.isArray(path) || path.length < 2) throw new TypeError('Path must contain at least two indexes');
   const container = blocks;
@@ -70,6 +78,11 @@ function resolve(blocks, path) {
 
 function descend(container, blockIndex, path, parent) {
   const block = container[blockIndex];
+  if (block?.type === 'quote') {
+    const quotedIndex = path[0];
+    if (!block.blocks?.[quotedIndex] || path.length < 2) throw new RangeError('Path does not reference a quoted list block');
+    return descend(block.blocks, quotedIndex, path.slice(1), parent);
+  }
   if (!block || !['list', 'taskList'].includes(block.type)) throw new RangeError('Path does not reference a list block');
   const index = path[0];
   const item = block.items[index];

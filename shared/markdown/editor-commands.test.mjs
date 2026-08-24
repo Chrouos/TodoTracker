@@ -15,8 +15,19 @@ const task = (value, checked = false, children = []) => ({ checked, inlines: tex
 test('detects heading and unchecked task shortcuts only at the block start', () => {
   assert.deepEqual(detectMarkdownShortcut('# '), { type: 'heading', level: 1 });
   assert.deepEqual(detectMarkdownShortcut('- [ ] '), { type: 'task', checked: false });
+  assert.deepEqual(detectMarkdownShortcut('- [x] '), { type: 'task', checked: true });
+  assert.deepEqual(detectMarkdownShortcut('3. '), { type: 'list', ordered: true });
   assert.equal(detectMarkdownShortcut('text # '), null);
   assert.equal(detectMarkdownShortcut('# heading '), null);
+});
+
+test('continues and toggles task items inside a quote using the shared path contract', () => {
+  const source = [{ type: 'quote', blocks: [{ type: 'taskList', items: [task('one')] }] }];
+  const continued = continueBlock(source, [0, 0, 0]);
+  assert.equal(continued[0].blocks[0].items.length, 2);
+  const toggled = toggleTaskItem(source, [0, 0, 0]);
+  assert.equal(toggled[0].blocks[0].items[0].checked, true);
+  assert.equal(source[0].blocks[0].items[0].checked, false);
 });
 
 test('continues a nested list without mutating the source tree', () => {
@@ -35,6 +46,23 @@ test('exits an empty nested task item into a paragraph after its list', () => {
   const next = exitEmptyBlock(source, [0, 0, 0]);
   assert.deepEqual(next[0].items[0].children, [{ type: 'paragraph', inlines: [] }]);
   assert.equal(source[0].items[0].children[0].items.length, 1);
+});
+
+test('does not exit a non-empty item or lose its children', () => {
+  const source = [{ type: 'list', ordered: false, items: [item('content', [
+    { type: 'paragraph', inlines: text('child') },
+  ])] }];
+  const next = exitEmptyBlock(source, [0, 0]);
+  assert.deepEqual(next, source);
+  assert.notStrictEqual(next, source);
+  assert.notStrictEqual(next[0], source[0]);
+});
+
+test('exits a top-level empty list item after removing its list', () => {
+  const source = [{ type: 'taskList', items: [task('')] }];
+  const next = exitEmptyBlock(source, [0, 0]);
+  assert.deepEqual(next, [{ type: 'paragraph', inlines: [] }]);
+  assert.deepEqual(source[0].items, [task('')]);
 });
 
 test('indents and outdents list items immutably', () => {
