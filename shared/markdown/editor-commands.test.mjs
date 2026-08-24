@@ -30,6 +30,15 @@ test('continues and toggles task items inside a quote using the shared path cont
   assert.equal(source[0].blocks[0].items[0].checked, false);
 });
 
+test('resolves a quote nested inside a list item at a four-index path', () => {
+  const source = [{ type: 'taskList', items: [task('parent', false, [
+    { type: 'quote', blocks: [{ type: 'taskList', items: [task('quoted')] }] },
+  ])] }];
+  const next = toggleTaskItem(source, [0, 0, 0, 0]);
+  assert.equal(next[0].items[0].children[0].blocks[0].items[0].checked, true);
+  assert.equal(source[0].items[0].children[0].blocks[0].items[0].checked, false);
+});
+
 test('continues a nested list without mutating the source tree', () => {
   const source = [{ type: 'list', ordered: false, items: [item('one'), item('two')] }];
   const next = continueBlock(source, [0, 0]);
@@ -73,6 +82,19 @@ test('indents and outdents list items immutably', () => {
   const outdented = indentListItem(indented, [0, 0, 0], 'out');
   assert.equal(outdented[0].items.length, 3);
   assert.equal(source[0].items.length, 3);
+});
+
+test('indents and outdents an item through more than one nested level', () => {
+  const source = [{ type: 'list', ordered: false, items: [item('root', [
+    { type: 'list', ordered: false, items: [item('middle'), item('leaf')] },
+  ])] }];
+  const deeper = indentListItem(source, [0, 0, 1], 'in');
+  assert.equal(deeper[0].items[0].children[0].items[0].children[0].items[0].inlines[0].value, 'leaf');
+  const oneLevelOut = indentListItem(deeper, [0, 0, 0, 0], 'out');
+  assert.deepEqual(oneLevelOut[0].items[0].children[0].items.map((entry) => entry.inlines[0].value), ['middle', 'leaf']);
+  const fullyOut = indentListItem(oneLevelOut, [0, 0, 1], 'out');
+  assert.deepEqual(fullyOut[0].items.map((entry) => entry.inlines[0].value), ['root', 'leaf']);
+  assert.equal(source[0].items[0].children[0].items.length, 2);
 });
 
 test('toggles only the selected task checkbox', () => {

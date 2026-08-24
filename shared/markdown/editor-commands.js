@@ -72,23 +72,26 @@ function isEmptyItem(item) {
 
 function resolve(blocks, path) {
   if (!Array.isArray(path) || path.length < 2) throw new TypeError('Path must contain at least two indexes');
-  const container = blocks;
-  return descend(container, path[0], path.slice(1), null);
+  return descend(blocks, path[0], path.slice(1), null);
 }
 
 function descend(container, blockIndex, path, parent) {
   const block = container[blockIndex];
   if (block?.type === 'quote') {
     const quotedIndex = path[0];
-    if (!block.blocks?.[quotedIndex] || path.length < 2) throw new RangeError('Path does not reference a quoted list block');
-    return descend(block.blocks, quotedIndex, path.slice(1), parent);
+    if (!block.blocks?.[quotedIndex]) throw new RangeError('Path does not reference a quoted block');
+    return descendBlock(block.blocks[quotedIndex], block.blocks, quotedIndex, path.slice(1), parent);
   }
+  return descendBlock(block, container, blockIndex, path, parent);
+}
+
+function descendBlock(block, container, blockIndex, path, parent) {
   if (!block || !['list', 'taskList'].includes(block.type)) throw new RangeError('Path does not reference a list block');
   const index = path[0];
   const item = block.items[index];
   if (!item) throw new RangeError('Path does not reference a list item');
   if (path.length === 1) return { list: block.items, index, item, block, container, containerIndex: blockIndex, parent, blockIndex };
-  const childIndex = item.children.findIndex((child) => ['list', 'taskList'].includes(child.type));
+  const childIndex = item.children.findIndex((child) => ['list', 'taskList', 'quote'].includes(child.type));
   if (childIndex < 0) throw new RangeError('Path does not reference a nested list');
   return descend(item.children, childIndex, path.slice(1), { list: block.items, index, item, block, container: item.children, blockIndex: childIndex });
 }
