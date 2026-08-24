@@ -15,18 +15,7 @@ export function cloneBlocks(blocks) {
  * @returns {import('./index.d.ts').TaskItem}
  */
 export function pathToItem(blocks, path) {
-  assertPath(path);
-  const block = blocks[path[0]];
-  if (!block || block.type !== 'taskList') throw new RangeError('Path does not reference a task list block');
-  let item = block.items[path[1]];
-  if (!item) throw new RangeError('Path does not reference a task item');
-  for (const itemIndex of path.slice(2)) {
-    const childList = item.children[itemIndex];
-    if (!childList || childList.type !== 'taskList') throw new RangeError('Path does not reference a nested task list');
-    item = childList.items[0];
-    if (!item) throw new RangeError('Path does not reference a task item');
-  }
-  return item;
+  return resolveLocation(blocks, path).list[resolveLocation(blocks, path).index];
 }
 
 /**
@@ -39,24 +28,29 @@ export function pathToItem(blocks, path) {
 export function updateAtPath(blocks, path, updater) {
   assertPath(path);
   const next = cloneBlocks(blocks);
-  const block = next[path[0]];
-  if (!block || block.type !== 'taskList') throw new RangeError('Path does not reference a task list block');
-  let item = block.items[path[1]];
-  if (!item) throw new RangeError('Path does not reference a task item');
-  for (const itemIndex of path.slice(2)) {
-    const childList = item.children[itemIndex];
-    if (!childList || childList.type !== 'taskList' || !childList.items[0]) throw new RangeError('Path does not reference a nested task item');
-    item = childList.items[0];
-  }
+  const location = resolveLocation(next, path);
+  const item = location.list[location.index];
   const updated = updater(item);
   if (!updated || typeof updated !== 'object') throw new TypeError('Updater must return a task item');
-  if (path.length === 2) block.items[path[1]] = updated;
-  else {
-    let parent = block.items[path[1]];
-    for (const itemIndex of path.slice(2, -1)) parent = parent.children[itemIndex].items[0];
-    parent.children[path.at(-1)].items[0] = updated;
-  }
+  location.list[location.index] = updated;
   return next;
+}
+
+function resolveLocation(blocks, path) {
+  assertPath(path);
+  const block = blocks[path[0]];
+  if (!block || block.type !== 'taskList') throw new RangeError('Path does not reference a task list block');
+  let list = block.items;
+  let item = list[path[1]];
+  if (!item) throw new RangeError('Path does not reference a task item');
+  for (const itemIndex of path.slice(2)) {
+    const childList = item.children.find((child) => child.type === 'taskList');
+    if (!childList) throw new RangeError('Path does not reference a nested task list');
+    list = childList.items;
+    item = list[itemIndex];
+    if (!item) throw new RangeError('Path does not reference a task item');
+  }
+  return { list, index: path.at(-1) };
 }
 
 function cloneNode(value) {
@@ -67,6 +61,6 @@ function cloneNode(value) {
 
 function assertPath(path) {
   if (!Array.isArray(path) || path.length < 2 || path.some((index) => !Number.isInteger(index) || index < 0)) {
-    throw new TypeError('Path must be a non-empty array of non-negative integers');
+    throw new TypeError('Path must contain at least two non-negative integer indexes');
   }
 }
