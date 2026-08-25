@@ -150,7 +150,11 @@ function renderList(block, options, path) {
     const task = block.type === 'taskList'
       ? `<input type="checkbox"${options.interactiveTasks ? ` data-markdown-task-path="${itemPath.join('.')}" data-markdown-task-checked="${item.checked}"` : ' disabled'}${item.checked ? ' checked' : ''}>`
       : '';
-    return `<li>${task}${renderInlines(item.inlines)}${item.children.map((child) => renderBlock(child, options, itemPath)).join('')}</li>`;
+    const listChildren = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
+    return `<li>${task}${renderInlines(item.inlines)}${item.children.map((child, childIndex) => {
+      const childPath = listChildren.length > 1 ? [...itemPath, childIndex] : itemPath;
+      return renderBlock(child, options, childPath);
+    }).join('')}</li>`;
   }).join('')}</${tag}>`;
 }
 
@@ -223,8 +227,17 @@ function isEscapedPipe(value, index) { let backslashes = 0; for (let cursor = in
 function isTableStart(lines, index) { return Boolean(lines[index]?.includes('|') && lines[index + 1]?.includes('|') && splitTableRow(lines[index + 1]).every((cell) => /^:?-{3,}:?$/.test(cell))); }
 function parseTable(lines, start) { const header = splitTableRow(lines[start]).map(parseInlines); const alignments = splitTableRow(lines[start + 1]).map((cell) => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'left'); const rows = []; let index = start + 2; while (index < lines.length && lines[index].includes('|') && lines[index].trim()) { const row = splitTableRow(lines[index++]).slice(0, header.length); while (row.length < header.length) row.push(''); rows.push(row.map(parseInlines)); } return { block: { type: 'table', header, alignments, rows }, next: index }; }
 function taskAtPath(blocks, path) {
-  let block = blocks[path[0]]; let cursor = 1;
+  let block = blocks[path[0]];
+  let cursor = 1;
   while (block?.type === 'quote') block = block.blocks?.[path[cursor++]];
-  while (block && (block.type === 'list' || block.type === 'taskList')) { const item = block.items[path[cursor++]]; if (cursor === path.length) return item; block = item?.children.find((child) => ['list', 'taskList', 'quote'].includes(child.type)); while (block?.type === 'quote') block = block.blocks?.[path[cursor++]]; }
+  while (block && (block.type === 'list' || block.type === 'taskList')) {
+    const item = block.items[path[cursor++]];
+    if (!item) break;
+    if (cursor === path.length) return item;
+    const candidates = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
+    if (!candidates.length) break;
+    block = candidates.length === 1 ? candidates[0] : item.children[path[cursor++]];
+    while (block?.type === 'quote') block = block.blocks?.[path[cursor++]];
+  }
   throw new RangeError('Path does not reference a task item');
 }

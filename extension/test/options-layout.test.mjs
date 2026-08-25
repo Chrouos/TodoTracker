@@ -70,8 +70,8 @@ assert.match(options, /const scrollY = window\.scrollY/, 'Management timer shoul
 assert.match(options, /window\.scrollTo\(0, scrollY\)/, 'Management timer should restore scroll position after reload');
 assert.match(options, /name === 'timer'[\s\S]*growTimerNotes\(\)/,
   'Management timer should recalculate notes height when its tab becomes visible');
-assert.match(options, /if \(\$\('mgTimerNotes'\) !== document\.activeElement\) \$\('mgTimerNotes'\)\.value = current\.notes \|\| '';/,
-  'Management timer should clear notes after stopping when the draft is empty');
+assert.match(options, /isMarkdownEditorFocused\(\$\('mgTimerNotes'\)\)/,
+  'Management timer should not overwrite an active block editor while refreshing');
 assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
@@ -90,4 +90,5 @@ assert.match(editor, /\['todo',/, 'Markdown editor should expose a Todo command'
 assert.match(editor, /\['table',/, 'Markdown editor should expose a table command');
 assert.match(css, /\.markdown-editor-content\s*\{/, 'Markdown editor should expose a block content surface');
 assert.match(css, /\.markdown-editor\.is-source\s+textarea/, 'Source mode should keep the original textarea discoverable');
+assert.match(options, /data-note-input="\$\{n\.id\}" data-markdown-editor-input/, 'Dynamic Project Notes should mount the Markdown editor');
 console.log('options layout contract passed');

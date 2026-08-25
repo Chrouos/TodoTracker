@@ -44,10 +44,21 @@ const markdownEditors = new Map();
 
 function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
   const editorMode = normalizeMarkdownEditorMode(mode);
+  markdownEditors.forEach((editor, textarea) => {
+    if (!document.contains(textarea)) { editor.destroy(); markdownEditors.delete(textarea); }
+  });
   document.querySelectorAll('[data-markdown-editor-input]').forEach((textarea) => {
     markdownEditors.get(textarea)?.destroy();
     markdownEditors.set(textarea, mountMarkdownEditor(textarea, { mode: editorMode }));
   });
+}
+
+function syncMarkdownEditor(textarea) {
+  markdownEditors.get(textarea)?.sync();
+}
+
+function isMarkdownEditorFocused(textarea) {
+  return textarea.closest('.markdown-editor')?.contains(document.activeElement) || document.activeElement === textarea;
 }
 
 function setMarkdownPreviewExpanded(preview, expanded) {
@@ -283,7 +294,8 @@ function renderTimer() {
   $('mgTimerStatus').textContent = timer ? '計時中' : '尚未開始';
   $('mgTimerToggle').textContent = timer ? '停止並儲存' : '開始計時';
   $('mgTimerDescription').value = current.description || '';
-  if ($('mgTimerNotes') !== document.activeElement) $('mgTimerNotes').value = current.notes || '';
+  if (!isMarkdownEditorFocused($('mgTimerNotes'))) $('mgTimerNotes').value = current.notes || '';
+  syncMarkdownEditor($('mgTimerNotes'));
 
   project.innerHTML = '<option value="">— 未分類 —</option>' +
     flattenTree(S.projects, { includeArchived: false })
@@ -1115,7 +1127,7 @@ function renderProjectNotes() {
                  </span>`}
           </div>
           ${editing
-            ? `<textarea data-note-input="${n.id}">${esc(n.text)}</textarea>`
+            ? `<textarea data-note-input="${n.id}" data-markdown-editor-input>${esc(n.text)}</textarea>`
             : `<div class="note-body">${renderMarkdownPreview(n.text)}</div>`}
         </div>`;
       }).join('')
@@ -1123,7 +1135,11 @@ function renderProjectNotes() {
 
   if (noteEditingId) {
     const ta = $('pjNoteList').querySelector(`[data-note-input="${noteEditingId}"]`);
-    if (ta) { autoGrow(ta, { min: 72, max: 400 }); ta.focus(); }
+    if (ta) {
+      autoGrow(ta, { min: 72, max: 400 });
+      markdownEditors.set(ta, mountMarkdownEditor(ta, { mode: normalizeMarkdownEditorMode(S.settings.notesEditor) }));
+      markdownEditors.get(ta).focus();
+    }
   }
 }
 
@@ -1134,12 +1150,19 @@ $('pjNoteAdd').addEventListener('click', async () => {
   await db.addProjectNote(pid, text);
   $('pjNoteDraft').value = '';
   $('pjNoteDraft').dispatchEvent(new Event('input'));
+  syncMarkdownEditor($('pjNoteDraft'));
   await load();
   renderProjectNotes();
 });
 
 $('pjNoteDraft').addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') $('pjNoteAdd').click();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key !== 'Enter' || e.target === $('pjNoteDraft')) return;
+  const textarea = e.target.closest?.('.markdown-editor')?.querySelector('#pjNoteDraft');
+  if (textarea) $('pjNoteAdd').click();
 });
 
 $('pjNoteList').addEventListener('click', async (e) => {
@@ -1165,8 +1188,9 @@ $('pjNoteList').addEventListener('click', async (e) => {
 });
 
 $('pjNoteList').addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.target.dataset.noteInput) {
-    $('pjNoteList').querySelector(`[data-note-save="${e.target.dataset.noteInput}"]`)?.click();
+  const textarea = e.target.closest?.('.markdown-editor')?.querySelector('[data-note-input]') || e.target.closest?.('[data-note-input]');
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && textarea?.dataset.noteInput) {
+    $('pjNoteList').querySelector(`[data-note-save="${textarea.dataset.noteInput}"]`)?.click();
   }
 });
 
@@ -1460,6 +1484,7 @@ function renderTodos() {
 
 function resetTodoForm() {
   $('tdId').value = ''; $('tdTitle').value = ''; $('tdNotes').value = '';
+  syncMarkdownEditor($('tdNotes'));
   $('tdParent').value = '';
   $('tdStatus').value = 'todo'; $('tdPriority').value = 'normal'; $('tdDue').value = ''; $('tdDueTime').value = '';
   $('tdOpened').value = '建立後自動記錄';
@@ -1523,6 +1548,7 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdProject').value = t.projectId || '';
     $('tdParent').value = t.parentId || '';
     $('tdStatus').value = t.status; $('tdNotes').value = t.notes || '';
+    syncMarkdownEditor($('tdNotes'));
     $('tdPriority').value = normalizePriority(t.priority);
     $('tdDue').value = t.dueDate || '';
     $('tdDueTime').value = t.dueTime || '';
@@ -1602,6 +1628,7 @@ function renderSchedules() {
 
 function resetSchForm() {
   $('scId').value = ''; $('scTitle').value = ''; $('scNotes').value = '';
+  syncMarkdownEditor($('scNotes'));
   $('scPriority').value = 'normal';
   $('scCreate').value = '09:00'; $('scDue').value = ''; $('scRemind').value = '';
   $('scEnabled').value = '1'; $('scCancel').hidden = true;
@@ -1665,6 +1692,7 @@ $('schList').addEventListener('click', async (e) => {
     $('scProject').value = s.projectId || '';
     $('scPriority').value = normalizePriority(s.priority);
     $('scNotes').value = s.notes || '';
+    syncMarkdownEditor($('scNotes'));
     $('scCreate').value = s.createTime; $('scDue').value = s.dueTime || '';
     $('scRemind').value = s.remindMinutes ?? '';
     $('scEnabled').value = s.enabled ? '1' : '0';
@@ -1879,6 +1907,7 @@ function openEntryDialog(e) {
   $('enStart').value = toLocalInput(e.startedAt);
   $('enEnd').value = toLocalInput(e.endedAt);
   $('enNotes').value = e.notes || '';
+  syncMarkdownEditor($('enNotes'));
   $('entryDlg').showModal();
   growNotes();   // dialog 開啟後才量得到高度
 }

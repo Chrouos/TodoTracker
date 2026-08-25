@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownToHTML, shouldShowMarkdownToggle } from './markdown.js';
+import { markdownToHTML, renderMarkdown, shouldShowMarkdownToggle } from './markdown.js';
 
 test('renders headings as h1 elements', () => {
   assert.equal(markdownToHTML('# Heading'), '<h1>Heading</h1>');
@@ -88,4 +88,10 @@ test('uses the shared renderer for disabled read-only task checkboxes', () => {
     markdownToHTML('- [ ] Open\n- [x] Done'),
     '<ul class="markdown-task-list"><li><input type="checkbox" disabled>Open</li><li><input type="checkbox" disabled checked>Done</li></ul>',
   );
+});
+
+test('gives mixed nested task lists unique paths consumed by the toggle resolver', () => {
+  const html = renderMarkdown('- Parent\n  - Plain child\n  - [ ] Nested task\n- [ ] Sibling task', { interactiveTasks: true });
+  assert.match(html, /data-markdown-task-path="0\.0\.1\.0"/);
+  assert.match(html, /data-markdown-task-path="1\.0"/);
 });
