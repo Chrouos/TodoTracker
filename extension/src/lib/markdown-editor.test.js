@@ -10,7 +10,9 @@ import {
   serializeTaskCheckboxToggle,
   splitTextBlockAtOffset,
   indentListItem,
+  insertInlineTextAtSelection,
   listItemPathAfterIndent,
+  restoreTextareaFromEditor,
   updateInlinesForTextInput,
 } from './markdown-editor.js';
 import { parseMarkdown, serializeMarkdown } from './markdown.js';
@@ -108,4 +110,21 @@ test('indents and outdents a list item without mutating the source', () => {
   assert.deepEqual(nestedPath, [0, 0, 0]);
   assert.equal(serializeMarkdown(indentListItem(nested, nestedPath, 'out')), '- One\n- Two');
   assert.equal(serializeMarkdown(source), '- One\n- Two');
+});
+
+test('restores the textarea by replacing the editor wrapper and removing its marker', () => {
+  const calls = [];
+  const textarea = { id: 'notes' };
+  const wrapper = { replaceWith(value) { calls.push(['replaceWith', value]); } };
+  const marker = { remove() { calls.push(['remove']); } };
+  restoreTextareaFromEditor(marker, wrapper, textarea);
+  assert.deepEqual(calls, [['replaceWith', textarea], ['remove']]);
+});
+
+test('inserts after a completed strong inline instead of extending the mark', () => {
+  const [block] = parseMarkdown('**Bold** plain');
+  assert.equal(
+    serializeMarkdown([{ ...block, inlines: insertInlineTextAtSelection(block.inlines, 4, 4, '!', { forceOuterBoundary: true }) }]),
+    '**Bold**! plain',
+  );
 });

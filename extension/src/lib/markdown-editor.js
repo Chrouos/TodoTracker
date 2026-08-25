@@ -109,6 +109,13 @@ export function updateInlinesForTextInput(inlines, nextText) {
   return replaceInlineRange(inlines, start, currentEnd, nextText.slice(start, nextEnd));
 }
 
+export function insertInlineTextAtSelection(inlines, start, end, text, { forceOuterBoundary = false } = {}) {
+  if (!forceOuterBoundary) return replaceInlineRange(inlines, start, end, text);
+  const [before, rest] = splitInlinesAtOffset(inlines, start);
+  const [, after] = splitInlinesAtOffset(rest, Math.max(0, end - start));
+  return mergeInlines([...before, ...(text ? [{ type: 'text', value: text }] : []), ...after]);
+}
+
 export function splitTextBlockAtOffset(blocks, path, offset) {
   const next = cloneBlocks(blocks);
   const location = textBlockLocation(next, path);
@@ -181,6 +188,11 @@ function parsePath(value) {
   return /^\d+(?:\.\d+)*$/.test(String(value ?? '')) ? String(value).split('.').map(Number) : null;
 }
 
+export function restoreTextareaFromEditor(marker, wrapper, textarea) {
+  wrapper.replaceWith(textarea);
+  marker.remove();
+}
+
 function caretOffset(surface) {
   const selection = window.getSelection();
   if (!selection?.rangeCount) return (surface.textContent ?? '').length;
@@ -197,6 +209,21 @@ function selectionOffsets(surface) {
   if (!surface.contains(range.startContainer) || !surface.contains(range.endContainer)) return null;
   const before = range.cloneRange(); before.selectNodeContents(surface); before.setEnd(range.startContainer, range.startOffset);
   return { start: before.toString().length, end: before.toString().length + range.toString().length, range };
+}
+
+function selectionSurface(root) {
+  const selection = window.getSelection();
+  const node = selection?.anchorNode;
+  const surface = node instanceof Element
+    ? node.closest('[data-editor-surface="true"]')
+    : node?.parentElement?.closest('[data-editor-surface="true"]');
+  return surface && root.contains(surface) ? surface : null;
+}
+
+function isAfterInlineBoundary(range, surface) {
+  if (!range.collapsed || range.startContainer !== surface || range.startOffset < 1) return false;
+  const previous = surface.childNodes[range.startOffset - 1];
+  return previous instanceof Element && ['STRONG', 'EM', 'CODE', 'A'].includes(previous.tagName);
 }
 
 function setSurfaceSelection(surface, start, end = start) {
@@ -413,6 +440,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   let content = null;
   let composing = false;
   let activeSurface = null;
+  let toolbarSelection = null;
   let emitting = false;
 
   const emit = () => {
@@ -459,9 +487,9 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     if (element) setSurfaceSelection(element, offset, end);
   });
   const applyInlineCommand = (command) => {
-    const element = activeSurface;
+    const element = toolbarSelection?.element || selectionSurface(content) || activeSurface;
     const path = element && parsePath(element.dataset.blockPath);
-    const selection = element && selectionOffsets(element);
+    const selection = toolbarSelection || (element && selectionOffsets(element));
     if (!element || !path || !selection || !['block', 'list-item', 'table-cell'].includes(element.dataset.editorKind)) return;
     const update = (inlines) => wrapInlineRange(inlines, selection.start, selection.end, command);
     if (element.dataset.editorKind === 'list-item') blocks = updateListItemAtPath(blocks, path, update);
@@ -474,7 +502,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
         return block;
       });
     } else blocks = updateBlockAtPath(blocks, path, (block) => ['paragraph', 'heading'].includes(block.type) ? { ...block, inlines: update(block.inlines) } : block);
-    emit(); refresh(); focusPath(path, selection.start, selection.end);
+    emit(); refresh(); focusPath(path, selection.start, selection.end); toolbarSelection = null;
   };
   const applyCommand = (command) => {
     const target = activeSurface && parsePath(activeSurface.dataset.blockPath);
@@ -552,7 +580,15 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     blocks = split.blocks; emit(); refresh(); focusPath(split.nextPath);
   };
   const onMouseDown = (event) => {
-    if (event.target.closest?.('[data-markdown-command]')) event.preventDefault();
+    if (!event.target.closest?.('[data-markdown-command]')) return;
+    const element = selectionSurface(content) || activeSurface;
+    const selection = element && selectionOffsets(element);
+    toolbarSelection = selection && element ? { ...selection, element } : null;
+    event.preventDefault();
+  };
+  const onFocusIn = (event) => {
+    const element = event.target.closest?.('[data-editor-surface="true"]');
+    if (element) activeSurface = element;
   };
 
   if (editorMode === 'toolbar') {
@@ -565,6 +601,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     wrapper.append(toolbar, content); refresh();
     wrapper.addEventListener('click', onClick);
     wrapper.addEventListener('mousedown', onMouseDown);
+    wrapper.addEventListener('focusin', onFocusIn);
     wrapper.addEventListener('input', onInput);
     wrapper.addEventListener('compositionstart', onComposition);
     wrapper.addEventListener('compositionend', onComposition);
@@ -574,11 +611,10 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
 
   return {
     destroy() {
-      wrapper.removeEventListener('click', onClick); wrapper.removeEventListener('mousedown', onMouseDown); wrapper.removeEventListener('input', onInput);
+      wrapper.removeEventListener('click', onClick); wrapper.removeEventListener('mousedown', onMouseDown); wrapper.removeEventListener('focusin', onFocusIn); wrapper.removeEventListener('input', onInput);
       wrapper.removeEventListener('compositionstart', onComposition); wrapper.removeEventListener('compositionend', onComposition); wrapper.removeEventListener('keydown', onKeyDown);
       textarea.removeEventListener('input', onTextareaInput);
-      if (marker.parentNode) marker.replaceWith(textarea);
-      else wrapper.replaceWith(textarea);
+      restoreTextareaFromEditor(marker, wrapper, textarea);
     },
     focus() { if (editorMode === 'source') textarea.focus(); else content?.querySelector('[data-editor-surface="true"]')?.focus(); },
     sync() {
@@ -600,11 +636,20 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
       if (!target) return;
       const offsets = selectionOffsets(target);
       if (!offsets) { target.append(document.createTextNode(text)); activeSurface = target; commitSurface(target); return; }
-      offsets.range.deleteContents();
-      const node = document.createTextNode(text); offsets.range.insertNode(node);
-      const range = document.createRange(); range.setStartAfter(node); range.collapse(true);
-      selected.removeAllRanges(); selected.addRange(range);
-      activeSurface = target; commitSurface(target);
+      const path = parsePath(target.dataset.blockPath);
+      if (!path) return;
+      const update = (inlines) => insertInlineTextAtSelection(inlines, offsets.start, offsets.end, text, { forceOuterBoundary: isAfterInlineBoundary(offsets.range, target) });
+      if (target.dataset.editorKind === 'list-item') blocks = updateListItemAtPath(blocks, path, update);
+      else if (target.dataset.editorKind === 'table-cell') {
+        blocks = updateBlockAtPath(blocks, path, (block) => {
+          if (block.type !== 'table') return block;
+          const cells = target.dataset.tableSection === 'header' ? block.header : block.rows[Number(target.dataset.tableRow)];
+          const column = Number(target.dataset.tableColumn);
+          if (cells?.[column]) cells[column] = update(cells[column]);
+          return block;
+        });
+      } else blocks = updateBlockAtPath(blocks, path, (block) => ['paragraph', 'heading'].includes(block.type) ? { ...block, inlines: update(block.inlines) } : block);
+      emit(); refresh(); focusPath(path, offsets.start + text.length);
     },
   };
 }
