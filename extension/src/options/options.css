@@ -96,6 +96,8 @@ section[hidden] { display: none; }
 .timer-notes-mode .btn-sm.active { background: var(--ink); color: var(--canvas); }
 .markdown-editor { margin-top: var(--xs); }
 .markdown-editor textarea { width: 100%; box-sizing: border-box; }
+.markdown-editor:not(.is-source) textarea { display: none; }
+.markdown-editor.is-source textarea { display: block; }
 .markdown-editor-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -120,6 +122,40 @@ section[hidden] { display: none; }
 .markdown-editor-toolbar [data-markdown-command="bold"] { font-weight: 700; }
 .markdown-editor-toolbar [data-markdown-command="italic"] { font-style: italic; }
 .markdown-editor.is-source .markdown-editor-toolbar { display: none; }
+.markdown-editor-content {
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  background: var(--canvas);
+  overflow-wrap: anywhere;
+}
+.markdown-editor-block { margin: 0 0 10px; }
+.markdown-editor-block:last-child { margin-bottom: 0; }
+.markdown-editor-surface {
+  min-height: 1.45em;
+  outline: 0;
+  border-radius: 3px;
+  white-space: pre-wrap;
+}
+.markdown-editor-surface:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 18%, transparent); }
+.markdown-editor-content ul,
+.markdown-editor-content ol { margin: 6px 0 10px 22px; }
+.markdown-editor-content li > .markdown-editor-surface { display: inline; }
+.markdown-editor-content .markdown-task-list { list-style: none; margin-left: 0; padding-left: 0; }
+.markdown-editor-content .markdown-task-list > li { display: flex; align-items: flex-start; gap: 6px; }
+.markdown-editor-content .markdown-task-list input[type="checkbox"] { margin: 5px 0 0; }
+.markdown-editor-content .markdown-task-list ul,
+.markdown-editor-content .markdown-task-list ol { flex: 1 0 100%; }
+.markdown-editor-table-wrap { overflow-x: auto; margin: 8px 0; }
+.markdown-editor-content table { min-width: 420px; width: 100%; border-collapse: collapse; }
+.markdown-editor-content th,
+.markdown-editor-content td { border: 1px solid var(--hairline-strong); padding: 5px 8px; vertical-align: top; }
+.markdown-editor-content pre { overflow-x: auto; padding: 9px; background: var(--surface-card); border: 1px solid var(--hairline); }
+.markdown-editor-content pre .markdown-editor-surface { font-family: var(--font-mono, ui-monospace, monospace); }
+.markdown-editor.is-source .markdown-editor-content { display: none; }
+.timer-notes-field .markdown-editor-content { min-height: 180px; max-height: 360px; overflow-y: auto; }
+.timer-notes-preview-actions { margin-top: var(--xs); }
 .timer-notes-preview {
   min-height: 180px;
   max-height: 360px;

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import AutoTextarea from '@/components/AutoTextarea';
+import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
+import MarkdownPreview from '@/components/MarkdownPreview';
 import { fmtDate, fmtClock } from '@/lib/time';
 import type { Project } from '@/lib/types';
 
@@ -32,16 +33,17 @@ export default function ProjectNotes({ project }: { project: Project }) {
   return (
     <>
       <div className="card">
-        <AutoTextarea
+        <div onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') append();
+        }}>
+          <MarkdownBlockEditor
           value={draft}
           min={72}
           max={320}
           placeholder="這個專案要達成什麼？有什麼決定或轉折？Ctrl+Enter 送出"
           onChange={setDraft}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') append();
-          }}
         />
+        </div>
         <div className="actions">
           <button className="btn-primary" onClick={append} disabled={!draft.trim()}>
             新增一則
@@ -83,15 +85,16 @@ export default function ProjectNotes({ project }: { project: Project }) {
           </div>
 
           {editingId === n.id ? (
-            <AutoTextarea
+            <div onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(n.id); }}>
+              <MarkdownBlockEditor
               value={editText}
               min={72}
               max={400}
               onChange={setEditText}
-              onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(n.id); }}
             />
+            </div>
           ) : (
-            <div className="note-body">{n.text}</div>
+            <MarkdownPreview className="note-body" value={n.text} />
           )}
         </div>
       )) : <div className="empty">還沒有目標或筆記</div>}

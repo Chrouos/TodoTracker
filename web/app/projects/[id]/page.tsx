@@ -9,6 +9,7 @@ import Section from '@/components/Section';
 import CopyButton from '@/components/CopyButton';
 import EntryDialog, { type EntryDraft } from '@/components/EntryDialog';
 import ProjectNotes from '@/components/ProjectNotes';
+import MarkdownPreview from '@/components/MarkdownPreview';
 import { LineChart, DonutChart } from '@/components/Charts';
 import { buildSummary } from '@/lib/summary';
 import {
@@ -357,7 +358,7 @@ export default function ProjectDetail() {
                         {ep && ep.id !== project.id && (
                           <div className="sub">{pathOf(projects, ep.id).join(' / ')}</div>
                         )}
-                        {e.notes && <div className="notes">{e.notes}</div>}
+                        {e.notes && <MarkdownPreview className="notes" value={e.notes} />}
                       </div>
                       <span className="num">{fmtHM(durationSec(e))}</span>
                       <div className="act">

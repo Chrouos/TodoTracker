@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
 import CopyButton from '@/components/CopyButton';
-import AutoTextarea from '@/components/AutoTextarea';
+import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
 import { buildSummary } from '@/lib/summary';
 import { durationSec, fmtHM, fmtDate, fmtClock, startOfDay } from '@/lib/time';
 import type { Entry } from '@/lib/types';
@@ -121,15 +121,18 @@ function LogRow({ entry, projectName, color }: {
         <span className="num mute">{fmtHM(durationSec(entry))}</span>
         {saved && <span className="badge">已儲存</span>}
       </div>
-      {editing && <AutoTextarea
-        value={text}
-        min={text ? 64 : 40}
-        max={400}
-        placeholder="做了什麼？遇到什麼？下次要注意什麼？"
-        onChange={setText}
-        onBlur={save}
-        onKeyDown={(ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') save(); }}
-      />}
+      {editing && <div
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) save(); }}
+        onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') save(); }}
+      >
+        <MarkdownBlockEditor
+          value={text}
+          min={text ? 64 : 40}
+          max={400}
+          placeholder="做了什麼？遇到什麼？下次要注意什麼？"
+          onChange={setText}
+        />
+      </div>}
       {!editing && <button className="btn-sm" onClick={() => setEditing(true)}>編輯 Markdown</button>}
       {editing && <div className="actions"><button className="btn-sm btn-primary" onClick={save}>儲存</button><button className="btn-sm" onClick={() => { setText(entry.notes ?? ''); setEditing(false); }}>取消</button></div>}
       {!editing && <MarkdownPreview value={text} className="log-note-preview" />}

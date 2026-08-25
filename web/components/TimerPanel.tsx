@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { fmtHMS, fmtClock } from '@/lib/time';
 import { flattenTree, indentLabel } from '@/lib/tree';
-import AutoTextarea from '@/components/AutoTextarea';
+import MarkdownBlockEditor, { type MarkdownEditorHandle } from '@/components/MarkdownBlockEditor';
+import { timestampInsertionText } from '@/lib/markdown-editor';
 
 type Draft = { projectId: string; taskId: string; description: string };
 
@@ -17,7 +18,7 @@ export default function TimerPanel() {
   // 計時中的即時紀錄：本地先收，500ms 後才寫回擴充
   const [notes, setNotes] = useState('');
   const [savedFlag, setSavedFlag] = useState('');
-  const notesRef = useRef<HTMLTextAreaElement | null>(null);
+  const notesRef = useRef<MarkdownEditorHandle | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
 
@@ -40,19 +41,14 @@ export default function TimerPanel() {
   };
 
   const stamp = () => {
-    const ta = notesRef.current;
-    if (!ta) return;
-    const at = ta.selectionStart;
-    const before = notes.slice(0, at);
-    const prefix = before === '' || before.endsWith('\n') ? '' : '\n';
-    const ins = `${prefix}${fmtClock(new Date().toISOString())} `;
-    writeNotes(before + ins + notes.slice(at));
-    requestAnimationFrame(() => {
-      const el = notesRef.current;
-      if (!el) return;
-      el.focus();
-      el.selectionStart = el.selectionEnd = at + ins.length;
-    });
+    const editor = notesRef.current;
+    if (!editor) return;
+    const selection = editor.getSelectionContext();
+    editor.insertText(timestampInsertionText(
+      selection.value,
+      selection.offset,
+      `${fmtClock(new Date().toISOString())} `,
+    ));
   };
 
   // 只有本地跳秒，不打擴充 —— 經過時間從 startedAt 現算
@@ -124,11 +120,11 @@ export default function TimerPanel() {
           <div className="livelog">
             <div className="livelog-head">
               工作紀錄
-              <button className="btn-sm" onClick={stamp} title="插入現在時間">[時間]</button>
+              <button className="btn-sm" onMouseDown={(event) => event.preventDefault()} onClick={stamp} title="插入現在時間">[時間]</button>
               <span className="flag">{savedFlag}</span>
             </div>
-            <AutoTextarea
-              innerRef={notesRef}
+            <MarkdownBlockEditor
+              ref={notesRef}
               value={notes}
               min={96}
               max={360}

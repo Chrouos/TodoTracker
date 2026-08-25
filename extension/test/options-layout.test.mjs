@@ -29,6 +29,7 @@ for (const id of ['mgTimerNotes', 'tdNotes', 'enNotes', 'pjNoteDraft', 'scNotes'
   assert.match(html, new RegExp(`id="${id}"[^>]*data-markdown-editor-input`), `${id} should use the shared Markdown editor`);
 }
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
+const editor = await readFile(new URL('../src/lib/markdown-editor.js', import.meta.url), 'utf8');
 assert.match(options, /projectIdForTask/, 'Entry Todo selection should synchronize its project');
 assert.match(options, /normalizeMarkdownEditorMode/, 'Options should normalize the shared Markdown editor setting');
 assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selection should update the project selector');
@@ -111,10 +112,10 @@ assert.match(options, /getTimer/, 'Management timer should load the shared timer
 assert.match(options, /completeTask/, 'Management timer should pass the completion choice when stopping');
 assert.match(options, /const scrollY = window\.scrollY/, 'Management timer should capture scroll position before reload');
 assert.match(options, /window\.scrollTo\(0, scrollY\)/, 'Management timer should restore scroll position after reload');
+assert.match(options, /isMarkdownEditorFocused\(\$\('mgTimerNotes'\)\)/,
+  'Management timer should not overwrite an active block editor while refreshing');
 assert.doesNotMatch(options, /growTimerNotes\(/,
   'Management timer should not resize the page while typing notes');
-assert.match(options, /if \(\$\('mgTimerNotes'\) !== document\.activeElement\) \$\('mgTimerNotes'\)\.value = current\.notes \|\| '';/,
-  'Management timer should clear notes after stopping when the draft is empty');
 assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
@@ -127,5 +128,11 @@ assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar sh
 assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');
 assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
 assert.match(css, /\.markdown-editor-toolbar\s*\{/, 'Markdown fields should render an editor toolbar');
-assert.match(css, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
+assert.match(editor, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
+assert.match(options, /mountMarkdownEditor/, 'Options should mount the native Markdown block editor');
+assert.match(editor, /\['todo',/, 'Markdown editor should expose a Todo command');
+assert.match(editor, /\['table',/, 'Markdown editor should expose a table command');
+assert.match(css, /\.markdown-editor-content\s*\{/, 'Markdown editor should expose a block content surface');
+assert.match(css, /\.markdown-editor\.is-source\s+textarea/, 'Source mode should keep the original textarea discoverable');
+assert.match(options, /data-note-input="\$\{n\.id\}" data-markdown-editor-input/, 'Dynamic Project Notes should mount the Markdown editor');
 console.log('options layout contract passed');
