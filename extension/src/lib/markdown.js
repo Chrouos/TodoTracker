@@ -117,6 +117,8 @@ export function detectMarkdownShortcut(value) {
   if (/^[-+*] \[[xX]\] $/.test(value)) return { type: 'task', checked: true };
   if (/^[-+*] $/.test(value)) return { type: 'list', ordered: false };
   if (/^\d+[.)] $/.test(value)) return { type: 'list', ordered: true };
+  if (value === '> ') return { type: 'quote' };
+  if (value === '``` ') return { type: 'codeBlock' };
   return null;
 }
 

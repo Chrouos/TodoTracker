@@ -74,6 +74,8 @@ export function markdownShortcutToBlock(value) {
   if (!shortcut) return null;
   if (shortcut.type === 'heading') return { type: 'heading', level: shortcut.level, inlines: [] };
   if (shortcut.type === 'task') return { type: 'taskList', items: [{ checked: shortcut.checked, inlines: [], children: [] }] };
+  if (shortcut.type === 'quote') return { type: 'quote', blocks: [{ type: 'paragraph', inlines: [] }] };
+  if (shortcut.type === 'codeBlock') return { type: 'codeBlock', value: '' };
   return { type: 'list', ordered: shortcut.ordered, items: [{ inlines: [], children: [] }] };
 }
 
@@ -129,6 +131,28 @@ export function splitTextBlockAtOffset(blocks, path, offset) {
   const [before, after] = splitInlinesAtOffset(block.inlines, offset);
   container.splice(index, 1, { ...block, inlines: before }, { ...block, inlines: after });
   return { blocks: next, nextPath: [...path.slice(0, -1), index + 1] };
+}
+
+export function pasteMarkdownAtTextBlock(blocks, path, start, end, markdown) {
+  const next = cloneBlocks(blocks);
+  const location = textBlockLocation(next, path);
+  const pasted = parseMarkdown(markdown);
+  if (!location || !pasted.length) return { blocks: next, nextPath: path };
+
+  const textLength = inlineText(location.block.inlines).length;
+  const safeStart = Math.max(0, Math.min(start, textLength));
+  const safeEnd = Math.max(safeStart, Math.min(end, textLength));
+  const [before, rest] = splitInlinesAtOffset(location.block.inlines, safeStart);
+  const [, after] = splitInlinesAtOffset(rest, safeEnd - safeStart);
+  const replacement = [];
+  if (before.length) replacement.push({ ...location.block, inlines: before });
+  replacement.push(...pasted);
+  if (after.length) replacement.push({ ...location.block, inlines: after });
+  location.container.splice(location.index, 1, ...replacement);
+  return {
+    blocks: next,
+    nextPath: [...path.slice(0, -1), location.index + replacement.length - 1],
+  };
 }
 
 function textBlockLocation(blocks, path) {
@@ -573,6 +597,19 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     if (!element || composing) return;
     activeSurface = element; commitSurface(element);
   };
+  const onPaste = (event) => {
+    const element = event.target.closest?.('[data-editor-surface="true"]');
+    if (!element || composing || event.isComposing || element.dataset.editorKind !== 'block') return;
+    const markdown = event.clipboardData?.getData('text/plain');
+    if (!markdown || !/\r?\n/.test(markdown)) return;
+    const path = parsePath(element.dataset.blockPath);
+    const offsets = selectionOffsets(element);
+    if (!path || !offsets) return;
+    event.preventDefault();
+    const result = pasteMarkdownAtTextBlock(blocks, path, offsets.start, offsets.end, markdown);
+    blocks = result.blocks;
+    emit(); refresh(); focusPath(result.nextPath);
+  };
   const onComposition = (event) => {
     const element = event.target.closest?.('[data-editor-surface="true"]');
     composing = event.type === 'compositionstart';
@@ -637,6 +674,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     wrapper.addEventListener('compositionstart', onComposition);
     wrapper.addEventListener('compositionend', onComposition);
     wrapper.addEventListener('keydown', onKeyDown);
+    wrapper.addEventListener('paste', onPaste);
     textarea.addEventListener('input', onTextareaInput);
   }
 
@@ -644,6 +682,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     destroy() {
       wrapper.removeEventListener('click', onClick); wrapper.removeEventListener('mousedown', onMouseDown); wrapper.removeEventListener('focusin', onFocusIn); wrapper.removeEventListener('input', onInput);
       wrapper.removeEventListener('compositionstart', onComposition); wrapper.removeEventListener('compositionend', onComposition); wrapper.removeEventListener('keydown', onKeyDown);
+      wrapper.removeEventListener('paste', onPaste);
       textarea.removeEventListener('input', onTextareaInput);
       restoreTextareaFromEditor(marker, wrapper, textarea);
     },

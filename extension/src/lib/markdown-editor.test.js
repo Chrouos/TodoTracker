@@ -7,6 +7,7 @@ import {
   formatMarkdownSelection,
   markdownShortcutToBlock,
   normalizeMarkdownEditorMode,
+  pasteMarkdownAtTextBlock,
   serializeTaskCheckboxToggle,
   splitTextBlockAtOffset,
   indentListItem,
@@ -54,6 +55,14 @@ test('converts block-start Markdown shortcuts to native editor blocks', () => {
   assert.equal(markdownShortcutToBlock('text - '), null);
 });
 
+test('converts quote and fenced-code shortcuts to native editor blocks', () => {
+  assert.deepEqual(markdownShortcutToBlock('> '), {
+    type: 'quote',
+    blocks: [{ type: 'paragraph', inlines: [] }],
+  });
+  assert.deepEqual(markdownShortcutToBlock('``` '), { type: 'codeBlock', value: '' });
+});
+
 test('serializes an editor task checkbox change back to Markdown', () => {
   assert.equal(
     serializeTaskCheckboxToggle('- [ ] Open\n- [x] Done', '0.0'),
@@ -88,6 +97,36 @@ test('splits a text block at the focused caret offset', () => {
   const split = splitTextBlockAtOffset(parseMarkdown('BeforeAfter'), [0], 6);
   assert.equal(serializeMarkdown(split.blocks), 'Before\n\nAfter');
   assert.deepEqual(split.nextPath, [1]);
+});
+
+test('replaces a selected text block with parsed multiline Markdown paste', () => {
+  const result = pasteMarkdownAtTextBlock(
+    parseMarkdown('replace me'),
+    [0],
+    0,
+    10,
+    '# Pasted\n\n- [ ] Task',
+  );
+
+  assert.deepEqual(result.blocks.map((block) => block.type), ['heading', 'taskList']);
+  assert.equal(serializeMarkdown(result.blocks), '# Pasted\n\n- [ ] Task');
+  assert.deepEqual(result.nextPath, [1]);
+});
+
+test('splits the active text block around multiline Markdown paste', () => {
+  const result = pasteMarkdownAtTextBlock(
+    parseMarkdown('before after'),
+    [0],
+    7,
+    7,
+    '> Quote\n\n```js\nconst value = 1;\n```',
+  );
+
+  assert.equal(
+    serializeMarkdown(result.blocks),
+    'before \n\n> Quote\n\n```js\nconst value = 1;\n```\n\nafter',
+  );
+  assert.deepEqual(result.nextPath, [3]);
 });
 
 test('toggles a nested task after a sibling normal list without path collisions', () => {

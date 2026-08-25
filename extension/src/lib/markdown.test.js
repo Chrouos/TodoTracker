@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownToHTML, renderBlocks, renderMarkdown, shouldShowMarkdownToggle, toggleTaskItem } from './markdown.js';
+import {
+  detectMarkdownShortcut,
+  markdownToHTML,
+  renderBlocks,
+  renderMarkdown,
+  shouldShowMarkdownToggle,
+  toggleTaskItem,
+} from './markdown.js';
+
+test('detects quote and fenced-code shortcuts only at an empty block start', () => {
+  assert.deepEqual(detectMarkdownShortcut('> '), { type: 'quote' });
+  assert.deepEqual(detectMarkdownShortcut('``` '), { type: 'codeBlock' });
+  assert.equal(detectMarkdownShortcut('text > '), null);
+  assert.equal(detectMarkdownShortcut('```` '), null);
+});
 
 test('renders headings as h1 elements', () => {
   assert.equal(markdownToHTML('# Heading'), '<h1>Heading</h1>');
