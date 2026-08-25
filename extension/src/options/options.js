@@ -9,7 +9,7 @@ import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tre
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
-import { markdownToHTML, shouldShowMarkdownToggle } from '../lib/markdown.js';
+import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, filterTasks, normalizePriority, priorityLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
@@ -18,7 +18,11 @@ import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData } from '../lib/todo-tracker.js';
 import { buildProjectTaskMetrics, buildReportQuality } from '../lib/report-metrics.js';
-import { formatMarkdownSelection, normalizeMarkdownEditorMode } from '../lib/markdown-editor.js';
+import {
+  mountMarkdownEditor,
+  normalizeMarkdownEditorMode,
+  serializeTaskCheckboxToggle,
+} from '../lib/markdown-editor.js';
 
 const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
 autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
@@ -30,43 +34,19 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function renderMarkdownPreview(markdown, className = '') {
-  return `<div class="${className} markdown-preview" data-markdown-preview>
-    <div data-markdown-content>${markdownToHTML(markdown)}</div>
+function renderMarkdownPreview(markdown, className = '', { interactiveTasks = false, inputId = '' } = {}) {
+  return `<div class="${className} markdown-preview" data-markdown-preview${inputId ? ` data-markdown-preview-input="${inputId}"` : ''}>
+    <div data-markdown-content>${renderMarkdown(markdown, { interactiveTasks })}</div>
   </div>`;
 }
 
-const MARKDOWN_TOOLBAR_BUTTONS = [
-  ['bold', 'B', '粗體'],
-  ['italic', 'I', '斜體'],
-  ['heading', 'H2', '標題'],
-  ['unordered-list', '•', '無序清單'],
-  ['ordered-list', '1.', '編號清單'],
-  ['quote', '❞', '引用'],
-  ['code', '</>', '程式碼'],
-  ['link', '↗', '連結'],
-];
-
-function markdownEditorToolbar() {
-  return `<div class="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯工具列">
-    ${MARKDOWN_TOOLBAR_BUTTONS.map(([command, label, title]) =>
-      `<button type="button" data-markdown-command="${command}" title="${title}" aria-label="${title}">${label}</button>`).join('')}
-  </div>`;
-}
+const markdownEditors = new Map();
 
 function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
   const editorMode = normalizeMarkdownEditorMode(mode);
   document.querySelectorAll('[data-markdown-editor-input]').forEach((textarea) => {
-    let editor = textarea.closest('.markdown-editor');
-    if (!editor) {
-      editor = document.createElement('div');
-      editor.className = 'markdown-editor';
-      textarea.parentNode.insertBefore(editor, textarea);
-      editor.appendChild(textarea);
-      editor.insertAdjacentHTML('afterbegin', markdownEditorToolbar());
-    }
-    editor.dataset.editorMode = editorMode;
-    editor.classList.toggle('is-source', editorMode === 'source');
+    markdownEditors.get(textarea)?.destroy();
+    markdownEditors.set(textarea, mountMarkdownEditor(textarea, { mode: editorMode }));
   });
 }
 
@@ -111,23 +91,6 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('click', (event) => {
-  const editorButton = event.target.closest('[data-markdown-command]');
-  if (editorButton) {
-    event.preventDefault();
-    const textarea = editorButton.closest('.markdown-editor')?.querySelector('[data-markdown-editor-input]');
-    if (!textarea) return;
-    const result = formatMarkdownSelection(
-      textarea.value,
-      textarea.selectionStart,
-      textarea.selectionEnd,
-      editorButton.dataset.markdownCommand,
-    );
-    textarea.value = result.value;
-    textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    textarea.focus();
-    return;
-  }
   const button = event.target.closest('[data-markdown-toggle]');
   if (!button) return;
   const preview = button.closest('[data-markdown-preview]');
@@ -138,6 +101,19 @@ document.addEventListener('click', (event) => {
 let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
 $('enTask').addEventListener('change', (event) => {
   $('enProject').value = projectIdForTask(event.target.value, S.tasks, $('enProject').value);
+});
+
+document.addEventListener('change', (event) => {
+  const checkbox = event.target.closest?.('input[data-markdown-task-path]');
+  const preview = checkbox?.closest('[data-markdown-preview-input]');
+  const textarea = preview && document.getElementById(preview.dataset.markdownPreviewInput);
+  if (!checkbox || !preview || !textarea) return;
+  textarea.value = serializeTaskCheckboxToggle(textarea.value, checkbox.dataset.markdownTaskPath);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  const host = preview.parentElement;
+  const className = [...preview.classList].filter((name) => name !== 'markdown-preview').join(' ');
+  preview.outerHTML = renderMarkdownPreview(textarea.value, className, { interactiveTasks: true, inputId: textarea.id });
+  if (host) initializeMarkdownPreviews(host);
 });
 let range = 'week';
 const customRange = { from: '', to: '' };
@@ -274,7 +250,10 @@ function startTimerTicker(timer) {
 
 function renderTimerNotesPreview() {
   const container = $('mgTimerNotesPreview');
-  container.innerHTML = renderMarkdownPreview($('mgTimerNotes').value, 'timer-notes-markdown');
+  container.innerHTML = renderMarkdownPreview($('mgTimerNotes').value, 'timer-notes-markdown', {
+    interactiveTasks: true,
+    inputId: 'mgTimerNotes',
+  });
   initializeMarkdownPreviews(container);
 }
 

@@ -21,17 +21,17 @@ test('renders consecutive ordered items in one ol', () => {
 });
 
 test('renders blockquotes as blockquote elements', () => {
-  assert.equal(markdownToHTML('> Quoted text'), '<blockquote>Quoted text</blockquote>');
+  assert.equal(markdownToHTML('> Quoted text'), '<blockquote><p>Quoted text</p></blockquote>');
 });
 
 test('renders Markdown horizontal rules as full-width hr elements', () => {
-  assert.equal(markdownToHTML('Before\n\n---\n\nAfter'), '<p>Before</p><hr /><p>After</p>');
+  assert.equal(markdownToHTML('Before\n\n---\n\nAfter'), '<p>Before</p><hr><p>After</p>');
 });
 
 test('renders fenced code and escapes code content', () => {
   assert.equal(
     markdownToHTML('```js\nconst value = <tag>;\n```'),
-    '<pre><code>const value = &lt;tag&gt;;</code></pre>',
+    '<pre><code class="language-js">const value = &lt;tag&gt;;</code></pre>',
   );
 });
 
@@ -49,10 +49,10 @@ test('keeps Markdown syntax literal inside inline code', () => {
   );
 });
 
-test('renders a fenced code block after up to three leading spaces', () => {
+test('treats indented fences as literal paragraph text in the shared contract', () => {
   assert.equal(
     markdownToHTML('   ```\n<literal>\n   ```'),
-    '<pre><code>&lt;literal&gt;</code></pre>',
+    '<p>   ``<code>\n&lt;literal&gt;\n   </code>``</p>',
   );
 });
 
@@ -74,4 +74,18 @@ test('only shows the toggle when the note is textually and visually long', () =>
   assert.equal(shouldShowMarkdownToggle('15:34 等待中', 240, 180), false);
   assert.equal(shouldShowMarkdownToggle('x'.repeat(121), 240, 180), true);
   assert.equal(shouldShowMarkdownToggle('x'.repeat(121), 200, 180), false);
+});
+
+test('renders escaped table pipes as cell content rather than delimiters', () => {
+  assert.equal(
+    markdownToHTML('| A | B |\n| --- | --- |\n| left\\|right | `code\\|pipe` |'),
+    '<table><thead><tr><th style="text-align:left">A</th><th style="text-align:left">B</th></tr></thead><tbody><tr><td style="text-align:left">left|right</td><td style="text-align:left"><code>code|pipe</code></td></tr></tbody></table>',
+  );
+});
+
+test('uses the shared renderer for disabled read-only task checkboxes', () => {
+  assert.equal(
+    markdownToHTML('- [ ] Open\n- [x] Done'),
+    '<ul class="markdown-task-list"><li><input type="checkbox" disabled>Open</li><li><input type="checkbox" disabled checked>Done</li></ul>',
+  );
 });

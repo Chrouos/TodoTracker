@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatMarkdownSelection, normalizeMarkdownEditorMode } from './markdown-editor.js';
+import {
+  formatMarkdownSelection,
+  markdownShortcutToBlock,
+  normalizeMarkdownEditorMode,
+  serializeTaskCheckboxToggle,
+} from './markdown-editor.js';
 
 test('wraps selected text in Markdown bold and keeps it selected', () => {
   assert.deepEqual(
@@ -26,4 +31,31 @@ test('prefixes every selected line for a Markdown list', () => {
 test('normalizes unknown editor settings to the toolbar editor', () => {
   assert.equal(normalizeMarkdownEditorMode('source'), 'source');
   assert.equal(normalizeMarkdownEditorMode('anything-else'), 'toolbar');
+});
+
+test('converts block-start Markdown shortcuts to native editor blocks', () => {
+  assert.deepEqual(markdownShortcutToBlock('# '), { type: 'heading', level: 1, inlines: [] });
+  assert.deepEqual(markdownShortcutToBlock('- [x] '), {
+    type: 'taskList',
+    items: [{ checked: true, inlines: [], children: [] }],
+  });
+  assert.equal(markdownShortcutToBlock('text - '), null);
+});
+
+test('serializes an editor task checkbox change back to Markdown', () => {
+  assert.equal(
+    serializeTaskCheckboxToggle('- [ ] Open\n- [x] Done', '0.0'),
+    '- [x] Open\n- [x] Done',
+  );
+});
+
+test('formats a selection as a Todo item without changing legacy commands', () => {
+  assert.deepEqual(
+    formatMarkdownSelection('Plan', 0, 4, 'todo'),
+    { value: '- [ ] Plan', selectionStart: 6, selectionEnd: 10 },
+  );
+  assert.deepEqual(
+    formatMarkdownSelection('Plan', 0, 4, 'bold'),
+    { value: '**Plan**', selectionStart: 2, selectionEnd: 6 },
+  );
 });
