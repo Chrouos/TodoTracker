@@ -335,18 +335,27 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
       }
       const selection = typeof window === 'undefined' ? null : window.getSelection();
       const node = selection?.anchorNode;
-      const surface = node instanceof Element
+      const selectedSurface = node instanceof Element
         ? node.closest<HTMLElement>('[data-editor-surface="true"]')
         : node?.parentElement?.closest<HTMLElement>('[data-editor-surface="true"]');
-      if (!selection?.rangeCount || !surface || !editorRef.current?.contains(surface)) return;
-      const range = selection.getRangeAt(0);
+      const surface = selection?.rangeCount && selectedSurface && editorRef.current?.contains(selectedSurface)
+        ? selectedSurface
+        : editorRef.current?.querySelector<HTMLElement>('[data-editor-surface="true"]');
+      if (!surface) return;
+      const range = selection?.rangeCount && surface === selectedSurface
+        ? selection.getRangeAt(0)
+        : document.createRange();
+      if (!selection?.rangeCount || surface !== selectedSurface) {
+        range.selectNodeContents(surface);
+        range.collapse(true);
+      }
       range.deleteContents();
       const textNode = document.createTextNode(text);
       range.insertNode(textNode);
       range.setStartAfter(textNode);
       range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
       commitSurface(surface);
     },
     getValue: () => mode === 'source' ? sourceValue : serializeMarkdown(blocks),
