@@ -7,4 +7,6 @@ assert.match(html, /<strong>完成<\/strong>/);
 assert.match(html, /<ul>[\s\S]*<li>一<\/li>[\s\S]*<\/ul>/);
 assert.match(html, /<code>code<\/code>/);
 assert.ok(!markdownToHtml('<script>alert(1)</script>').includes('<script>'));
-assert.equal(markdownToHtml('Before\n\n---\n\nAfter'), '<p>Before</p><hr /><p>After</p>');
+assert.equal(markdownToHtml('Before\n\n---\n\nAfter'), '<p>Before</p><hr><p>After</p>');
+assert.match(markdownToHtml('- [ ] Open\n- [x] Done'), /type="checkbox"/);
+assert.match(markdownToHtml('| A | B |\n| --- | --- |\n| x | y |'), /<table>/);
