@@ -109,8 +109,8 @@ export function updateInlinesForTextInput(inlines, nextText) {
   return replaceInlineRange(inlines, start, currentEnd, nextText.slice(start, nextEnd));
 }
 
-export function insertInlineTextAtSelection(inlines, start, end, text, { forceOuterBoundary = false } = {}) {
-  if (!forceOuterBoundary) return replaceInlineRange(inlines, start, end, text);
+export function insertInlineTextAtSelection(inlines, start, end, text, { range, surface } = {}) {
+  if (!isAfterInlineBoundary(range, surface)) return replaceInlineRange(inlines, start, end, text);
   const [before, rest] = splitInlinesAtOffset(inlines, start);
   const [, after] = splitInlinesAtOffset(rest, Math.max(0, end - start));
   return mergeInlines([...before, ...(text ? [{ type: 'text', value: text }] : []), ...after]);
@@ -220,10 +220,31 @@ function selectionSurface(root) {
   return surface && root.contains(surface) ? surface : null;
 }
 
-function isAfterInlineBoundary(range, surface) {
-  if (!range.collapsed || range.startContainer !== surface || range.startOffset < 1) return false;
-  const previous = surface.childNodes[range.startOffset - 1];
-  return previous instanceof Element && ['STRONG', 'EM', 'CODE', 'A'].includes(previous.tagName);
+export function isTextNodeEndAtOffset(node, offset) {
+  return node?.nodeType === 3 && offset === (node.nodeValue ?? '').length;
+}
+
+function isAtNodeEnd(node, offset) {
+  if (node?.nodeType === 3) return isTextNodeEndAtOffset(node, offset);
+  return Number.isInteger(offset) && offset === (node?.childNodes?.length ?? 0);
+}
+
+function isInlineMark(node) {
+  return node?.nodeType === 1 && ['STRONG', 'EM', 'CODE', 'A'].includes(node.tagName);
+}
+
+export function isAfterInlineBoundary(range, surface) {
+  if (!range?.collapsed || !surface || !isAtNodeEnd(range.startContainer, range.startOffset)) return false;
+  let node = range.startContainer;
+  if (node === surface) return isInlineMark(surface.childNodes?.[range.startOffset - 1]);
+  if (isInlineMark(node)) return true;
+  while (node && node !== surface) {
+    const parent = node.parentNode;
+    if (!parent || node.nextSibling) return false;
+    if (isInlineMark(parent)) return true;
+    node = parent;
+  }
+  return false;
 }
 
 function setSurfaceSelection(surface, start, end = start) {
@@ -638,7 +659,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
       if (!offsets) { target.append(document.createTextNode(text)); activeSurface = target; commitSurface(target); return; }
       const path = parsePath(target.dataset.blockPath);
       if (!path) return;
-      const update = (inlines) => insertInlineTextAtSelection(inlines, offsets.start, offsets.end, text, { forceOuterBoundary: isAfterInlineBoundary(offsets.range, target) });
+      const update = (inlines) => insertInlineTextAtSelection(inlines, offsets.start, offsets.end, text, { range: offsets.range, surface: target });
       if (target.dataset.editorKind === 'list-item') blocks = updateListItemAtPath(blocks, path, update);
       else if (target.dataset.editorKind === 'table-cell') {
         blocks = updateBlockAtPath(blocks, path, (block) => {

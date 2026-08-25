@@ -11,6 +11,8 @@ import {
   splitTextBlockAtOffset,
   indentListItem,
   insertInlineTextAtSelection,
+  isAfterInlineBoundary,
+  isTextNodeEndAtOffset,
   listItemPathAfterIndent,
   restoreTextareaFromEditor,
   updateInlinesForTextInput,
@@ -121,10 +123,23 @@ test('restores the textarea by replacing the editor wrapper and removing its mar
   assert.deepEqual(calls, [['replaceWith', textarea], ['remove']]);
 });
 
-test('inserts after a completed strong inline instead of extending the mark', () => {
+test('recognizes text-node carets at inline mark boundaries before inserting', () => {
+  const surface = { nodeType: 1, tagName: 'DIV' };
+  const ranges = ['STRONG', 'EM', 'CODE', 'A'].map((tagName) => {
+    const mark = { nodeType: 1, tagName, parentNode: surface };
+    const nested = { nodeType: 1, tagName: 'SPAN', parentNode: mark };
+    const textNode = { nodeType: 3, nodeValue: 'Bold', parentNode: nested };
+    return { textNode, range: { collapsed: true, startContainer: textNode, startOffset: 4 } };
+  });
+  assert.ok(ranges.every(({ textNode, range }) => isTextNodeEndAtOffset(textNode, range.startOffset) && isAfterInlineBoundary(range, surface)));
+
   const [block] = parseMarkdown('**Bold** plain');
   assert.equal(
-    serializeMarkdown([{ ...block, inlines: insertInlineTextAtSelection(block.inlines, 4, 4, '!', { forceOuterBoundary: true }) }]),
+    serializeMarkdown([{ ...block, inlines: insertInlineTextAtSelection(block.inlines, 4, 4, '!', { range: ranges[0].range, surface }) }]),
     '**Bold**! plain',
+  );
+  assert.equal(
+    serializeMarkdown([{ ...block, inlines: insertInlineTextAtSelection(block.inlines, 3, 3, '!', { range: { ...ranges[0].range, startOffset: 3 }, surface }) }]),
+    '**Bol!d** plain',
   );
 });
