@@ -6,7 +6,9 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type ClipboardEvent,
   type CompositionEvent,
+  type FormEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
@@ -23,10 +25,14 @@ import {
   type Inline,
 } from '@/lib/markdown';
 import {
+  applyInlineCommand,
   inlineText,
+  insertInlineTextAtRange,
   listItemPathAfterIndent,
+  pasteMarkdownAtTextBlock,
   splitTextBlockAtOffset,
   updateInlinesForTextInput,
+  type InlineCommand,
 } from '@/lib/markdown-editor';
 
 export type MarkdownBlockEditorProps = {
@@ -43,6 +49,7 @@ export type MarkdownEditorHandle = {
   focus: () => void;
   insertText: (text: string) => void;
   getValue: () => string;
+  getSelectionContext: () => { value: string; offset: number };
 };
 
 type EditorTarget = {
@@ -86,19 +93,30 @@ function getTarget(surface: HTMLElement): EditorTarget | null {
   return target;
 }
 
+function blockLocation(blocks: Block[], path: number[]): { container: Block[]; index: number; block: Block } | null {
+  const visit = (container: Block[], index: number, remaining: number[]): { container: Block[]; index: number; block: Block } | null => {
+    const block = container[index];
+    if (!block) return null;
+    if (!remaining.length) return { container, index, block };
+    if (block.type === 'quote') {
+      return block.blocks ? visit(block.blocks, remaining[0], remaining.slice(1)) : null;
+    }
+    if (block.type === 'list' || block.type === 'taskList') {
+      const item = block.items[remaining[0]];
+      const childIndex = remaining[1];
+      return item && childIndex !== undefined
+        ? visit(item.children, childIndex, remaining.slice(2))
+        : null;
+    }
+    return null;
+  };
+  return path.length ? visit(blocks, path[0], path.slice(1)) : null;
+}
+
 function updateBlockAtPath(blocks: Block[], path: number[], updater: (block: Block) => Block): Block[] {
   const next = cloneBlocks(blocks);
-  const update = (container: Block[], remaining: number[]): void => {
-    const index = remaining[0];
-    const block = container[index];
-    if (!block) return;
-    if (remaining.length === 1) {
-      container[index] = updater(block);
-      return;
-    }
-    if (block.type === 'quote' && block.blocks) update(block.blocks, remaining.slice(1));
-  };
-  update(next, path);
+  const location = blockLocation(next, path);
+  if (location) location.container[location.index] = updater(location.block);
   return next;
 }
 
@@ -114,8 +132,8 @@ function updateListItemAtPath(blocks: Block[], path: number[], updater: (inlines
       item.inlines = updater(item.inlines);
       return true;
     }
-    const child = item.children.find((entry) => entry.type === 'list' || entry.type === 'taskList' || entry.type === 'quote');
-    return visitBlock(child, remaining.slice(1));
+    const child = item.children[remaining[1]];
+    return visitBlock(child, remaining.slice(2));
   };
   visitBlock(next[path[0]], path.slice(1));
   return next;
@@ -131,12 +149,58 @@ function updateTableCell(blocks: Block[], target: EditorTarget, value: string): 
   });
 }
 
+function updateTargetInlines(blocks: Block[], target: EditorTarget, updater: (inlines: Inline[]) => Inline[]): Block[] {
+  if (target.kind === 'listItem') return updateListItemAtPath(blocks, target.path, updater);
+  if (target.kind === 'tableCell') {
+    return updateBlockAtPath(blocks, target.path, (block) => {
+      if (block.type !== 'table' || target.row === undefined || target.column === undefined || !target.section) return block;
+      const cells = target.section === 'header' ? block.header : block.rows[target.row];
+      if (cells?.[target.column]) cells[target.column] = updater(cells[target.column]);
+      return block;
+    });
+  }
+  return updateBlockAtPath(blocks, target.path, (block) => {
+    return block.type === 'paragraph' || block.type === 'heading'
+      ? { ...block, inlines: updater(block.inlines) }
+      : block;
+  });
+}
+
+function getTargetInlines(blocks: Block[], target: EditorTarget): Inline[] {
+  if (target.kind === 'listItem') {
+    const visit = (block: Block | undefined, remaining: number[]): Inline[] => {
+      if (!block || !remaining.length) return [];
+      if (block.type === 'quote') return visit(block.blocks?.[remaining[0]], remaining.slice(1));
+      if (block.type !== 'list' && block.type !== 'taskList') return [];
+      const item = block.items[remaining[0]];
+      if (!item) return [];
+      if (remaining.length === 1) return item.inlines;
+      return visit(item.children[remaining[1]], remaining.slice(2));
+    };
+    return visit(blocks[target.path[0]], target.path.slice(1));
+  }
+  const block = findBlockAtPath(blocks, target.path);
+  if (target.kind === 'tableCell' && block?.type === 'table' && target.row !== undefined && target.column !== undefined && target.section) {
+    const cells = target.section === 'header' ? block.header : block.rows[target.row];
+    return cells?.[target.column] ?? [];
+  }
+  return block?.type === 'paragraph' || block?.type === 'heading' ? block.inlines : [];
+}
+
 function shortcutBlock(block: Block, value: string): Block | null {
-  const shortcut = detectMarkdownShortcut(value);
+  const shortcut = detectMarkdownShortcut(value) as
+    | { type: 'heading'; level: number }
+    | { type: 'task'; checked: boolean }
+    | { type: 'list'; ordered: boolean }
+    | { type: 'quote' }
+    | { type: 'codeBlock' }
+    | null;
   if (!shortcut || (block.type !== 'paragraph' && block.type !== 'heading')) return null;
   if (shortcut.type === 'heading') return { type: 'heading', level: shortcut.level, inlines: [] };
   if (shortcut.type === 'task') return { type: 'taskList', items: [{ checked: shortcut.checked, inlines: [], children: [] }] };
-  return { type: 'list', ordered: shortcut.ordered, items: [{ inlines: [], children: [] }] };
+  if (shortcut.type === 'list') return { type: 'list', ordered: shortcut.ordered, items: [{ inlines: [], children: [] }] };
+  if (shortcut.type === 'quote') return { type: 'quote', blocks: [{ type: 'paragraph', inlines: [] }] };
+  return { type: 'codeBlock', value: '' };
 }
 
 function isEmptySurface(surface: HTMLElement): boolean {
@@ -152,6 +216,79 @@ function caretOffset(surface: HTMLElement): number {
   before.selectNodeContents(surface);
   before.setEnd(range.startContainer, range.startOffset);
   return before.toString().length;
+}
+
+function selectionOffsets(surface: HTMLElement): { start: number; end: number } | null {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return null;
+  const range = selection.getRangeAt(0);
+  if (!surface.contains(range.startContainer) || !surface.contains(range.endContainer)) return null;
+  const before = range.cloneRange();
+  before.selectNodeContents(surface);
+  before.setEnd(range.startContainer, range.startOffset);
+  const start = before.toString().length;
+  return { start, end: start + range.toString().length };
+}
+
+function isInlineMark(node: Node | null): node is HTMLElement {
+  return node instanceof HTMLElement && ['STRONG', 'EM', 'CODE', 'A'].includes(node.tagName);
+}
+
+function isAtNodeEnd(node: Node, offset: number): boolean {
+  return node.nodeType === Node.TEXT_NODE
+    ? offset === (node.nodeValue ?? '').length
+    : offset === node.childNodes.length;
+}
+
+function isSelectionAfterInlineMark(surface: HTMLElement): boolean {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return false;
+  const range = selection.getRangeAt(0);
+  if (!range.collapsed || !surface.contains(range.startContainer) || !isAtNodeEnd(range.startContainer, range.startOffset)) return false;
+  let node: Node | null = range.startContainer;
+  if (node === surface) return isInlineMark(surface.childNodes[range.startOffset - 1] ?? null);
+  if (isInlineMark(node)) return true;
+  while (node && node !== surface) {
+    const parent: Node | null = node.parentNode;
+    if (!parent || node.nextSibling) return false;
+    if (isInlineMark(parent)) return true;
+    node = parent;
+  }
+  return false;
+}
+
+function setSurfaceSelection(surface: HTMLElement, start: number, end = start): void {
+  const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT);
+  let cursor = 0;
+  let startNode: Node | null = null;
+  let endNode: Node | null = null;
+  let startOffset = 0;
+  let endOffset = 0;
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const length = node.textContent?.length ?? 0;
+    if (!startNode && start <= cursor + length) {
+      startNode = node;
+      startOffset = Math.max(0, start - cursor);
+    }
+    if (!endNode && end <= cursor + length) {
+      endNode = node;
+      endOffset = Math.max(0, end - cursor);
+      break;
+    }
+    cursor += length;
+  }
+  if (!startNode) {
+    surface.focus();
+    return;
+  }
+  const range = document.createRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode ?? startNode, endNode ? endOffset : startOffset);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  surface.focus();
 }
 
 function renderInlines(inlines: Inline[]): ReactNode {
@@ -177,6 +314,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
 }, ref) {
   const [blocks, setBlocks] = useState<Block[]>(() => blocksFromValue(value));
   const [sourceValue, setSourceValue] = useState(value);
+  const [editorMode, setEditorMode] = useState<'blocks' | 'source'>(mode);
   const editorRef = useRef<HTMLDivElement>(null);
   const sourceRef = useRef<HTMLTextAreaElement>(null);
   const dirtyRef = useRef(false);
@@ -196,6 +334,10 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     }
   }, [value]);
 
+  useEffect(() => {
+    setEditorMode(mode);
+  }, [mode]);
+
   const commitBlocks = (next: Block[]) => {
     const nextValue = serializeMarkdown(next);
     setBlocks(next);
@@ -214,11 +356,26 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     onChange(nextValue);
   };
 
-  const focusPath = (path: number[]) => {
+  const focusPath = (path: number[], start?: number, end = start) => {
     requestAnimationFrame(() => {
       const element = editorRef.current?.querySelector<HTMLElement>(`[data-editor-surface="true"][data-block-path="${pathLabel(path)}"]`);
-      element?.focus();
+      if (!element) return;
+      if (start === undefined) element.focus();
+      else setSurfaceSelection(element, start, end);
     });
+  };
+
+  const selectedSurface = (): HTMLElement | null => {
+    const selection = typeof window === 'undefined' ? null : window.getSelection();
+    const node = selection?.anchorNode;
+    const selected = node instanceof Element
+      ? node.closest<HTMLElement>('[data-editor-surface="true"]')
+      : node?.parentElement?.closest<HTMLElement>('[data-editor-surface="true"]');
+    if (selected && editorRef.current?.contains(selected)) return selected;
+    const target = activeTargetRef.current;
+    return target
+      ? editorRef.current?.querySelector<HTMLElement>(`[data-editor-surface="true"][data-block-path="${pathLabel(target.path)}"]`) ?? null
+      : editorRef.current?.querySelector<HTMLElement>('[data-editor-surface="true"]') ?? null;
   };
 
   const commitSurface = (surface: HTMLElement) => {
@@ -253,15 +410,68 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     if (!composingRef.current) commitSurface(surface);
   };
 
+  const onSurfaceBeforeInput = (event: FormEvent<HTMLElement>) => {
+    if (composingRef.current) return;
+    const input = event.nativeEvent as InputEvent;
+    if (input.inputType !== 'insertText' || !input.data || !isSelectionAfterInlineMark(event.currentTarget)) return;
+    const target = getTarget(event.currentTarget);
+    const selection = selectionOffsets(event.currentTarget);
+    if (!target || !selection || !['block', 'listItem', 'tableCell'].includes(target.kind)) return;
+    event.preventDefault();
+    activeTargetRef.current = target;
+    commitBlocks(updateTargetInlines(
+      blocks,
+      target,
+      (inlines) => insertInlineTextAtRange(inlines, selection.start, selection.end, input.data ?? '', true),
+    ));
+    focusPath(target.path, selection.start + input.data.length);
+  };
+
+  const onSurfacePaste = (event: ClipboardEvent<HTMLElement>) => {
+    const markdown = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
+    if (!markdown.includes('\n')) return;
+    const target = getTarget(event.currentTarget);
+    const selection = selectionOffsets(event.currentTarget);
+    if (!target || target.kind !== 'block' || !selection) return;
+    event.preventDefault();
+    const pasted = pasteMarkdownAtTextBlock(blocks, target.path, selection.start, selection.end, markdown);
+    commitBlocks(pasted.blocks);
+    focusPath(pasted.nextPath);
+  };
+
   const onSurfaceComposition = (event: CompositionEvent<HTMLElement>) => {
     composingRef.current = event.type === 'compositionstart';
     if (event.type === 'compositionend') commitSurface(event.currentTarget);
+  };
+
+  const applyInlineFormatting = (command: InlineCommand) => {
+    const surface = selectedSurface();
+    const target = surface ? getTarget(surface) : null;
+    const selection = surface ? selectionOffsets(surface) : null;
+    if (!target || !selection || !['block', 'listItem', 'tableCell'].includes(target.kind)) return;
+    const url = command === 'link'
+      ? window.prompt('連結網址（僅支援 https://）', 'https://example.com') ?? 'https://example.com'
+      : undefined;
+    const formatted = applyInlineCommand(
+      getTargetInlines(blocks, target),
+      selection.start,
+      selection.end,
+      command,
+      url,
+    );
+    commitBlocks(updateTargetInlines(blocks, target, () => formatted.inlines));
+    focusPath(target.path, formatted.selectionStart, formatted.selectionEnd);
   };
 
   const onSurfaceKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const target = getTarget(event.currentTarget);
     if (!target || composingRef.current) return;
     activeTargetRef.current = target;
+    if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'k'].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      applyInlineFormatting(event.key.toLowerCase() === 'b' ? 'strong' : event.key.toLowerCase() === 'i' ? 'emphasis' : 'link');
+      return;
+    }
     if (target.kind === 'block' && event.key === 'Enter') {
       event.preventDefault();
       const split = splitTextBlockAtOffset(blocks, target.path, caretOffset(event.currentTarget));
@@ -315,12 +525,12 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
 
   useImperativeHandle(ref, () => ({
     focus: () => {
-      if (mode === 'source') sourceRef.current?.focus();
+      if (editorMode === 'source') sourceRef.current?.focus();
       else editorRef.current?.querySelector<HTMLElement>('[data-editor-surface="true"]')?.focus();
     },
     insertText: (text: string) => {
       if (!text) return;
-      if (mode === 'source') {
+      if (editorMode === 'source') {
         const textarea = sourceRef.current;
         if (!textarea) return;
         const start = textarea.selectionStart;
@@ -333,33 +543,40 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
         });
         return;
       }
-      const selection = typeof window === 'undefined' ? null : window.getSelection();
-      const node = selection?.anchorNode;
-      const selectedSurface = node instanceof Element
-        ? node.closest<HTMLElement>('[data-editor-surface="true"]')
-        : node?.parentElement?.closest<HTMLElement>('[data-editor-surface="true"]');
-      const surface = selection?.rangeCount && selectedSurface && editorRef.current?.contains(selectedSurface)
-        ? selectedSurface
-        : editorRef.current?.querySelector<HTMLElement>('[data-editor-surface="true"]');
+      const surface = selectedSurface();
       if (!surface) return;
-      const range = selection?.rangeCount && surface === selectedSurface
-        ? selection.getRangeAt(0)
-        : document.createRange();
-      if (!selection?.rangeCount || surface !== selectedSurface) {
-        range.selectNodeContents(surface);
-        range.collapse(true);
+      const target = getTarget(surface);
+      const selection = selectionOffsets(surface) ?? { start: 0, end: 0 };
+      if (!target) return;
+      if (target.kind === 'codeBlock') {
+        commitBlocks(updateBlockAtPath(blocks, target.path, (block) => {
+          if (block.type !== 'codeBlock') return block;
+          const current = block.value ?? '';
+          return { ...block, value: `${current.slice(0, selection.start)}${text}${current.slice(selection.end)}` };
+        }));
+      } else if (['block', 'listItem', 'tableCell'].includes(target.kind)) {
+        commitBlocks(updateTargetInlines(
+          blocks,
+          target,
+          (inlines) => insertInlineTextAtRange(inlines, selection.start, selection.end, text, isSelectionAfterInlineMark(surface)),
+        ));
+      } else {
+        return;
       }
-      range.deleteContents();
-      const textNode = document.createTextNode(text);
-      range.insertNode(textNode);
-      range.setStartAfter(textNode);
-      range.collapse(true);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      commitSurface(surface);
+      focusPath(target.path, selection.start + text.length);
     },
-    getValue: () => mode === 'source' ? sourceValue : serializeMarkdown(blocks),
-  }), [blocks, mode, sourceValue]);
+    getValue: () => editorMode === 'source' ? sourceValue : serializeMarkdown(blocks),
+    getSelectionContext: () => {
+      if (editorMode === 'source') {
+        const offset = sourceRef.current?.selectionStart ?? 0;
+        return { value: sourceValue, offset };
+      }
+      const surface = selectedSurface();
+      if (!surface) return { value: '', offset: 0 };
+      const offset = selectionOffsets(surface)?.start ?? 0;
+      return { value: surface.textContent ?? '', offset };
+    },
+  }), [blocks, editorMode, sourceValue]);
 
   const renderTextSurface = (content: ReactNode, target: EditorTarget, className = '') => (
     <div
@@ -372,7 +589,9 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
       data-table-column={target.column}
       data-table-section={target.section}
       onFocus={(event) => { activeTargetRef.current = getTarget(event.currentTarget); }}
+      onBeforeInput={onSurfaceBeforeInput}
       onInput={(event) => onSurfaceInput(event.currentTarget)}
+      onPaste={onSurfacePaste}
       onCompositionStart={onSurfaceComposition}
       onCompositionEnd={onSurfaceComposition}
       onKeyDown={onSurfaceKeyDown}
@@ -408,7 +627,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
           {renderTextSurface(renderInlines(item.inlines), { kind: 'listItem', path: itemPath })}
           {item.children.map((child, childIndex) => renderBlock(
             child,
-            itemPath,
+            [...itemPath, childIndex],
             [...blockPath, index, childIndex],
           ))}
         </li>;
@@ -418,19 +637,45 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     return <hr className="markdown-editor-block" data-block-path={key} key={key} />;
   };
 
-  if (mode === 'source') {
-    return <textarea ref={sourceRef} className="markdown-block-editor markdown-block-editor-source" value={sourceValue} placeholder={placeholder} style={{ minHeight: min, maxHeight: max }} onChange={(event) => commitSource(event.target.value)} />;
+  const modeToggle = (
+    <>
+      <button aria-pressed={editorMode === 'blocks'} onClick={() => setEditorMode('blocks')} type="button">Blocks</button>
+      <button aria-pressed={editorMode === 'source'} onClick={() => setEditorMode('source')} type="button">Source</button>
+    </>
+  );
+
+  if (editorMode === 'source') {
+    return (
+      <div className="markdown-block-editor" style={{ minHeight: min, maxHeight: max }}>
+        <div className="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯模式">
+          {modeToggle}
+        </div>
+        <textarea
+          ref={sourceRef}
+          className="markdown-block-editor-source"
+          value={sourceValue}
+          placeholder={placeholder}
+          style={{ minHeight: min, maxHeight: max, border: 0, borderRadius: 0, background: 'transparent' }}
+          onChange={(event) => commitSource(event.target.value)}
+        />
+      </div>
+    );
   }
 
   return (
     <div className="markdown-block-editor" style={{ minHeight: min, maxHeight: max }}>
       <div className="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯工具">
+        {modeToggle}
+        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('strong')} type="button"><strong>B</strong></button>
+        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('emphasis')} type="button"><em>I</em></button>
+        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('code')} type="button">行內碼</button>
+        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('link')} type="button">連結</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('paragraph')} type="button">段落</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('heading')} type="button">標題</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('list')} type="button">清單</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('task')} type="button">待辦</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('quote')} type="button">引用</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('code')} type="button">程式碼</button>
+        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('code')} type="button">程式碼區塊</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('table')} type="button">表格</button>
         <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('rule')} type="button">分隔線</button>
       </div>
@@ -442,15 +687,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
 });
 
 function findBlockAtPath(blocks: Block[], path: number[]): Block | null {
-  let container = blocks;
-  for (let index = 0; index < path.length; index += 1) {
-    const block = container[path[index]];
-    if (!block) return null;
-    if (index === path.length - 1) return block;
-    if (block.type !== 'quote' || !block.blocks) return null;
-    container = block.blocks;
-  }
-  return null;
+  return blockLocation(blocks, path)?.block ?? null;
 }
 
 export default MarkdownBlockEditor;

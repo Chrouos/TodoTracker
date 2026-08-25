@@ -7,6 +7,8 @@ export function detectMarkdownShortcut(value) {
   if (/^[-+*] \[[xX]\] $/.test(value)) return { type: 'task', checked: true };
   if (/^[-+*] $/.test(value)) return { type: 'list', ordered: false };
   if (/^\d+[.)] $/.test(value)) return { type: 'list', ordered: true };
+  if (value === '> ') return { type: 'quote' };
+  if (value === '``` ') return { type: 'codeBlock' };
   return null;
 }
 
@@ -93,7 +95,8 @@ function descendBlock(block, container, blockIndex, path, parent) {
   const item = block.items[index];
   if (!item) throw new RangeError('Path does not reference a list item');
   if (path.length === 1) return { list: block.items, index, item, block, container, containerIndex: blockIndex, parent, blockIndex };
-  const childIndex = item.children.findIndex((child) => ['list', 'taskList', 'quote'].includes(child.type));
-  if (childIndex < 0) throw new RangeError('Path does not reference a nested list');
-  return descend(item.children, childIndex, path.slice(1), { list: block.items, index, item, block, container: item.children, blockIndex: childIndex });
+  const childIndex = path[1];
+  const child = item.children[childIndex];
+  if (!child || path.length < 3) throw new RangeError('Path does not reference a nested list');
+  return descend(item.children, childIndex, path.slice(2), { list: block.items, index, item, block, container: item.children, blockIndex: childIndex });
 }

@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
 import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
+import MarkdownPreview from '@/components/MarkdownPreview';
 import { flattenTree, indentLabel, pathOf } from '@/lib/tree';
 import type { Schedule } from '@/lib/types';
 
@@ -171,7 +172,7 @@ export default function SchedulesPage() {
                   {p ? pathOf(projects, p.id).join(' / ') : '未分類'}
                   {s.lastRunDate ? ` · 上次開單 ${s.lastRunDate}` : ' · 尚未執行過'}
                 </div>
-                {s.notes && <div className="notes">{s.notes}</div>}
+                {s.notes && <MarkdownPreview className="notes" value={s.notes} />}
               </div>
               <div className="act">
                 <button className="btn-sm" onClick={() => edit(s)}>[編輯]</button>

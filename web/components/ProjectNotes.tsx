@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
+import MarkdownPreview from '@/components/MarkdownPreview';
 import { fmtDate, fmtClock } from '@/lib/time';
 import type { Project } from '@/lib/types';
 
@@ -93,7 +94,7 @@ export default function ProjectNotes({ project }: { project: Project }) {
             />
             </div>
           ) : (
-            <div className="note-body">{n.text}</div>
+            <MarkdownPreview className="note-body" value={n.text} />
           )}
         </div>
       )) : <div className="empty">還沒有目標或筆記</div>}

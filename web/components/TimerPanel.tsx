@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { fmtHMS, fmtClock } from '@/lib/time';
 import { flattenTree, indentLabel } from '@/lib/tree';
 import MarkdownBlockEditor, { type MarkdownEditorHandle } from '@/components/MarkdownBlockEditor';
+import { timestampInsertionText } from '@/lib/markdown-editor';
 
 type Draft = { projectId: string; taskId: string; description: string };
 
@@ -40,7 +41,14 @@ export default function TimerPanel() {
   };
 
   const stamp = () => {
-    notesRef.current?.insertText(`${fmtClock(new Date().toISOString())} `);
+    const editor = notesRef.current;
+    if (!editor) return;
+    const selection = editor.getSelectionContext();
+    editor.insertText(timestampInsertionText(
+      selection.value,
+      selection.offset,
+      `${fmtClock(new Date().toISOString())} `,
+    ));
   };
 
   // 只有本地跳秒，不打擴充 —— 經過時間從 startedAt 現算

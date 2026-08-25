@@ -1,14 +1,17 @@
-import { cloneBlocks } from '../../shared/markdown/index.js';
+import { cloneBlocks, parseMarkdown } from '../../shared/markdown/index.js';
 import type { Block, Inline } from '../../shared/markdown/index.js';
 
 type ListBlock = Extract<Block, { type: 'list' | 'taskList' }>;
 type ListItem = ListBlock['items'][number];
 type ListLocation = {
   block: ListBlock;
+  blockPath: number[];
   index: number;
   item: ListItem;
-  parentItemPath: number[] | null;
+  parent: { blockPath: number[]; index: number } | null;
 };
+
+export type InlineCommand = 'strong' | 'emphasis' | 'code' | 'link';
 
 export function inlineText(inlines: Inline[] = []): string {
   return inlines.map((inline) => {
@@ -32,6 +35,84 @@ export function updateInlinesForTextInput(inlines: Inline[], nextText: string): 
   }
 
   return replaceInlineRange(inlines, start, currentEnd, nextText.slice(start, nextEnd));
+}
+
+export function applyInlineCommand(
+  inlines: Inline[],
+  start: number,
+  end: number,
+  command: InlineCommand,
+  url = 'https://example.com',
+): { inlines: Inline[]; selectionStart: number; selectionEnd: number } {
+  const length = inlineText(inlines).length;
+  const safeStart = Math.max(0, Math.min(start, length));
+  const safeEnd = Math.max(safeStart, Math.min(end, length));
+  const [before, rest] = splitInlinesAtOffset(inlines, safeStart);
+  let [selected, after] = splitInlinesAtOffset(rest, safeEnd - safeStart);
+  const placeholder = command === 'strong'
+    ? '粗體文字'
+    : command === 'emphasis'
+      ? '斜體文字'
+      : command === 'code'
+        ? '程式碼'
+        : '連結文字';
+  if (!selected.length) selected = [{ type: 'text', value: placeholder }];
+  const wrapper = command === 'link'
+    ? { type: 'link', url: safeHttpsUrl(url), inlines: selected } satisfies Inline
+    : { type: command, inlines: selected } satisfies Inline;
+  const selectedLength = inlineText(selected).length;
+  return {
+    inlines: mergeInlines([...before, wrapper, ...after]),
+    selectionStart: safeStart,
+    selectionEnd: safeStart + selectedLength,
+  };
+}
+
+export function insertInlineTextAtRange(
+  inlines: Inline[],
+  start: number,
+  end: number,
+  text: string,
+  afterInlineMark = false,
+): Inline[] {
+  if (!afterInlineMark) return replaceInlineRange(inlines, start, end, text);
+  const [before, rest] = splitInlinesAtOffset(inlines, start);
+  const [, after] = splitInlinesAtOffset(rest, Math.max(0, end - start));
+  return mergeInlines([...before, ...(text ? [{ type: 'text', value: text } satisfies Inline] : []), ...after]);
+}
+
+export function pasteMarkdownAtTextBlock(
+  blocks: Block[],
+  path: number[],
+  start: number,
+  end: number,
+  markdown: string,
+): { blocks: Block[]; nextPath: number[] } {
+  const next = cloneBlocks(blocks);
+  const location = resolveTextBlock(next, path);
+  const pasted = parseMarkdown(markdown);
+  if (!location || !pasted.length) return { blocks: next, nextPath: path };
+
+  const textLength = inlineText(location.block.inlines).length;
+  const safeStart = Math.max(0, Math.min(start, textLength));
+  const safeEnd = Math.max(safeStart, Math.min(end, textLength));
+  const [before, rest] = splitInlinesAtOffset(location.block.inlines, safeStart);
+  const [, after] = splitInlinesAtOffset(rest, safeEnd - safeStart);
+  const replacement: Block[] = [];
+  if (before.length) replacement.push({ ...location.block, inlines: before });
+  replacement.push(...pasted);
+  if (after.length) replacement.push({ ...location.block, inlines: after });
+  location.container.splice(location.index, 1, ...replacement);
+  return {
+    blocks: next,
+    nextPath: [...path.slice(0, -1), location.index + replacement.length - 1],
+  };
+}
+
+export function timestampInsertionText(value: string, offset: number, timestamp: string): string {
+  const safeOffset = Math.max(0, Math.min(offset, value.length));
+  const atLineStart = safeOffset === 0 || value[safeOffset - 1] === '\n';
+  return `${atLineStart ? '' : '\n'}${timestamp}`;
 }
 
 export function splitTextBlockAtOffset(blocks: Block[], path: number[], offset: number): { blocks: Block[]; nextPath: number[] } {
@@ -65,16 +146,28 @@ export function listItemPathAfterIndent(blocks: Block[], path: number[], directi
   if (!location) return path;
 
   if (direction === 'out') {
-    if (!location.parentItemPath) return path;
-    const next = [...location.parentItemPath];
-    next[next.length - 1] += 1;
-    return next;
+    return location.parent ? [...location.parent.blockPath, location.parent.index + 1] : path;
   }
 
   if (location.index === 0) return path;
   const previous = location.block.items[location.index - 1];
-  const nested = previous.children.find((child) => child.type === location.block.type) as ListBlock | undefined;
-  return [...path.slice(0, -1), location.index - 1, nested?.items.length ?? 0];
+  const childIndex = previous.children.findIndex((child) => child.type === location.block.type);
+  const nested = childIndex < 0 ? undefined : previous.children[childIndex] as ListBlock;
+  return [
+    ...location.blockPath,
+    location.index - 1,
+    childIndex < 0 ? previous.children.length : childIndex,
+    nested?.items.length ?? 0,
+  ];
+}
+
+function safeHttpsUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' ? parsed.toString() : 'https://example.com';
+  } catch {
+    return 'https://example.com';
+  }
 }
 
 function replaceInlineRange(inlines: Inline[], start: number, end: number, replacement: string): Inline[] {
@@ -156,16 +249,23 @@ function cloneInline(inline: Inline): Inline {
 }
 
 function resolveTextBlock(blocks: Block[], path: number[]): { container: Block[]; index: number; block: Extract<Block, { type: 'paragraph' | 'heading' }> } | null {
-  let container = blocks;
-  for (let depth = 0; depth < path.length; depth += 1) {
-    const index = path[depth];
+  const visit = (container: Block[], index: number, remaining: number[]): ReturnType<typeof resolveTextBlock> => {
     const block = container[index];
     if (!block) return null;
-    if (depth === path.length - 1) return block.type === 'paragraph' || block.type === 'heading' ? { container, index, block } : null;
-    if (block.type !== 'quote' || !block.blocks) return null;
-    container = block.blocks;
-  }
-  return null;
+    if (!remaining.length) return block.type === 'paragraph' || block.type === 'heading' ? { container, index, block } : null;
+    if (block.type === 'quote') {
+      return block.blocks ? visit(block.blocks, remaining[0], remaining.slice(1)) : null;
+    }
+    if (block.type === 'list' || block.type === 'taskList') {
+      const item = block.items[remaining[0]];
+      const childIndex = remaining[1];
+      return item && childIndex !== undefined
+        ? visit(item.children, childIndex, remaining.slice(2))
+        : null;
+    }
+    return null;
+  };
+  return path.length ? visit(blocks, path[0], path.slice(1)) : null;
 }
 
 function collectBlockTaskPaths(block: Block, path: number[], paths: number[][]): void {
@@ -177,7 +277,7 @@ function collectBlockTaskPaths(block: Block, path: number[], paths: number[][]):
   block.items.forEach((item, index) => {
     const itemPath = [...path, index];
     if (block.type === 'taskList') paths.push(itemPath);
-    item.children.forEach((child) => collectBlockTaskPaths(child, itemPath, paths));
+    item.children.forEach((child, childIndex) => collectBlockTaskPaths(child, [...itemPath, childIndex], paths));
   });
 }
 
@@ -187,17 +287,25 @@ function resolveListLocation(blocks: Block[], path: number[]): ListLocation | nu
   return resolveListBlock(first, path.slice(1), [path[0]], null);
 }
 
-function resolveListBlock(block: Block, path: number[], prefix: number[], parentItemPath: number[] | null): ListLocation | null {
+function resolveListBlock(
+  block: Block,
+  path: number[],
+  blockPath: number[],
+  parent: { blockPath: number[]; index: number } | null,
+): ListLocation | null {
   if (block.type === 'quote') {
-    const child = block.blocks?.[path[0]];
-    return child ? resolveListBlock(child, path.slice(1), [...prefix, path[0]], null) : null;
+    const childIndex = path[0];
+    const child = block.blocks?.[childIndex];
+    return child ? resolveListBlock(child, path.slice(1), [...blockPath, childIndex], null) : null;
   }
   if ((block.type !== 'list' && block.type !== 'taskList') || !path.length) return null;
   const index = path[0];
   const item = block.items[index];
   if (!item) return null;
-  if (path.length === 1) return { block, index, item, parentItemPath };
-  const child = item.children.find((entry) => entry.type === 'list' || entry.type === 'taskList' || entry.type === 'quote');
-  const itemPath = [...prefix, index];
-  return child ? resolveListBlock(child, path.slice(1), itemPath, itemPath) : null;
+  if (path.length === 1) return { block, blockPath, index, item, parent };
+  const childIndex = path[1];
+  const child = item.children[childIndex];
+  return child
+    ? resolveListBlock(child, path.slice(2), [...blockPath, index, childIndex], { blockPath, index })
+    : null;
 }
