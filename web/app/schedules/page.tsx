@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
-import AutoTextarea from '@/components/AutoTextarea';
+import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
 import { flattenTree, indentLabel, pathOf } from '@/lib/tree';
 import type { Schedule } from '@/lib/types';
 
@@ -134,7 +134,7 @@ export default function SchedulesPage() {
         </div>
 
         <label className="field" style={{ marginTop: 12 }}><span>備註</span>
-          <AutoTextarea value={form.notes} min={72} max={280}
+          <MarkdownBlockEditor value={form.notes} min={72} max={280}
             placeholder="會一併寫進產生的 Todo"
             onChange={(v) => setForm({ ...form, notes: v })} /></label>
 

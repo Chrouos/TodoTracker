@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
-import AutoTextarea from '@/components/AutoTextarea';
+import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
 import { fmtHM } from '@/lib/time';
 import { taskMetrics, dueLabel, leadLabel, stampLabel } from '@/lib/tasks';
 import { flattenTree, indentLabel, descendantIds, pathOf } from '@/lib/tree';
@@ -115,7 +115,7 @@ export default function TodosPage() {
         </div>
 
         <label className="field" style={{ marginTop: 12 }}><span>備註</span>
-          <AutoTextarea value={form.notes} min={80} max={320}
+          <MarkdownBlockEditor value={form.notes} min={80} max={320}
             placeholder="細節、連結、驗收條件…"
             onChange={(v) => setForm({ ...form, notes: v })} /></label>
 
