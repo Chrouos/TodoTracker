@@ -98,10 +98,28 @@ test('toggles a nested task after a sibling normal list without path collisions'
   );
 });
 
+test('toggles a quote-list-task item at the canonical editor path', () => {
+  const markdown = '> - Parent\n>   - [ ] Nested task';
+  assert.equal(
+    serializeTaskCheckboxToggle(markdown, '0.0.0.0.0'),
+    '> - Parent\n>   - [x] Nested task',
+  );
+});
+
 test('continues and exits list items with the shared Markdown structure', () => {
   const source = parseMarkdown('- One');
   assert.equal(serializeMarkdown(continueListItem(source, [0, 0])), '- One\n- ');
   assert.equal(serializeMarkdown(exitEmptyListItem(continueListItem(source, [0, 0]), [0, 1])), '- One\n\n');
+});
+
+test('exits an empty quoted list item without removing the preceding paragraph', () => {
+  const source = parseMarkdown('> Intro\n>\n> - ');
+  const next = exitEmptyListItem(source, [0, 1, 0]);
+
+  assert.deepEqual(next[0].blocks, [
+    { type: 'paragraph', inlines: [{ type: 'text', value: 'Intro' }] },
+    { type: 'paragraph', inlines: [] },
+  ]);
 });
 
 test('indents and outdents a list item without mutating the source', () => {
@@ -109,7 +127,7 @@ test('indents and outdents a list item without mutating the source', () => {
   const nestedPath = listItemPathAfterIndent(source, [0, 1], 'in');
   const nested = indentListItem(source, [0, 1], 'in');
   assert.equal(serializeMarkdown(nested), '- One\n  - Two');
-  assert.deepEqual(nestedPath, [0, 0, 0]);
+  assert.deepEqual(nestedPath, [0, 0, 0, 0]);
   assert.equal(serializeMarkdown(indentListItem(nested, nestedPath, 'out')), '- One\n- Two');
   assert.equal(serializeMarkdown(source), '- One\n- Two');
 });

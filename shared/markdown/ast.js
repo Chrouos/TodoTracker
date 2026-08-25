@@ -71,9 +71,10 @@ function resolveList(list, path) {
 }
 
 function resolveChildBlock(children, path) {
-  const child = children.find((block) => ['list', 'quote', 'taskList'].includes(block.type));
-  if (!child) throw new RangeError('Path does not reference a nested task list');
-  return resolveBlock(child, path);
+  const [childIndex, ...nestedPath] = path;
+  const child = children[childIndex];
+  if (!child || !nestedPath.length) throw new RangeError('Path does not reference a nested task list');
+  return resolveBlock(child, nestedPath);
 }
 
 function cloneNode(value) {

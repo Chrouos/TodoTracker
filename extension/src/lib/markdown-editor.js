@@ -302,23 +302,29 @@ function updateListItemAtPath(blocks, path, updater) {
     const item = block.items[rest.shift()];
     if (!item) return;
     if (!rest.length) { item.inlines = updater(item.inlines); return; }
-    const candidates = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
-    visit(candidates.length === 1 ? candidates[0] : item.children[rest.shift()], rest);
+    visit(item.children[rest.shift()], rest);
   };
   visit(next[path[0]], path.slice(1));
   return next;
 }
 
 function listLocation(blocks, path) {
-  const descend = (block, container, containerIndex, rest, parent, parentPath) => {
-    if (block?.type === 'quote') return descend(block.blocks?.[rest.shift()], block.blocks ?? [], rest[0], rest, null, parentPath);
+  const descend = (block, container, containerIndex, rest, parent, blockPath) => {
+    if (block?.type === 'quote') {
+      const childIndex = rest.shift();
+      return descend(block.blocks?.[childIndex], block.blocks ?? [], childIndex, rest, null, [...blockPath, childIndex]);
+    }
     if (!block || !['list', 'taskList'].includes(block.type)) return null;
     const index = rest.shift(); const item = block.items[index];
     if (!item) return null;
-    if (!rest.length) return { block, container, containerIndex, index, item, parent, path: parentPath };
-    const candidates = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
-    const childIndex = candidates.length === 1 ? item.children.indexOf(candidates[0]) : rest.shift();
-    return descend(item.children[childIndex], item.children, childIndex, rest, { block, index, item, container, containerIndex, childIndex }, [...parentPath, index]);
+    if (!rest.length) return { block, container, containerIndex, index, item, parent, blockPath };
+    const childIndex = rest.shift();
+    return descend(item.children[childIndex], item.children, childIndex, rest, {
+      block,
+      blockPath,
+      index,
+      item,
+    }, [...blockPath, index, childIndex]);
   };
   return descend(blocks[path[0]], blocks, path[0], path.slice(1), null, [path[0]]);
 }
@@ -361,8 +367,12 @@ export function indentListItem(blocks, path, direction) {
 export function listItemPathAfterIndent(blocks, path, direction) {
   const location = listLocation(blocks, path);
   if (!location) return path;
-  if (direction === 'out') return location.parent ? [...location.path.slice(0, -1), location.parent.index + 1] : path;
-  return location.index ? [...location.path, location.index - 1, 0] : path;
+  if (direction === 'out') return location.parent ? [...location.parent.blockPath, location.parent.index + 1] : path;
+  if (!location.index) return path;
+  const previous = location.block.items[location.index - 1];
+  const childIndex = previous.children.findIndex((entry) => entry.type === location.block.type);
+  const nestedIndex = childIndex < 0 ? 0 : previous.children[childIndex].items.length;
+  return [...location.blockPath, location.index - 1, childIndex < 0 ? previous.children.length : childIndex, nestedIndex];
 }
 
 function renderBlocks(container, blocks) {
@@ -421,11 +431,11 @@ function renderBlock(block, path) {
       const itemPath = [...path, index]; const li = document.createElement('li');
       if (block.type === 'taskList') {
         const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = item.checked;
+        checkbox.setAttribute('aria-label', `Toggle task ${inlineText(item.inlines)} (${pathLabel(itemPath)})`);
         checkbox.dataset.markdownEditorTask = 'true'; checkbox.dataset.markdownTaskPath = pathLabel(itemPath); li.appendChild(checkbox);
       }
       li.appendChild(surface('list-item', itemPath, item.inlines));
-      const listChildren = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
-      item.children.forEach((child, childIndex) => li.appendChild(renderBlock(child, listChildren.length > 1 ? [...itemPath, childIndex] : itemPath)));
+      item.children.forEach((child, childIndex) => li.appendChild(renderBlock(child, [...itemPath, childIndex])));
       list.appendChild(li);
     });
     return list;

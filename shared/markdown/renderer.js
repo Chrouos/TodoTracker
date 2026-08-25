@@ -50,7 +50,7 @@ function renderTaskList(block, options, taskPath) {
 }
 
 function renderChildBlocks(children, options, taskPath) {
-  return children.map((child) => renderBlock(child, options, taskPath)).join('');
+  return children.map((child, index) => renderBlock(child, options, [...taskPath, index])).join('');
 }
 
 function renderQuoteBlocks(blocks, options, taskPath) {
@@ -60,7 +60,8 @@ function renderQuoteBlocks(blocks, options, taskPath) {
 function renderTaskInput(item, options, path) {
   const checked = item.checked ? ' checked' : '';
   if (options.interactiveTasks) {
-    return `<input type="checkbox" data-markdown-task-path="${path.join('.')}" data-markdown-task-checked="${item.checked}"${checked}>`;
+    const label = escapeHtml(`Toggle task ${inlineText(item.inlines)} (${path.join('.')})`);
+    return `<input type="checkbox" aria-label="${label}" data-markdown-task-path="${path.join('.')}" data-markdown-task-checked="${item.checked}"${checked}>`;
   }
   return `<input type="checkbox" disabled${checked}>`;
 }

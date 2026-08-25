@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownToHTML, renderMarkdown, shouldShowMarkdownToggle } from './markdown.js';
+import { markdownToHTML, renderBlocks, renderMarkdown, shouldShowMarkdownToggle, toggleTaskItem } from './markdown.js';
 
 test('renders headings as h1 elements', () => {
   assert.equal(markdownToHTML('# Heading'), '<h1>Heading</h1>');
@@ -94,4 +94,36 @@ test('gives mixed nested task lists unique paths consumed by the toggle resolver
   const html = renderMarkdown('- Parent\n  - Plain child\n  - [ ] Nested task\n- [ ] Sibling task', { interactiveTasks: true });
   assert.match(html, /data-markdown-task-path="0\.0\.1\.0"/);
   assert.match(html, /data-markdown-task-path="1\.0"/);
+});
+
+test('uses every mixed child-block index and toggles only task B', () => {
+  const blocks = [{ type: 'list', ordered: false, items: [{ inlines: [{ type: 'text', value: 'Parent' }], children: [
+    { type: 'taskList', items: [{ checked: false, inlines: [{ type: 'text', value: 'Task A' }], children: [] }] },
+    { type: 'paragraph', inlines: [{ type: 'text', value: 'Plain child block' }] },
+    { type: 'taskList', items: [{ checked: false, inlines: [{ type: 'text', value: 'Task B' }], children: [] }] },
+  ] }] }];
+  const html = renderBlocks(blocks, { interactiveTasks: true });
+
+  assert.match(html, /data-markdown-task-path="0\.0\.0\.0"/);
+  assert.match(html, /data-markdown-task-path="0\.0\.2\.0"/);
+  const next = toggleTaskItem(blocks, [0, 0, 2, 0]);
+  assert.equal(next[0].items[0].children[0].items[0].checked, false);
+  assert.equal(next[0].items[0].children[2].items[0].checked, true);
+});
+
+test('renders nested quote, list, and task paths with accessible escaped context', () => {
+  const blocks = [{ type: 'quote', blocks: [{ type: 'list', ordered: false, items: [{
+    inlines: [{ type: 'text', value: 'Parent' }],
+    children: [{ type: 'quote', blocks: [{ type: 'taskList', items: [{
+      checked: false,
+      inlines: [{ type: 'text', value: 'Ship <now> & "later"' }],
+      children: [],
+    }] }] }],
+  }] }] }];
+  const html = renderBlocks(blocks, { interactiveTasks: true });
+
+  assert.match(html, /data-markdown-task-path="0\.0\.0\.0\.0\.0"/);
+  assert.match(html, /aria-label="Toggle task Ship &lt;now&gt; &amp; &quot;later&quot; \(0\.0\.0\.0\.0\.0\)"/);
+  const next = toggleTaskItem(blocks, [0, 0, 0, 0, 0, 0]);
+  assert.equal(next[0].blocks[0].items[0].children[0].blocks[0].items[0].checked, true);
 });

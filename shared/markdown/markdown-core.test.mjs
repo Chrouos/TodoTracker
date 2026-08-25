@@ -54,6 +54,7 @@ test('renders escaped deterministic HTML and only safe task interactions', () =>
   const interactive = renderBlocks(parseMarkdown(source), { interactiveTasks: true });
   assert.match(interactive, /data-markdown-task-path="2\.0"/);
   assert.match(interactive, /data-markdown-task-checked="false"/);
+  assert.match(interactive, /aria-label="Toggle task Open \(2\.0\)"/);
   assert.doesNotMatch(interactive, /disabled/);
 
   assert.equal(
@@ -78,10 +79,10 @@ test('preserves escaped table pipes and round-trips their semantic AST', () => {
 
 test('renders normal-list and quote task paths consumable by AST helpers', () => {
   const normalListBlocks = parseMarkdown(['- Parent', '  - [ ] Nested task'].join('\n'));
-  const normalListPath = [0, 0, 0];
+  const normalListPath = [0, 0, 0, 0];
   const normalListHtml = renderBlocks(normalListBlocks, { interactiveTasks: true });
 
-  assert.match(normalListHtml, /data-markdown-task-path="0\.0\.0"/);
+  assert.match(normalListHtml, /data-markdown-task-path="0\.0\.0\.0"/);
   assert.equal(pathToItem(normalListBlocks, normalListPath).inlines[0].value, 'Nested task');
   assert.equal(updateAtPath(normalListBlocks, normalListPath, (item) => ({ ...item, checked: true }))[0].items[0].children[0].items[0].checked, true);
 
@@ -92,6 +93,37 @@ test('renders normal-list and quote task paths consumable by AST helpers', () =>
   assert.match(quoteHtml, /data-markdown-task-path="0\.0\.0"/);
   assert.equal(pathToItem(quoteBlocks, quotePath).inlines[0].value, 'Quoted task');
   assert.equal(updateAtPath(quoteBlocks, quotePath, (item) => ({ ...item, checked: false }))[0].blocks[0].items[0].checked, false);
+});
+
+test('renders unique canonical paths for mixed child blocks and resolves task B only', () => {
+  const blocks = [{ type: 'list', ordered: false, items: [{ inlines: [{ type: 'text', value: 'Parent' }], children: [
+    { type: 'taskList', items: [{ checked: false, inlines: [{ type: 'text', value: 'Task A' }], children: [] }] },
+    { type: 'paragraph', inlines: [{ type: 'text', value: 'Plain child block' }] },
+    { type: 'taskList', items: [{ checked: false, inlines: [{ type: 'text', value: 'Task B' }], children: [] }] },
+  ] }] }];
+  const html = renderBlocks(blocks, { interactiveTasks: true });
+
+  assert.match(html, /data-markdown-task-path="0\.0\.0\.0"/);
+  assert.match(html, /data-markdown-task-path="0\.0\.2\.0"/);
+  const next = updateAtPath(blocks, [0, 0, 2, 0], (item) => ({ ...item, checked: true }));
+  assert.equal(next[0].items[0].children[0].items[0].checked, false);
+  assert.equal(next[0].items[0].children[2].items[0].checked, true);
+});
+
+test('renders nested quote, list, and task paths with accessible escaped context', () => {
+  const blocks = [{ type: 'quote', blocks: [{ type: 'list', ordered: false, items: [{
+    inlines: [{ type: 'text', value: 'Parent' }],
+    children: [{ type: 'quote', blocks: [{ type: 'taskList', items: [{
+      checked: false,
+      inlines: [{ type: 'text', value: 'Ship <now> & "later"' }],
+      children: [],
+    }] }] }],
+  }] }] }];
+  const html = renderBlocks(blocks, { interactiveTasks: true });
+
+  assert.match(html, /data-markdown-task-path="0\.0\.0\.0\.0\.0"/);
+  assert.match(html, /aria-label="Toggle task Ship &lt;now&gt; &amp; &quot;later&quot; \(0\.0\.0\.0\.0\.0\)"/);
+  assert.equal(pathToItem(blocks, [0, 0, 0, 0, 0, 0]).inlines[0].value, 'Ship <now> & "later"');
 });
 
 test('renders Inline-array code with one escaping pass', () => {

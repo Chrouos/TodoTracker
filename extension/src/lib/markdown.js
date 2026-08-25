@@ -148,12 +148,10 @@ function renderList(block, options, path) {
   return `<${tag}${className}>${block.items.map((item, index) => {
     const itemPath = [...path, index];
     const task = block.type === 'taskList'
-      ? `<input type="checkbox"${options.interactiveTasks ? ` data-markdown-task-path="${itemPath.join('.')}" data-markdown-task-checked="${item.checked}"` : ' disabled'}${item.checked ? ' checked' : ''}>`
+      ? `<input type="checkbox"${options.interactiveTasks ? ` aria-label="${escapeHTML(`Toggle task ${inlineText(item.inlines)} (${itemPath.join('.')})`)}" data-markdown-task-path="${itemPath.join('.')}" data-markdown-task-checked="${item.checked}"` : ' disabled'}${item.checked ? ' checked' : ''}>`
       : '';
-    const listChildren = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
     return `<li>${task}${renderInlines(item.inlines)}${item.children.map((child, childIndex) => {
-      const childPath = listChildren.length > 1 ? [...itemPath, childIndex] : itemPath;
-      return renderBlock(child, options, childPath);
+      return renderBlock(child, options, [...itemPath, childIndex]);
     }).join('')}</li>`;
   }).join('')}</${tag}>`;
 }
@@ -171,6 +169,14 @@ function renderInlines(inlines = []) {
     if (inline.type === 'code') return `<code>${escapeHTML(typeof inline.inlines === 'string' ? inline.inlines : serializeInlines(inline.inlines))}</code>`;
     if (inline.type === 'link') return isSafeUrl(inline.url) ? `<a href="${escapeHTML(inline.url)}" target="_blank" rel="noopener noreferrer">${renderInlines(inline.inlines)}</a>` : renderInlines(inline.inlines);
     return '';
+  }).join('');
+}
+
+function inlineText(inlines = []) {
+  return inlines.map((inline) => {
+    if (inline.type === 'text') return inline.value;
+    if (inline.type === 'code') return typeof inline.inlines === 'string' ? inline.inlines : inlineText(inline.inlines);
+    return inlineText(inline.inlines);
   }).join('');
 }
 
@@ -227,17 +233,27 @@ function isEscapedPipe(value, index) { let backslashes = 0; for (let cursor = in
 function isTableStart(lines, index) { return Boolean(lines[index]?.includes('|') && lines[index + 1]?.includes('|') && splitTableRow(lines[index + 1]).every((cell) => /^:?-{3,}:?$/.test(cell))); }
 function parseTable(lines, start) { const header = splitTableRow(lines[start]).map(parseInlines); const alignments = splitTableRow(lines[start + 1]).map((cell) => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'left'); const rows = []; let index = start + 2; while (index < lines.length && lines[index].includes('|') && lines[index].trim()) { const row = splitTableRow(lines[index++]).slice(0, header.length); while (row.length < header.length) row.push(''); rows.push(row.map(parseInlines)); } return { block: { type: 'table', header, alignments, rows }, next: index }; }
 function taskAtPath(blocks, path) {
-  let block = blocks[path[0]];
-  let cursor = 1;
-  while (block?.type === 'quote') block = block.blocks?.[path[cursor++]];
-  while (block && (block.type === 'list' || block.type === 'taskList')) {
-    const item = block.items[path[cursor++]];
-    if (!item) break;
-    if (cursor === path.length) return item;
-    const candidates = item.children.filter((child) => ['list', 'taskList', 'quote'].includes(child.type));
-    if (!candidates.length) break;
-    block = candidates.length === 1 ? candidates[0] : item.children[path[cursor++]];
-    while (block?.type === 'quote') block = block.blocks?.[path[cursor++]];
+  if (!Array.isArray(path) || path.length < 2) throw new RangeError('Path does not reference a task item');
+  return taskInBlock(blocks[path[0]], path.slice(1));
+}
+
+function taskInBlock(block, path) {
+  if (block?.type === 'quote') {
+    const [blockIndex, ...nestedPath] = path;
+    const child = block.blocks?.[blockIndex];
+    if (!child || !nestedPath.length) throw new RangeError('Path does not reference a task item');
+    return taskInBlock(child, nestedPath);
   }
-  throw new RangeError('Path does not reference a task item');
+  if (!block || !['list', 'taskList'].includes(block.type)) throw new RangeError('Path does not reference a task item');
+  const [itemIndex, ...nestedPath] = path;
+  const item = block.items[itemIndex];
+  if (!item) throw new RangeError('Path does not reference a task item');
+  if (!nestedPath.length) {
+    if (block.type !== 'taskList') throw new RangeError('Path does not reference a task item');
+    return item;
+  }
+  const [childIndex, ...childPath] = nestedPath;
+  const child = item.children[childIndex];
+  if (!child || !childPath.length) throw new RangeError('Path does not reference a task item');
+  return taskInBlock(child, childPath);
 }
