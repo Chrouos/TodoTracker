@@ -26,9 +26,11 @@ export function replaceEditorSelection(blocks, selection, pastedMarkdown) {
   const selectedBlock = pasted.at(-1) ?? replacement[0];
   const selectedIndex = pasted.length ? insertionIndex + pasted.length - 1 : start.index;
   const selectedPath = [...start.path.slice(0, -1), selectedIndex];
-  const offset = pasted.length
-    ? textLength(selectedBlock.inlines ?? [])
-    : textLength(before);
+  if (pasted.length && !isTextBlock(selectedBlock)) {
+    const caret = ensureParagraphAfterBlock(next, selectedPath);
+    return { blocks: caret.blocks, nextSelection: selectionAt(caret.nextPath, 0) };
+  }
+  const offset = pasted.length ? textLength(selectedBlock.inlines) : textLength(before);
   return { blocks: next, nextSelection: selectionAt(selectedPath, offset) };
 }
 
@@ -46,7 +48,7 @@ export function splitBlockAtSelection(blocks, selection) {
 export function deleteBackwardAtSelection(blocks, selection) {
   if (!isCollapsed(selection)) {
     const result = replaceEditorSelection(blocks, selection, '');
-    return { ...result, changed: true };
+    return { ...result, changed: Boolean(resolveSelection(blocks, selection)) };
   }
   const next = cloneBlocks(blocks);
   const location = resolveTextBlock(next, selection.anchor.path);
@@ -63,7 +65,7 @@ export function deleteBackwardAtSelection(blocks, selection) {
 export function deleteForwardAtSelection(blocks, selection) {
   if (!isCollapsed(selection)) {
     const result = replaceEditorSelection(blocks, selection, '');
-    return { ...result, changed: true };
+    return { ...result, changed: Boolean(resolveSelection(blocks, selection)) };
   }
   const next = cloneBlocks(blocks);
   const location = resolveTextBlock(next, selection.anchor.path);
@@ -162,6 +164,9 @@ function resolveSelection(blocks, selection) {
   const anchor = resolveTextBlock(blocks, selection.anchor.path);
   const focus = resolveTextBlock(blocks, selection.focus.path);
   if (!anchor || !focus || anchor.container !== focus.container) return null;
+  const firstIndex = Math.min(anchor.index, focus.index);
+  const lastIndex = Math.max(anchor.index, focus.index);
+  if (anchor.container.slice(firstIndex + 1, lastIndex).some((block) => !isTextBlock(block))) return null;
   const anchorFirst = anchor.index < focus.index || (anchor.index === focus.index && selection.anchor.offset <= selection.focus.offset);
   const first = anchorFirst
     ? { ...anchor, offset: clampOffset(anchor.block.inlines, selection.anchor.offset) }
@@ -174,7 +179,11 @@ function resolveSelection(blocks, selection) {
 
 function resolveTextBlock(blocks, path) {
   const location = resolveBlock(blocks, path);
-  return location && (location.block.type === 'paragraph' || location.block.type === 'heading') ? location : null;
+  return location && isTextBlock(location.block) ? location : null;
+}
+
+function isTextBlock(block) {
+  return block?.type === 'paragraph' || block?.type === 'heading';
 }
 
 function resolveBlock(blocks, path) {

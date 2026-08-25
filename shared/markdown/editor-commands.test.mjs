@@ -265,3 +265,88 @@ test('adds a paragraph after a table and removes a table before its paragraph', 
   assert.deepEqual(removed.blocks, [{ type: 'paragraph', inlines: [] }]);
   assert.deepEqual(removed.nextPath, [0]);
 });
+
+test('keeps nested quote and list transaction paths canonical', () => {
+  const source = [{ type: 'list', ordered: false, items: [item('parent', [
+    { type: 'quote', blocks: [{ type: 'paragraph', inlines: text('quoted text') }] },
+    { type: 'paragraph', inlines: text('nested text') },
+  ])] }];
+  const quoted = replaceEditorSelection(source, {
+    anchor: { path: [0, 0, 0, 0], offset: 0 },
+    focus: { path: [0, 0, 0, 0], offset: 6 },
+  }, 'updated');
+  const nested = splitBlockAtSelection(quoted.blocks, {
+    anchor: { path: [0, 0, 1], offset: 6 },
+    focus: { path: [0, 0, 1], offset: 6 },
+  });
+
+  assert.deepEqual(quoted.nextSelection, {
+    anchor: { path: [0, 0, 0, 0], offset: 7 },
+    focus: { path: [0, 0, 0, 0], offset: 7 },
+  });
+  assert.deepEqual(nested.nextSelection, {
+    anchor: { path: [0, 0, 2], offset: 0 },
+    focus: { path: [0, 0, 2], offset: 0 },
+  });
+  assert.equal(source[0].items[0].children[0].blocks[0].inlines[0].value, 'quoted text');
+});
+
+test('does not mark non-collapsed deletion as changed across structural containers', () => {
+  const cases = [
+    {
+      source: [
+        { type: 'paragraph', inlines: text('before') },
+        { type: 'quote', blocks: [{ type: 'paragraph', inlines: text('quoted') }] },
+        { type: 'paragraph', inlines: text('after') },
+      ],
+      selection: { anchor: { path: [0], offset: 3 }, focus: { path: [1, 0], offset: 3 } },
+    },
+    {
+      source: [
+        { type: 'paragraph', inlines: text('before') },
+        { type: 'list', ordered: false, items: [item('listed')] },
+        { type: 'paragraph', inlines: text('after') },
+      ],
+      selection: { anchor: { path: [0], offset: 3 }, focus: { path: [2], offset: 2 } },
+    },
+    {
+      source: [
+        { type: 'paragraph', inlines: text('before') },
+        { type: 'table', header: [text('head')], alignments: ['left'], rows: [] },
+        { type: 'paragraph', inlines: text('after') },
+      ],
+      selection: { anchor: { path: [0], offset: 3 }, focus: { path: [2], offset: 2 } },
+    },
+  ];
+
+  for (const { source, selection } of cases) {
+    const backward = deleteBackwardAtSelection(source, selection);
+    const forward = deleteForwardAtSelection(source, selection);
+    assert.equal(backward.changed, false);
+    assert.equal(forward.changed, false);
+    assert.deepEqual(backward.blocks, source);
+    assert.deepEqual(forward.blocks, source);
+  }
+});
+
+test('places the caret in a paragraph after multiline paste ending in non-text blocks', () => {
+  const cases = [
+    ['intro\n\n- item', { type: 'list', ordered: false, items: [item('item')] }],
+    ['intro\n\n> quote', { type: 'quote', blocks: [{ type: 'paragraph', inlines: text('quote') }] }],
+    ['intro\n\n```\ncode\n```', { type: 'codeBlock', value: 'code' }],
+    ['intro\n\n| head |\n| --- |', { type: 'table', header: [text('head')], alignments: ['left'], rows: [] }],
+  ];
+
+  for (const [markdown, tail] of cases) {
+    const result = replaceEditorSelection([{ type: 'paragraph', inlines: text('source') }], {
+      anchor: { path: [0], offset: 0 },
+      focus: { path: [0], offset: 6 },
+    }, markdown);
+    assert.deepEqual(result.blocks.at(-2), tail);
+    assert.deepEqual(result.blocks.at(-1), { type: 'paragraph', inlines: [] });
+    assert.deepEqual(result.nextSelection, {
+      anchor: { path: [result.blocks.length - 1], offset: 0 },
+      focus: { path: [result.blocks.length - 1], offset: 0 },
+    });
+  }
+});
