@@ -5,6 +5,12 @@ import {
   continueBlock,
   exitEmptyBlock,
   indentListItem,
+  replaceEditorSelection,
+  splitBlockAtSelection,
+  deleteBackwardAtSelection,
+  deleteForwardAtSelection,
+  ensureParagraphAfterBlock,
+  removeTableBeforeParagraph,
   toggleTaskItem,
 } from './editor-commands.js';
 
@@ -143,4 +149,119 @@ test('consumes every child block index when toggling mixed nested tasks', () => 
   const next = toggleTaskItem(source, [0, 0, 2, 0]);
   assert.equal(next[0].items[0].children[0].items[0].checked, false);
   assert.equal(next[0].items[0].children[2].items[0].checked, true);
+});
+
+test('replaces a paragraph selection with text without mutating the source tree', () => {
+  const source = [{ type: 'paragraph', inlines: text('hello world') }];
+  const result = replaceEditorSelection(source, {
+    anchor: { path: [0], offset: 6 },
+    focus: { path: [0], offset: 11 },
+  }, 'there');
+
+  assert.deepEqual(result.blocks, [{ type: 'paragraph', inlines: text('hello there') }]);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [0], offset: 11 },
+    focus: { path: [0], offset: 11 },
+  });
+  assert.deepEqual(source, [{ type: 'paragraph', inlines: text('hello world') }]);
+});
+
+test('replaces a selection with parsed multiline Markdown blocks', () => {
+  const result = replaceEditorSelection([{ type: 'paragraph', inlines: text('replace me') }], {
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [0], offset: 10 },
+  }, '# Pasted\n\nsecond');
+
+  assert.deepEqual(result.blocks, [
+    { type: 'heading', level: 1, inlines: text('Pasted') },
+    { type: 'paragraph', inlines: text('second') },
+  ]);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [1], offset: 6 },
+    focus: { path: [1], offset: 6 },
+  });
+});
+
+test('splits a heading at its logical selection offset', () => {
+  const result = splitBlockAtSelection([{ type: 'heading', level: 2, inlines: text('abcdef') }], {
+    anchor: { path: [0], offset: 3 },
+    focus: { path: [0], offset: 3 },
+  });
+
+  assert.deepEqual(result.blocks, [
+    { type: 'heading', level: 2, inlines: text('abc') },
+    { type: 'heading', level: 2, inlines: text('def') },
+  ]);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [1], offset: 0 },
+    focus: { path: [1], offset: 0 },
+  });
+});
+
+test('Backspace merges adjacent paragraphs and returns the join selection', () => {
+  const result = deleteBackwardAtSelection([
+    { type: 'paragraph', inlines: text('first') },
+    { type: 'paragraph', inlines: text('second') },
+  ], {
+    anchor: { path: [1], offset: 0 },
+    focus: { path: [1], offset: 0 },
+  });
+
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.blocks, [{ type: 'paragraph', inlines: text('firstsecond') }]);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [0], offset: 5 },
+    focus: { path: [0], offset: 5 },
+  });
+});
+
+test('Delete merges the following paragraph and returns the join selection', () => {
+  const result = deleteForwardAtSelection([
+    { type: 'paragraph', inlines: text('first') },
+    { type: 'paragraph', inlines: text('second') },
+  ], {
+    anchor: { path: [0], offset: 5 },
+    focus: { path: [0], offset: 5 },
+  });
+
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.blocks, [{ type: 'paragraph', inlines: text('firstsecond') }]);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [0], offset: 5 },
+    focus: { path: [0], offset: 5 },
+  });
+});
+
+test('does not merge across quote, list, or table boundaries', () => {
+  const source = [
+    { type: 'paragraph', inlines: text('before') },
+    { type: 'quote', blocks: [{ type: 'paragraph', inlines: text('quoted') }] },
+    { type: 'list', ordered: false, items: [item('listed')] },
+    { type: 'table', header: [text('head')], alignments: ['left'], rows: [] },
+    { type: 'paragraph', inlines: text('after') },
+  ];
+  const backward = deleteBackwardAtSelection(source, {
+    anchor: { path: [4], offset: 0 },
+    focus: { path: [4], offset: 0 },
+  });
+  const forward = deleteForwardAtSelection(source, {
+    anchor: { path: [0], offset: 6 },
+    focus: { path: [0], offset: 6 },
+  });
+
+  assert.equal(backward.changed, false);
+  assert.equal(forward.changed, false);
+  assert.deepEqual(backward.blocks, source);
+  assert.deepEqual(forward.blocks, source);
+});
+
+test('adds a paragraph after a table and removes a table before its paragraph', () => {
+  const table = { type: 'table', header: [text('head')], alignments: ['left'], rows: [] };
+  const continued = ensureParagraphAfterBlock([table], [0]);
+  assert.deepEqual(continued.blocks, [table, { type: 'paragraph', inlines: [] }]);
+  assert.deepEqual(continued.nextPath, [1]);
+
+  const removed = removeTableBeforeParagraph(continued.blocks, [1]);
+  assert.deepEqual(removed.blocks, [{ type: 'paragraph', inlines: [] }]);
+  assert.deepEqual(removed.nextPath, [0]);
 });

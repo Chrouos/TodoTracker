@@ -1,4 +1,100 @@
 import { cloneBlocks } from './ast.js';
+import { parseMarkdown } from './parser.js';
+
+export function replaceEditorSelection(blocks, selection, pastedMarkdown) {
+  const next = cloneBlocks(blocks);
+  const range = resolveSelection(next, selection);
+  if (!range) return { blocks: next, nextSelection: collapseSelection(selection.focus) };
+
+  const { start, end } = range;
+  const [before] = splitInlinesAtOffset(start.block.inlines, start.offset);
+  const [, after] = splitInlinesAtOffset(end.block.inlines, end.offset);
+  const pasted = parseMarkdown(pastedMarkdown);
+  if (pasted.length === 1 && pasted[0].type === 'paragraph') {
+    const inlines = mergeInlines([...before, ...pasted[0].inlines, ...after]);
+    start.container.splice(start.index, end.index - start.index + 1, { ...start.block, inlines });
+    return { blocks: next, nextSelection: selectionAt(start.path, textLength(before) + textLength(pasted[0].inlines)) };
+  }
+  const replacement = [];
+  if (before.length) replacement.push({ ...start.block, inlines: before });
+  replacement.push(...pasted);
+  if (after.length) replacement.push({ ...end.block, inlines: after });
+  if (!replacement.length) replacement.push({ ...start.block, inlines: [] });
+
+  const insertionIndex = start.index + (before.length ? 1 : 0);
+  start.container.splice(start.index, end.index - start.index + 1, ...replacement);
+  const selectedBlock = pasted.at(-1) ?? replacement[0];
+  const selectedIndex = pasted.length ? insertionIndex + pasted.length - 1 : start.index;
+  const selectedPath = [...start.path.slice(0, -1), selectedIndex];
+  const offset = pasted.length
+    ? textLength(selectedBlock.inlines ?? [])
+    : textLength(before);
+  return { blocks: next, nextSelection: selectionAt(selectedPath, offset) };
+}
+
+export function splitBlockAtSelection(blocks, selection) {
+  const next = cloneBlocks(blocks);
+  const range = resolveSelection(next, selection);
+  if (!range || !samePoint(range.start, range.end)) return { blocks: next, nextSelection: collapseSelection(selection.focus) };
+
+  const { start } = range;
+  const [before, after] = splitInlinesAtOffset(start.block.inlines, start.offset);
+  start.container.splice(start.index, 1, { ...start.block, inlines: before }, { ...start.block, inlines: after });
+  return { blocks: next, nextSelection: selectionAt([...start.path.slice(0, -1), start.index + 1], 0) };
+}
+
+export function deleteBackwardAtSelection(blocks, selection) {
+  if (!isCollapsed(selection)) {
+    const result = replaceEditorSelection(blocks, selection, '');
+    return { ...result, changed: true };
+  }
+  const next = cloneBlocks(blocks);
+  const location = resolveTextBlock(next, selection.anchor.path);
+  if (!location || selection.anchor.offset !== 0) return unchanged(next, selection);
+  const previous = location.container[location.index - 1];
+  if (location.block.type !== 'paragraph' || previous?.type !== 'paragraph') return unchanged(next, selection);
+
+  const offset = textLength(previous.inlines);
+  previous.inlines = mergeInlines([...previous.inlines, ...location.block.inlines]);
+  location.container.splice(location.index, 1);
+  return { blocks: next, nextSelection: selectionAt([...location.path.slice(0, -1), location.index - 1], offset), changed: true };
+}
+
+export function deleteForwardAtSelection(blocks, selection) {
+  if (!isCollapsed(selection)) {
+    const result = replaceEditorSelection(blocks, selection, '');
+    return { ...result, changed: true };
+  }
+  const next = cloneBlocks(blocks);
+  const location = resolveTextBlock(next, selection.anchor.path);
+  if (!location || selection.anchor.offset !== textLength(location.block.inlines)) return unchanged(next, selection);
+  const following = location.container[location.index + 1];
+  if (location.block.type !== 'paragraph' || following?.type !== 'paragraph') return unchanged(next, selection);
+
+  following.inlines = mergeInlines([...location.block.inlines, ...following.inlines]);
+  location.container.splice(location.index, 1);
+  return { blocks: next, nextSelection: selectionAt(location.path, selection.anchor.offset), changed: true };
+}
+
+export function ensureParagraphAfterBlock(blocks, path) {
+  const next = cloneBlocks(blocks);
+  const location = resolveBlock(next, path);
+  if (!location) return { blocks: next, nextPath: path };
+  const following = location.container[location.index + 1];
+  if (following?.type === 'paragraph') return { blocks: next, nextPath: [...path.slice(0, -1), location.index + 1] };
+  location.container.splice(location.index + 1, 0, { type: 'paragraph', inlines: [] });
+  return { blocks: next, nextPath: [...path.slice(0, -1), location.index + 1] };
+}
+
+export function removeTableBeforeParagraph(blocks, path) {
+  const next = cloneBlocks(blocks);
+  const location = resolveBlock(next, path);
+  if (!location || location.block.type !== 'paragraph' || location.container[location.index - 1]?.type !== 'table') {
+    return { blocks: next, nextPath: path };
+  }
+  location.container.splice(location.index - 1, 1);
+  return { blocks: next, nextPath: [...path.slice(0, -1), location.index - 1] };
+}
 
 export function detectMarkdownShortcut(value) {
   if (typeof value !== 'string' || !/^.* $/.test(value)) return null;
@@ -59,6 +155,124 @@ export function toggleTaskItem(blocks, path) {
   if (location.block.type !== 'taskList') return next;
   location.item.checked = !location.item.checked;
   return next;
+}
+
+function resolveSelection(blocks, selection) {
+  if (!selection?.anchor || !selection?.focus) return null;
+  const anchor = resolveTextBlock(blocks, selection.anchor.path);
+  const focus = resolveTextBlock(blocks, selection.focus.path);
+  if (!anchor || !focus || anchor.container !== focus.container) return null;
+  const anchorFirst = anchor.index < focus.index || (anchor.index === focus.index && selection.anchor.offset <= selection.focus.offset);
+  const first = anchorFirst
+    ? { ...anchor, offset: clampOffset(anchor.block.inlines, selection.anchor.offset) }
+    : { ...focus, offset: clampOffset(focus.block.inlines, selection.focus.offset) };
+  const last = anchorFirst
+    ? { ...focus, offset: clampOffset(focus.block.inlines, selection.focus.offset) }
+    : { ...anchor, offset: clampOffset(anchor.block.inlines, selection.anchor.offset) };
+  return { start: first, end: last };
+}
+
+function resolveTextBlock(blocks, path) {
+  const location = resolveBlock(blocks, path);
+  return location && (location.block.type === 'paragraph' || location.block.type === 'heading') ? location : null;
+}
+
+function resolveBlock(blocks, path) {
+  if (!Array.isArray(path) || !path.length) return null;
+  const visit = (container, index, remaining, currentPath) => {
+    const block = container[index];
+    if (!block) return null;
+    if (!remaining.length) return { container, index, block, path: currentPath };
+    if (block.type === 'quote') return visit(block.blocks ?? [], remaining[0], remaining.slice(1), [...currentPath, remaining[0]]);
+    if (block.type === 'list' || block.type === 'taskList') {
+      const itemIndex = remaining[0];
+      const childIndex = remaining[1];
+      const child = block.items[itemIndex]?.children[childIndex];
+      return child === undefined ? null : visit(block.items[itemIndex].children, childIndex, remaining.slice(2), [...currentPath, itemIndex, childIndex]);
+    }
+    return null;
+  };
+  return visit(blocks, path[0], path.slice(1), [path[0]]);
+}
+
+function splitInlinesAtOffset(inlines, offset) {
+  const left = [];
+  const right = [];
+  let cursor = 0;
+  for (const inline of inlines) {
+    const length = textLength([inline]);
+    if (offset <= cursor) right.push(cloneInline(inline));
+    else if (offset >= cursor + length) left.push(cloneInline(inline));
+    else {
+      const [before, after] = splitInline(inline, offset - cursor);
+      if (before) left.push(before);
+      if (after) right.push(after);
+    }
+    cursor += length;
+  }
+  return [mergeInlines(left), mergeInlines(right)];
+}
+
+function splitInline(inline, offset) {
+  if (inline.type === 'text') {
+    return [inline.value.slice(0, offset) ? { type: 'text', value: inline.value.slice(0, offset) } : null, inline.value.slice(offset) ? { type: 'text', value: inline.value.slice(offset) } : null];
+  }
+  if (inline.type === 'code' && typeof inline.inlines === 'string') {
+    return [inline.inlines.slice(0, offset) ? { ...inline, inlines: inline.inlines.slice(0, offset) } : null, inline.inlines.slice(offset) ? { ...inline, inlines: inline.inlines.slice(offset) } : null];
+  }
+  if (typeof inline.inlines === 'string') return [cloneInline(inline), null];
+  const [before, after] = splitInlinesAtOffset(inline.inlines, offset);
+  return [before.length ? { ...inline, inlines: before } : null, after.length ? { ...inline, inlines: after } : null];
+}
+
+function mergeInlines(inlines) {
+  const output = [];
+  for (const inline of inlines) {
+    const previous = output.at(-1);
+    if (inline.type === 'text' && previous?.type === 'text') previous.value += inline.value;
+    else output.push(cloneInline(inline));
+  }
+  return output;
+}
+
+function cloneInline(inline) {
+  if (inline.type === 'text') return { ...inline };
+  return typeof inline.inlines === 'string' ? { ...inline } : { ...inline, inlines: inline.inlines.map(cloneInline) };
+}
+
+function textLength(inlines) {
+  return inlines.reduce((length, inline) => length + (inline.type === 'text'
+    ? inline.value.length
+    : typeof inline.inlines === 'string'
+      ? inline.inlines.length
+      : textLength(inline.inlines)), 0);
+}
+
+function clampOffset(inlines, offset) {
+  return Math.max(0, Math.min(Number.isFinite(offset) ? offset : 0, textLength(inlines)));
+}
+
+function selectionAt(path, offset) {
+  const point = { path, offset };
+  return { anchor: point, focus: { ...point, path: [...path] } };
+}
+
+function collapseSelection(point) {
+  return selectionAt(point?.path ?? [], point?.offset ?? 0);
+}
+
+function samePoint(first, second) {
+  return first.path.length === second.path.length && first.path.every((part, index) => part === second.path[index]) && first.offset === second.offset;
+}
+
+function isCollapsed(selection) {
+  return selection?.anchor?.offset === selection?.focus?.offset
+    && selection.anchor.path?.length === selection.focus.path?.length
+    && selection.anchor.path.every((part, index) => part === selection.focus.path[index]);
+}
+
+function unchanged(blocks, selection) {
+  return { blocks, nextSelection: collapseSelection(selection.anchor), changed: false };
 }
 
 function emptyItem(item) {

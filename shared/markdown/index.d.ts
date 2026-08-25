@@ -8,6 +8,8 @@ export type ListItem = { inlines: Inline[]; children: Block[] };
 export type TableAlignment = 'left' | 'center' | 'right';
 /** Numeric AST path: top-level block, list item indexes, and quote block indexes. */
 export type TaskPath = number[];
+export type EditorPoint = { path: TaskPath; offset: number };
+export type EditorSelection = { anchor: EditorPoint; focus: EditorPoint };
 export type Block =
   | { type: 'paragraph' | 'heading'; inlines: Inline[]; level?: number }
   | { type: 'quote' | 'codeBlock'; blocks?: Block[]; value?: string; language?: string }
@@ -33,3 +35,9 @@ export function continueBlock(blocks: Block[], path: TaskPath): Block[];
 export function exitEmptyBlock(blocks: Block[], path: TaskPath): Block[];
 export function indentListItem(blocks: Block[], path: TaskPath, direction: 'in' | 'out'): Block[];
 export function toggleTaskItem(blocks: Block[], path: TaskPath): Block[];
+export function replaceEditorSelection(blocks: Block[], selection: EditorSelection, pastedMarkdown: string): { blocks: Block[]; nextSelection: EditorSelection };
+export function splitBlockAtSelection(blocks: Block[], selection: EditorSelection): { blocks: Block[]; nextSelection: EditorSelection };
+export function deleteBackwardAtSelection(blocks: Block[], selection: EditorSelection): { blocks: Block[]; nextSelection: EditorSelection; changed: boolean };
+export function deleteForwardAtSelection(blocks: Block[], selection: EditorSelection): { blocks: Block[]; nextSelection: EditorSelection; changed: boolean };
+export function ensureParagraphAfterBlock(blocks: Block[], path: TaskPath): { blocks: Block[]; nextPath: TaskPath };
+export function removeTableBeforeParagraph(blocks: Block[], path: TaskPath): { blocks: Block[]; nextPath: TaskPath };
