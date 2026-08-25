@@ -22,6 +22,12 @@ import {
   type Block,
   type Inline,
 } from '@/lib/markdown';
+import {
+  inlineText,
+  listItemPathAfterIndent,
+  splitTextBlockAtOffset,
+  updateInlinesForTextInput,
+} from '@/lib/markdown-editor';
 
 export type MarkdownBlockEditorProps = {
   value: string;
@@ -52,14 +58,6 @@ const textInline = (value: string): Inline[] => value ? [{ type: 'text', value }
 function blocksFromValue(value: string): Block[] {
   const parsed = parseMarkdown(value);
   return parsed.length ? parsed : [{ type: 'paragraph', inlines: [] }];
-}
-
-function inlineText(inlines: Inline[] = []): string {
-  return inlines.map((inline) => {
-    if (inline.type === 'text') return inline.value;
-    if (inline.type === 'code') return typeof inline.inlines === 'string' ? inline.inlines : inlineText(inline.inlines);
-    return inlineText(inline.inlines as Inline[]);
-  }).join('');
 }
 
 function toPath(value: string | undefined): number[] | null {
@@ -128,7 +126,7 @@ function updateTableCell(blocks: Block[], target: EditorTarget, value: string): 
     if (block.type !== 'table' || target.row === undefined || target.column === undefined || !target.section) return block;
     const cells = target.section === 'header' ? block.header : block.rows[target.row];
     if (!cells || !cells[target.column]) return block;
-    cells[target.column] = textInline(value);
+    cells[target.column] = updateInlinesForTextInput(cells[target.column], value);
     return block;
   });
 }
@@ -143,6 +141,29 @@ function shortcutBlock(block: Block, value: string): Block | null {
 
 function isEmptySurface(surface: HTMLElement): boolean {
   return !(surface.textContent ?? '').trim();
+}
+
+function caretOffset(surface: HTMLElement): number {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return (surface.textContent ?? '').length;
+  const range = selection.getRangeAt(0);
+  if (!surface.contains(range.startContainer)) return (surface.textContent ?? '').length;
+  const before = range.cloneRange();
+  before.selectNodeContents(surface);
+  before.setEnd(range.startContainer, range.startOffset);
+  return before.toString().length;
+}
+
+function renderInlines(inlines: Inline[]): ReactNode {
+  return inlines.map((inline, index) => {
+    if (inline.type === 'text') return inline.value;
+    const content = typeof inline.inlines === 'string' ? inline.inlines : renderInlines(inline.inlines);
+    if (inline.type === 'strong') return <strong key={index}>{content}</strong>;
+    if (inline.type === 'emphasis') return <em key={index}>{content}</em>;
+    if (inline.type === 'code') return <code key={index}>{content}</code>;
+    if (inline.type === 'link') return <a href={inline.url} key={index} rel="noopener noreferrer" target="_blank">{content}</a>;
+    return null;
+  });
 }
 
 const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditorProps>(function MarkdownBlockEditor({
@@ -206,7 +227,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     activeTargetRef.current = target;
     const nextText = surface.textContent ?? '';
     if (target.kind === 'listItem') {
-      commitBlocks(updateListItemAtPath(blocks, target.path, () => textInline(nextText)));
+      commitBlocks(updateListItemAtPath(blocks, target.path, (inlines) => updateInlinesForTextInput(inlines, nextText)));
       return;
     }
     if (target.kind === 'codeBlock') {
@@ -221,7 +242,9 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     const converted = current ? shortcutBlock(current, nextText) : null;
     const next = updateBlockAtPath(blocks, target.path, (block) => {
       if (converted) return converted;
-      return block.type === 'heading' || block.type === 'paragraph' ? { ...block, inlines: textInline(nextText) } : block;
+      return block.type === 'heading' || block.type === 'paragraph'
+        ? { ...block, inlines: updateInlinesForTextInput(block.inlines, nextText) }
+        : block;
     });
     commitBlocks(next);
   };
@@ -239,12 +262,21 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     const target = getTarget(event.currentTarget);
     if (!target || composingRef.current) return;
     activeTargetRef.current = target;
+    if (target.kind === 'block' && event.key === 'Enter') {
+      event.preventDefault();
+      const split = splitTextBlockAtOffset(blocks, target.path, caretOffset(event.currentTarget));
+      commitBlocks(split.blocks);
+      focusPath(split.nextPath);
+      return;
+    }
     if (target.kind !== 'listItem') return;
 
     if (event.key === 'Tab') {
       event.preventDefault();
-      commitBlocks(indentListItem(blocks, target.path, event.shiftKey ? 'out' : 'in'));
-      focusPath(target.path);
+      const direction = event.shiftKey ? 'out' : 'in';
+      const nextPath = listItemPathAfterIndent(blocks, target.path, direction);
+      commitBlocks(indentListItem(blocks, target.path, direction));
+      focusPath(nextPath);
       return;
     }
     if (event.key !== 'Enter') return;
@@ -320,7 +352,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     getValue: () => mode === 'source' ? sourceValue : serializeMarkdown(blocks),
   }), [blocks, mode, sourceValue]);
 
-  const renderTextSurface = (text: string, target: EditorTarget, className = '') => (
+  const renderTextSurface = (content: ReactNode, target: EditorTarget, className = '') => (
     <div
       className={`markdown-editor-surface ${className}`.trim()}
       contentEditable
@@ -337,14 +369,14 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
       onKeyDown={onSurfaceKeyDown}
       suppressContentEditableWarning
     >
-      {text}
+      {content}
     </div>
   );
 
   const renderBlock = (block: Block, path: number[], blockPath = path): ReactNode => {
     const key = pathLabel(blockPath);
     if (block.type === 'paragraph' || block.type === 'heading') {
-      const surface = renderTextSurface(inlineText(block.inlines), { kind: 'block', path });
+      const surface = renderTextSurface(renderInlines(block.inlines), { kind: 'block', path });
       if (block.type === 'paragraph') return <p className="markdown-editor-block" data-block-path={key} key={key}>{surface}</p>;
       const headingProps = { className: 'markdown-editor-block', 'data-block-path': key, key };
       switch (Math.min(6, Math.max(1, block.level ?? 1))) {
@@ -364,16 +396,16 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
         const itemPath = [...path, index];
         return <li data-block-path={pathLabel(itemPath)} key={pathLabel(itemPath)}>
           {block.type === 'taskList' && <input aria-label="切換待辦事項" checked={'checked' in item && item.checked} onChange={() => toggleTask(itemPath)} type="checkbox" />}
-          {renderTextSurface(inlineText(item.inlines), { kind: 'listItem', path: itemPath })}
+          {renderTextSurface(renderInlines(item.inlines), { kind: 'listItem', path: itemPath })}
           {item.children.map((child, childIndex) => renderBlock(
             child,
-            child.type === 'quote' ? [...itemPath, childIndex] : itemPath,
+            itemPath,
             [...blockPath, index, childIndex],
           ))}
         </li>;
       })}</ListTag>;
     }
-    if (block.type === 'table') return <div className="markdown-editor-table-wrap" data-block-path={key} key={key}><table className="markdown-editor-block"><thead><tr>{block.header.map((cell, column) => <th key={column}>{renderTextSurface(inlineText(cell), { kind: 'tableCell', path, section: 'header', row: 0, column })}</th>)}</tr></thead><tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, column) => <td key={column}>{renderTextSurface(inlineText(cell), { kind: 'tableCell', path, section: 'body', row: rowIndex, column })}</td>)}</tr>)}</tbody></table></div>;
+    if (block.type === 'table') return <div className="markdown-editor-table-wrap" data-block-path={key} key={key}><table className="markdown-editor-block"><thead><tr>{block.header.map((cell, column) => <th key={column}>{renderTextSurface(renderInlines(cell), { kind: 'tableCell', path, section: 'header', row: 0, column })}</th>)}</tr></thead><tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, column) => <td key={column}>{renderTextSurface(renderInlines(cell), { kind: 'tableCell', path, section: 'body', row: rowIndex, column })}</td>)}</tr>)}</tbody></table></div>;
     return <hr className="markdown-editor-block" data-block-path={key} key={key} />;
   };
 

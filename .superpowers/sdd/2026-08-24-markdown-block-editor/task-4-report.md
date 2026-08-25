@@ -51,3 +51,62 @@ No Task 5 page fields were migrated.
 ## Concerns
 
 There is no browser component test runner in this repository, so selection mapping, contenteditable behavior, toolbar interactions, and IME handling are type-checked and deliberately built on the already-tested pure command transitions, but still need manual browser validation when Task 5 wires the editor into real fields. Direct Node execution of TypeScript emits the repository's existing module-type warning; no package configuration was changed for this task.
+
+## Fix round: review issues 1-5
+
+### Changes
+
+- Added caret-aware Enter handling for paragraph and heading surfaces. It splits the AST block at the current selection; an empty heading exits to a paragraph, while Enter on an empty paragraph inserts the next paragraph. List Enter/empty-list exit behavior is unchanged.
+- Centralized editor-only AST operations in `web/lib/markdown-editor.ts`. Nested list children retain their parent item semantic path; only quote traversal appends its quoted-block index. The nested task regression verifies `[0, 0, 0, 0]` is accepted by `pathToItem` for task list → quote → task list.
+- Calculated the post-indent/outdent list-item path before running the shared immutable command, then focused that transformed path rather than the stale source path.
+- Rendered inline AST marks and links inside contenteditable surfaces. Text input now applies a minimal visible-text range edit to the existing inline tree, preserving strong/emphasis/code/link semantics around the edited content.
+- Replaced the non-runnable TypeScript side-effect test with `web/lib/markdown.test.mjs`, which imports `./markdown.ts` explicitly and runs with Node's available TypeScript strip-types mode.
+
+### TDD evidence
+
+Before the helper existed, the focused helper test failed as expected:
+
+```text
+node --test --experimental-strip-types web/lib/markdown-editor.test.mjs
+ERR_MODULE_NOT_FOUND: web/lib/markdown-editor.ts
+tests 1; pass 0; fail 1
+```
+
+The empty-paragraph Enter regression then failed against the initial helper implementation:
+
+```text
+inserts a new paragraph when Enter is pressed on an empty paragraph
+Expected 2 paragraph blocks; received 1
+tests 5; pass 4; fail 1
+```
+
+### Final verification
+
+```text
+node --test shared/markdown/*.test.mjs
+```
+
+Output: `tests 24`, `pass 24`, `fail 0`.
+
+```text
+node --test --experimental-strip-types web/lib/markdown.test.mjs web/lib/markdown-editor.test.mjs
+```
+
+Output: `tests 6`, `pass 6`, `fail 0`.
+
+```text
+cd web && npm run typecheck
+```
+
+Output: `tsc --noEmit` completed with exit code 0.
+
+Node emitted its existing `MODULE_TYPELESS_PACKAGE_JSON` warning while stripping TypeScript; the focused test process still exited 0 and executed all renderer, path, split, focus-path, and inline-preservation assertions.
+
+### Changed files
+
+- `web/components/MarkdownBlockEditor.tsx`
+- `web/lib/markdown-editor.ts`
+- `web/lib/markdown-editor.test.mjs`
+- `web/lib/markdown.test.mjs`
+- `web/lib/markdown.test.ts` (removed; replaced by runnable `.mjs` test)
+- `.superpowers/sdd/2026-08-24-markdown-block-editor/task-4-report.md`
