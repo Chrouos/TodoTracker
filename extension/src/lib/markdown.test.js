@@ -34,6 +34,13 @@ test('renders consecutive ordered items in one ol', () => {
   );
 });
 
+test('renders lists that end with a trailing newline', () => {
+  assert.equal(
+    markdownToHTML('- First\n'),
+    '<ul><li>First</li></ul>',
+  );
+});
+
 test('renders blockquotes as blockquote elements', () => {
   assert.equal(markdownToHTML('> Quoted text'), '<blockquote><p>Quoted text</p></blockquote>');
 });

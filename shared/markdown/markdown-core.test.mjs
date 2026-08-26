@@ -44,6 +44,12 @@ test('keeps indented list children across blank lines', () => {
   assert.equal(blocks[0].items[0].children[0].items[0].children[0].type, 'list');
 });
 
+test('parses lists that end with a trailing newline', () => {
+  assert.deepEqual(parseMarkdown('- First\n'), [
+    { type: 'list', ordered: false, items: [{ inlines: [{ type: 'text', value: 'First' }], children: [] }] },
+  ]);
+});
+
 test('keeps non-task ordered and unordered lists plus unsupported syntax as semantic text', () => {
   const blocks = parseMarkdown(['1. First', '2. Second', '', '- Plain', '  - Child', '', '~~not supported~~'].join('\n'));
 

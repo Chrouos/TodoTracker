@@ -203,7 +203,7 @@ function serializeTableCell(inlines) { return serializeInlines(inlines).replace(
 function isSafeUrl(url) { return /^https:\/\/[^\s]+$/i.test(url); }
 function isHorizontalRule(line) { return /^ {0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line); }
 function startsBlock(lines, index) { return /^```([^`]*)\s*$/.test(lines[index]) || /^(#{1,6})[ \t]+/.test(lines[index]) || isTableStart(lines, index) || isHorizontalRule(lines[index]) || lines[index].startsWith('>') || Boolean(matchListItem(lines[index])); }
-function matchListItem(line) { const match = line.match(/^( *)([-+*]|\d+[.)])\s+(.*)$/); return !match || match[1].length % 2 ? null : { indent: match[1].length, ordered: /^\d/.test(match[2]), content: match[3] }; }
+function matchListItem(line) { if (typeof line !== 'string') return null; const match = line.match(/^( *)([-+*]|\d+[.)])\s+(.*)$/); return !match || match[1].length % 2 ? null : { indent: match[1].length, ordered: /^\d/.test(match[2]), content: match[3] }; }
 function parseTaskMarker(content) { const match = content.match(/^\[([ xX])\]\s+(.*)$/); return match ? { checked: match[1].toLowerCase() === 'x', content: match[2] } : null; }
 function parseList(lines, start, indent) {
   const first = matchListItem(lines[start]); const task = parseTaskMarker(first.content); const items = []; let index = start;

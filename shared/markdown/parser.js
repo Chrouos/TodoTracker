@@ -123,6 +123,7 @@ function parseList(lines, start, indent) {
 }
 
 function matchListItem(line) {
+  if (typeof line !== 'string') return null;
   const match = line.match(/^( *)([-+*]|\d+[.)])\s+(.*)$/);
   if (!match || match[1].length % 2) return null;
   return { indent: match[1].length, ordered: /^\d/.test(match[2]), content: match[3] };
