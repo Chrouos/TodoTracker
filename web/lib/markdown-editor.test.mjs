@@ -10,6 +10,7 @@ import {
   replaceEditorSelectionWithFallback,
   replaceEditorSelection,
   serializeMarkdown,
+  shouldPreventEditorDefault,
   splitListItemAtSelection,
   syncEditorValue,
   toggleTaskItem,
@@ -262,4 +263,40 @@ test('delegates one task checkbox change without changing unrelated editor conte
   assert.equal(result.blocks[0].items[0].checked, true);
   assert.equal(serializeMarkdown(result.blocks), '- [x] task');
   assert.equal(applyEditorCheckboxChange(blocks, { dataset: {} }).handled, false);
+});
+
+test('replaces text inside one list item without replacing the enclosing list', () => {
+  const result = replaceEditorSelectionWithFallback(parseMarkdown('- one\n- two'), {
+    anchor: { path: [0, 0], offset: 0 },
+    focus: { path: [0, 0], offset: 3 },
+  }, 'first');
+
+  assert.equal(result.handled, true);
+  assert.equal(result.blocks[0].type, 'list');
+  assert.deepEqual(result.blocks[0].items.map((item) => item.inlines[0]?.value), ['first', 'two']);
+});
+
+test('multiline paste inside a list item preserves the item siblings', () => {
+  const result = replaceEditorSelectionWithFallback(parseMarkdown('- one\n- two'), {
+    anchor: { path: [0, 0], offset: 2 },
+    focus: { path: [0, 0], offset: 2 },
+  }, 'A\n\nB');
+
+  assert.equal(result.handled, true);
+  assert.deepEqual(result.blocks[0].items.map((item) => item.inlines[0]?.value), ['onA', 'Be', 'two']);
+});
+
+test('prevents the native event only when the replacement transaction handled the selection', () => {
+  const handled = replaceEditorSelectionWithFallback(parseMarkdown('- one\n- two'), {
+    anchor: { path: [0, 0], offset: 0 },
+    focus: { path: [0, 0], offset: 3 },
+  }, 'first');
+  const unhandled = replaceEditorSelectionWithFallback(parseMarkdown('- one'), {
+    anchor: { path: [99], offset: 0 },
+    focus: { path: [99], offset: 0 },
+  }, 'replacement');
+
+  assert.equal(shouldPreventEditorDefault(handled), true);
+  assert.equal(shouldPreventEditorDefault(unhandled), false);
+  assert.equal(serializeMarkdown(unhandled.blocks), '- one');
 });

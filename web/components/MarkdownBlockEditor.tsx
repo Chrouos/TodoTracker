@@ -25,6 +25,7 @@ import {
   removeTableBeforeParagraph,
   replaceEditorSelectionWithFallback,
   serializeMarkdown,
+  shouldPreventEditorDefault,
   splitListItemAtSelection,
   splitBlockAtSelection,
   syncEditorValue,
@@ -411,9 +412,9 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     const selection = logicalSelection(root, blocks);
     if (!selection || (isCollapsed(selection) && !allowCollapsedFallback)) return false;
     const replaced = replaceEditorSelectionWithFallback(blocks, selection, text);
-    if (!replaced.handled) return false;
+    if (!shouldPreventEditorDefault(replaced)) return false;
     commitBlocks(replaced.blocks, { selection: replaced.nextSelection });
-    return replaced.handled;
+    return true;
   };
 
   const handleEnter = (root: HTMLElement): boolean => {

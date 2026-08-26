@@ -228,6 +228,72 @@ function isValidEditorPoint(blocks: Block[], point: EditorPoint): boolean {
   return Boolean(locateBlock(blocks, point.path) ?? locateListItem(blocks, point.path));
 }
 
+function replaceListItemSelection(
+  blocks: Block[],
+  selection: EditorSelection,
+  pastedMarkdown: string,
+): EditorReplacementResult | null {
+  const anchor = locateListItem(blocks, selection.anchor.path);
+  const focus = locateListItem(blocks, selection.focus.path);
+  if (!anchor || !focus || anchor.items !== focus.items || anchor.index !== focus.index) return null;
+
+  const next = cloneBlocks(blocks);
+  const location = locateListItem(next, selection.anchor.path);
+  if (!location) return null;
+  const start = Math.min(selection.anchor.offset, selection.focus.offset);
+  const end = Math.max(selection.anchor.offset, selection.focus.offset);
+  const [before] = splitInlinesAtOffset(location.item.inlines, start);
+  const [, after] = splitInlinesAtOffset(location.item.inlines, end);
+  const pasted = parseMarkdown(pastedMarkdown);
+  const textBlocks = pasted.length > 0 && pasted.every(isTextBlock);
+  const itemPath = [...selection.anchor.path];
+  const itemIndex = location.index;
+
+  if (!pasted.length) {
+    location.items.splice(itemIndex, 1, { ...location.item, inlines: mergeInlines([...before, ...after]) });
+    return {
+      blocks: next,
+      nextSelection: selectionAt(itemPath, inlineLength(before)),
+      handled: true,
+      usedFallback: true,
+    };
+  }
+
+  if (textBlocks) {
+    const newItems = pasted.map((block, index) => ({
+      ...location.item,
+      inlines: mergeInlines([
+        ...(index === 0 ? before : []),
+        ...block.inlines,
+        ...(index === pasted.length - 1 ? after : []),
+      ]),
+      children: index === 0 ? location.item.children : [],
+    }));
+    location.items.splice(itemIndex, 1, ...newItems);
+    const caretItemIndex = itemIndex + pasted.length - 1;
+    itemPath[itemPath.length - 1] = caretItemIndex;
+    const caretOffset = (pasted.length === 1 ? inlineLength(before) : 0)
+      + inlineLength(pasted.at(-1)!.inlines);
+    return {
+      blocks: next,
+      nextSelection: selectionAt(itemPath, caretOffset),
+      handled: true,
+      usedFallback: true,
+    };
+  }
+
+  const leftItem = { ...location.item, inlines: before };
+  const rightItem = { ...location.item, inlines: after, children: cloneBlocks(pasted) };
+  location.items.splice(itemIndex, 1, leftItem, rightItem);
+  itemPath[itemPath.length - 1] = itemIndex + 1;
+  return {
+    blocks: next,
+    nextSelection: selectionAt(itemPath, 0),
+    handled: true,
+    usedFallback: true,
+  };
+}
+
 export function reconcileEditorSelection(blocks: Block[], previous: EditorSelection | null): EditorSelection {
   if (previous && isValidEditorPoint(blocks, previous.anchor) && isValidEditorPoint(blocks, previous.focus)) return previous;
   const point = firstEditablePoint(blocks);
@@ -245,10 +311,21 @@ export function replaceEditorSelectionWithFallback(
   selection: EditorSelection,
   pastedMarkdown: string,
 ): EditorReplacementResult {
+  if (!isValidEditorPoint(blocks, selection.anchor) || !isValidEditorPoint(blocks, selection.focus)) {
+    return {
+      blocks: cloneBlocks(blocks),
+      nextSelection: selection,
+      handled: false,
+      usedFallback: false,
+    };
+  }
   if (canUseTextReplacement(blocks, selection)) {
     const result = replaceEditorSelection(blocks, selection, pastedMarkdown);
     return { ...result, handled: true, usedFallback: false };
   }
+
+  const listItemReplacement = replaceListItemSelection(blocks, selection, pastedMarkdown);
+  if (listItemReplacement) return listItemReplacement;
 
   const next = cloneBlocks(blocks);
   const anchorTop = selection.anchor.path[0] ?? 0;
@@ -297,6 +374,10 @@ export function replaceEditorSelectionWithFallback(
     handled: true,
     usedFallback: true,
   };
+}
+
+export function shouldPreventEditorDefault(result: Pick<EditorReplacementResult, 'handled'>): boolean {
+  return result.handled;
 }
 
 export function splitListItemAtSelection(blocks: Block[], selection: EditorSelection): { blocks: Block[]; nextSelection: EditorSelection; handled: boolean } {
