@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import Disconnected from '@/components/Disconnected';
 import Section from '@/components/Section';
 import CopyButton from '@/components/CopyButton';
-import MarkdownBlockEditor from '@/components/MarkdownBlockEditor';
+import AutoTextarea from '@/components/AutoTextarea';
 import { buildSummary } from '@/lib/summary';
 import { durationSec, fmtHM, fmtDate, fmtClock, startOfDay } from '@/lib/time';
 import type { Entry } from '@/lib/types';
@@ -125,7 +125,7 @@ function LogRow({ entry, projectName, color }: {
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) save(); }}
         onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') save(); }}
       >
-        <MarkdownBlockEditor
+        <AutoTextarea
           value={text}
           min={text ? 64 : 40}
           max={400}
