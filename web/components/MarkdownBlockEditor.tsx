@@ -14,7 +14,7 @@ import {
 } from 'react';
 import {
   cloneBlocks,
-  continueBlock,
+  applyEditorCheckboxChange,
   deleteBackwardAtSelection,
   deleteForwardAtSelection,
   detectMarkdownShortcut,
@@ -23,10 +23,11 @@ import {
   indentListItem,
   parseMarkdown,
   removeTableBeforeParagraph,
-  replaceEditorSelection,
+  replaceEditorSelectionWithFallback,
   serializeMarkdown,
+  splitListItemAtSelection,
   splitBlockAtSelection,
-  toggleTaskItem,
+  syncEditorValue,
   type Block,
   type EditorPoint,
   type EditorSelection,
@@ -300,12 +301,11 @@ function rootWideSelection(root: HTMLElement, blocks: Block[]): EditorSelection 
     && range.startOffset === 0
     && range.endContainer === root
     && range.endOffset === root.childNodes.length;
-  const first = blocks[0];
   const last = blocks.at(-1);
-  if (!selectsRoot || (first.type !== 'paragraph' && first.type !== 'heading') || (last?.type !== 'paragraph' && last?.type !== 'heading')) return null;
+  if (!selectsRoot || !last) return null;
   return {
     anchor: { path: [0], offset: 0 },
-    focus: { path: [blocks.length - 1], offset: inlineText(last.inlines).length },
+    focus: { path: [blocks.length - 1], offset: last.type === 'paragraph' || last.type === 'heading' ? inlineText(last.inlines).length : 0 },
   };
 }
 
@@ -346,14 +346,15 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
 
   useEffect(() => {
     if (value !== emittedValueRef.current) {
-      const blocks = blocksFromValue(value);
-      blocksRef.current = blocks;
+      const root = editorRef.current;
+      const previous = root ? logicalSelection(root, blocksRef.current) : null;
+      const synced = syncEditorValue(value, previous);
+      blocksRef.current = synced.blocks;
       emittedValueRef.current = value;
       setSourceValue(value);
-      const root = editorRef.current;
-      if (root) renderRoot(root, blocks);
+      if (root) renderRoot(root, synced.blocks, synced.selection);
     }
-  }, [value]);
+  }, [value, sourceValue]);
 
   useEffect(() => {
     setEditorMode(mode);
@@ -403,15 +404,16 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     commitDom(event.currentTarget);
   };
 
-  const replaceLogicalSelection = (text: string): boolean => {
+  const replaceLogicalSelection = (text: string, allowCollapsedFallback = false): boolean => {
     const root = editorRef.current;
     if (!root) return false;
     const blocks = blocksRef.current;
     const selection = logicalSelection(root, blocks);
-    if (!selection || !textBlockPoint(blocks, selection.anchor) || !textBlockPoint(blocks, selection.focus)) return false;
-    const replaced = replaceEditorSelection(blocks, selection, text);
+    if (!selection || (isCollapsed(selection) && !allowCollapsedFallback)) return false;
+    const replaced = replaceEditorSelectionWithFallback(blocks, selection, text);
+    if (!replaced.handled) return false;
     commitBlocks(replaced.blocks, { selection: replaced.nextSelection });
-    return true;
+    return replaced.handled;
   };
 
   const handleEnter = (root: HTMLElement): boolean => {
@@ -435,10 +437,11 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
         commitBlocks(next, { selection: selectionAt(path, 0) });
         return true;
       }
-      const nextPath = [...path];
-      nextPath[nextPath.length - 1] += 1;
-      commitBlocks(continueBlock(blocks, path), { selection: selectionAt(nextPath, 0) });
-      return true;
+      if (!selection) return false;
+      const split = splitListItemAtSelection(blocks, selection);
+      if (!split.handled) return false;
+      commitBlocks(split.blocks, { selection: split.nextSelection });
+      return split.handled;
     }
 
     if (!selection || !isCollapsed(selection) || !textBlockPoint(blocks, selection.focus)) return false;
@@ -541,7 +544,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>): void => {
     const markdown = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
     const selection = logicalSelection(event.currentTarget, blocksRef.current);
-    if ((!markdown.includes('\n') && (!selection || isCollapsed(selection))) || !replaceLogicalSelection(markdown)) return;
+    if ((!markdown.includes('\n') && (!selection || isCollapsed(selection))) || !replaceLogicalSelection(markdown, markdown.includes('\n'))) return;
     event.preventDefault();
   };
 
@@ -561,9 +564,9 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const handleChange = (event: FormEvent<HTMLDivElement>): void => {
     const checkbox = event.target as HTMLInputElement;
     if (checkbox.tagName !== 'INPUT' || checkbox.type !== 'checkbox' || checkbox.dataset.markdownEditorTask !== 'true') return;
-    const path = parsePath(checkbox.dataset.markdownTaskPath);
-    if (!path) return;
-    const nextValue = commitBlocks(toggleTaskItem(blocksRef.current, path), { render: false });
+    const result = applyEditorCheckboxChange(blocksRef.current, { dataset: checkbox.dataset });
+    if (!result.handled) return;
+    const nextValue = commitBlocks(result.blocks, { render: false });
     onTaskToggle?.(nextValue);
   };
 

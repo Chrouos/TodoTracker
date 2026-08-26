@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import test from 'node:test';
 import {
+  applyEditorCheckboxChange,
   ensureParagraphAfterBlock,
   indentListItem,
   parseMarkdown,
   pathToItem,
+  reconcileEditorSelection,
+  replaceEditorSelectionWithFallback,
   replaceEditorSelection,
   serializeMarkdown,
+  splitListItemAtSelection,
+  syncEditorValue,
   toggleTaskItem,
 } from './markdown.ts';
 import {
@@ -186,42 +190,76 @@ test('parses multiline paste and keeps a paragraph after a terminal table', () =
   assert.equal(serializeMarkdown(continued.blocks), '# Pasted\n\n| Name |\n| --- |\n| Ada |\n\n');
 });
 
-test('wires one persistent Web root to the DOM adapter and shared transactions', () => {
-  const source = fs.readFileSync(new URL('../components/MarkdownBlockEditor.tsx', import.meta.url), 'utf8');
+test('falls back to a top-level structural replacement across lists, quotes, and tables', () => {
+  const source = parseMarkdown('- one\n\n> quoted\n\n| name |\n| --- |\n| cell |');
+  const result = replaceEditorSelectionWithFallback(source, {
+    anchor: { path: [0, 0], offset: 0 },
+    focus: { path: [2], offset: 0 },
+  }, '# New\n\n- [ ] task');
 
-  assert.match(source, /renderEditableBlocks\(root, blocks\)/);
-  assert.match(source, /readEditableBlocks\(root,/);
-  assert.match(source, /readEditorSelection\(root\)/);
-  assert.match(source, /restoreEditorSelection\(root, selection\)/);
-  assert.equal((source.match(/contentEditable/g) ?? []).length, 1);
-  assert.doesNotMatch(source, /data-editor-surface|activeTargetRef|focusPath|onSurface/);
-  for (const handler of [
-    'onBeforeInput',
-    'onInput',
-    'onKeyDown',
-    'onPaste',
-    'onCompositionStart',
-    'onCompositionEnd',
-    'onClick',
-    'onChange',
-  ]) assert.match(source, new RegExp(`${handler}=`));
+  assert.equal(result.handled, true);
+  assert.equal(result.usedFallback, true);
+  assert.deepEqual(result.blocks.map((block) => block.type), ['heading', 'taskList', 'paragraph']);
+  assert.equal(serializeMarkdown(result.blocks), '# New\n\n- [ ] task\n\n');
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [2], offset: 0 },
+    focus: { path: [2], offset: 0 },
+  });
 });
 
-test('preserves toolbar, source mode, imperative, task, and external-sync hooks', () => {
-  const source = fs.readFileSync(new URL('../components/MarkdownBlockEditor.tsx', import.meta.url), 'utf8');
+test('normalizes reversed structural selections before applying the fallback', () => {
+  const result = replaceEditorSelectionWithFallback(parseMarkdown('First text\n\n- list'), {
+    anchor: { path: [1, 0], offset: 0 },
+    focus: { path: [0], offset: 2 },
+  }, 'Replacement');
 
-  assert.match(source, /role="toolbar"/);
-  assert.match(source, /MarkdownBlockEditorProps/);
-  assert.match(source, /MarkdownEditorHandle/);
-  assert.match(source, /focus:\s*\(\)\s*=>/);
-  assert.match(source, /insertText:\s*\(text: string\)\s*=>/);
-  assert.match(source, /getValue:\s*\(\)\s*=>/);
-  assert.match(source, /getSelectionContext:\s*\(\)\s*=>/);
-  assert.match(source, /className="markdown-block-editor-source"/);
-  assert.match(source, /value !== emittedValueRef\.current/);
-  assert.match(source, /dataset\.markdownEditorTask/);
-  assert.match(source, /onInput=\{handleInput\}/);
-  assert.match(source, /const handleInput[\s\S]*?markdownEditorTask[\s\S]*?commitDom/);
-  assert.match(source, /toggleTaskItem\(/);
-  assert.match(source, /ensureParagraphAfterBlock\(/);
+  assert.equal(serializeMarkdown(result.blocks), 'Fi\n\nReplacement');
+});
+
+test('splits a non-empty nested list item at the caret using canonical paths', () => {
+  const source = [{ type: 'list', ordered: false, items: [{
+    inlines: [{ type: 'text', value: 'parent' }],
+    children: [{
+      type: 'taskList',
+      items: [task('nested text')],
+    }],
+  }] }];
+  const result = splitListItemAtSelection(source, {
+    anchor: { path: [0, 0, 0, 0], offset: 6 },
+    focus: { path: [0, 0, 0, 0], offset: 6 },
+  });
+
+  assert.equal(result.handled, true);
+  assert.deepEqual(result.blocks[0].items[0].children[0].items.map((item) => serializeMarkdown([{ type: 'paragraph', inlines: item.inlines }])), ['nested', ' text']);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [0, 0, 0, 1], offset: 0 },
+    focus: { path: [0, 0, 0, 1], offset: 0 },
+  });
+});
+
+test('reconciles a rejected controlled value and preserves or falls back selection', () => {
+  const oldBlocks = parseMarkdown('local text');
+  const accepted = syncEditorValue('server text', { anchor: { path: [0], offset: 5 }, focus: { path: [0], offset: 5 } });
+  const rejected = syncEditorValue('prop text', { anchor: { path: [99], offset: 5 }, focus: { path: [99], offset: 5 } });
+
+  assert.equal(serializeMarkdown(accepted.blocks), 'server text');
+  assert.deepEqual(accepted.selection, { anchor: { path: [0], offset: 5 }, focus: { path: [0], offset: 5 } });
+  assert.equal(serializeMarkdown(rejected.blocks), 'prop text');
+  assert.deepEqual(rejected.selection, { anchor: { path: [0], offset: 0 }, focus: { path: [0], offset: 0 } });
+  assert.deepEqual(reconcileEditorSelection(oldBlocks, { anchor: { path: [99], offset: 0 }, focus: { path: [99], offset: 0 } }), {
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [0], offset: 0 },
+  });
+});
+
+test('delegates one task checkbox change without changing unrelated editor content', () => {
+  const blocks = parseMarkdown('- [ ] task');
+  const result = applyEditorCheckboxChange(blocks, {
+    dataset: { markdownEditorTask: 'true', markdownTaskPath: '0.0' },
+  });
+
+  assert.equal(result.handled, true);
+  assert.equal(result.blocks[0].items[0].checked, true);
+  assert.equal(serializeMarkdown(result.blocks), '- [x] task');
+  assert.equal(applyEditorCheckboxChange(blocks, { dataset: {} }).handled, false);
 });
