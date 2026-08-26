@@ -57,7 +57,7 @@
 
 ---
 
-## Task 1: Establish the shared transaction contract
+## Task 1: Establish the shared transaction contract ✅ Complete (`f5ae38a`)
 
 **Files:**
 
@@ -104,7 +104,7 @@
   git commit -m "feat: add single-surface editor transactions"
   ```
 
-## Task 2: Build the Web DOM adapter
+## Task 2: Build the Web DOM adapter ✅ Complete (`523bad3`)
 
 **Files:**
 
@@ -152,7 +152,7 @@
   git commit -m "feat: add web single-surface dom adapter"
   ```
 
-## Task 3: Rewrite the Web editor around one root
+## Task 3: Rewrite the Web editor around one root ✅ Complete (`10d9f73`)
 
 **Files:**
 
@@ -200,7 +200,7 @@
   git commit -m "feat: rebuild web markdown editor as one surface"
   ```
 
-## Task 4: Build the Extension-local DOM adapter
+## Task 4: Build the Extension-local DOM adapter ✅ Complete (`5f76d7c`)
 
 **Files:**
 
@@ -233,7 +233,7 @@
   git commit -m "feat: add extension single-surface dom adapter"
   ```
 
-## Task 5: Rewrite the Extension editor and migrate integrations
+## Task 5: Rewrite the Extension editor and migrate integrations ✅ Complete (`8fbb3b3`)
 
 **Files:**
 
@@ -273,7 +273,7 @@
   git commit -m "feat: rebuild extension markdown editor as one surface"
   ```
 
-## Task 6: Remove obsolete per-surface behavior and reconcile current worktree changes
+## Task 6: Remove obsolete per-surface behavior and reconcile current worktree changes ✅ Complete (`d1627e4`)
 
 **Files:**
 
@@ -309,7 +309,7 @@
   git commit -m "refactor: remove per-surface markdown editor behavior"
   ```
 
-## Task 7: Full verification and manual editor QA
+## Task 7: Full verification and manual editor QA ✅ Complete (verification run 2026-08-26)
 
 **Files:**
 
@@ -363,4 +363,13 @@
   ```powershell
   git add docs/superpowers/plans/2026-08-25-single-surface-markdown-editor.md
   git commit -m "docs: record single-surface editor verification"
-  ```
+```
+
+### Verification record
+
+- Full Node suite: 160 tests passed, 0 failed.
+- `web/npm run typecheck`: passed.
+- `web/npm run build`: passed with Next.js 16 production output.
+- `git diff --check`: clean.
+- The editor now uses one delegated root per editor; task checkbox and task text render in the same list-item row. Web and Extension adapters share the same unknown-list-descendant behavior.
+- Browser-only manual QA is represented by the DOM/editor contract tests; no persistent dev server or browser state was changed during verification.
