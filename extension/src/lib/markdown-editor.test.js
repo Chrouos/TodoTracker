@@ -673,3 +673,73 @@ test('delegates task checkbox changes while keeping checkbox and text in one lis
     fixture.restore();
   }
 });
+
+test('keeps list-local multiline replacement inside the task list', () => {
+  const fixture = editorFixture('- [x] Parent\n  - Nested child\n- [ ] Sibling');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    const items = root.querySelectorAll('li');
+    const parentText = items[0].childNodes[1];
+    setEditorFixtureSelection(fixture.document, parentText, 0, parentText, 6);
+    const paste = new EditorFixtureEvent('beforeinput', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: 'Updated\n\nSecond',
+    });
+    root.dispatchEvent(paste);
+
+    assert.equal(paste.defaultPrevented, true);
+    assert.equal(
+      fixture.textarea.value,
+      '- [x] Updated\n  - Nested child\n- [x] Second\n- [ ] Sibling',
+    );
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('preserves paragraph text around multiline paste in the middle', () => {
+  const fixture = editorFixture('before after');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    const paragraphText = root.querySelector('p').firstChild;
+    setEditorFixtureSelection(fixture.document, paragraphText, 7);
+    const paste = new EditorFixtureEvent('paste', {
+      bubbles: true,
+      clipboardData: { getData: () => 'First\n\nSecond' },
+    });
+    root.dispatchEvent(paste);
+
+    assert.equal(paste.defaultPrevented, true);
+    assert.equal(fixture.textarea.value, 'before \n\nFirst\n\nSecond\n\nafter');
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('does not run editor keyboard transactions from the toolbar', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    const text = root.querySelector('p').firstChild;
+    setEditorFixtureSelection(fixture.document, text, 0, text, 4);
+    const toolbarButton = fixture.host.querySelector('[data-markdown-command="bold"]');
+    const keyboard = new EditorFixtureEvent('keydown', {
+      bubbles: true,
+      key: 'b',
+      ctrlKey: true,
+    });
+    toolbarButton.dispatchEvent(keyboard);
+
+    assert.equal(keyboard.defaultPrevented, undefined);
+    assert.equal(fixture.textarea.value, 'Text');
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});

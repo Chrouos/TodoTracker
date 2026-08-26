@@ -501,12 +501,60 @@ function ensureParagraphAfterBlockLocal(blocks, path) {
   return { blocks: next, nextPath: [...path.slice(0, -1), location.index + 1] };
 }
 
+function replaceListItemSelectionLocal(blocks, selection, markdown) {
+  const anchor = listLocation(blocks, selection.anchor.path);
+  const focus = listLocation(blocks, selection.focus.path);
+  if (!anchor || !focus || anchor.block.items !== focus.block.items || anchor.index !== focus.index) return null;
+
+  const next = cloneBlocks(blocks);
+  const location = listLocation(next, selection.anchor.path);
+  if (!location) return null;
+  const start = Math.min(selection.anchor.offset, selection.focus.offset);
+  const end = Math.max(selection.anchor.offset, selection.focus.offset);
+  const [before] = splitInlinesAtOffset(location.item.inlines, start);
+  const [, after] = splitInlinesAtOffset(location.item.inlines, end);
+  const pasted = parseMarkdown(markdown);
+  const itemPath = [...selection.anchor.path];
+
+  if (!pasted.length) {
+    location.item.inlines = mergeInlines([...before, ...after]);
+    return { blocks: next, nextSelection: selectionAt(itemPath, inlineText(before).length), handled: true };
+  }
+
+  if (pasted.every((block) => ['paragraph', 'heading'].includes(block.type))) {
+    const items = pasted.map((block, index) => ({
+      ...location.item,
+      inlines: mergeInlines([
+        ...(index === 0 ? before : []),
+        ...block.inlines,
+        ...(index === pasted.length - 1 ? after : []),
+      ]),
+      children: index === 0 ? location.item.children : [],
+    }));
+    location.block.items.splice(location.index, 1, ...items);
+    const caretIndex = location.index + pasted.length - 1;
+    itemPath[itemPath.length - 1] = caretIndex;
+    const caretOffset = (pasted.length === 1 ? inlineText(before).length : 0)
+      + inlineText(pasted.at(-1).inlines).length;
+    return { blocks: next, nextSelection: selectionAt(itemPath, caretOffset), handled: true };
+  }
+
+  const leftItem = { ...location.item, inlines: before };
+  const rightItem = { ...location.item, inlines: after, children: cloneBlocks(pasted) };
+  location.block.items.splice(location.index, 1, leftItem, rightItem);
+  itemPath[itemPath.length - 1] = location.index + 1;
+  return { blocks: next, nextSelection: selectionAt(itemPath, 0), handled: true };
+}
+
 function replaceLogicalSelection(blocks, selection, markdown) {
+  const listReplacement = replaceListItemSelectionLocal(blocks, selection, markdown);
+  if (listReplacement) return listReplacement;
+
   const range = textSelectionRange(blocks, selection);
   if (range) {
     const next = cloneBlocks(blocks);
     const nextRange = textSelectionRange(next, selection);
-    const [before] = splitInlinesAtOffset(nextRange.start.block.inlines, Math.max(0, selection === null ? 0 : nextRange.start.offset));
+    const [before] = splitInlinesAtOffset(nextRange.start.block.inlines, Math.max(0, nextRange.start.offset));
     const [, after] = splitInlinesAtOffset(nextRange.end.block.inlines, Math.max(0, nextRange.end.offset));
     const pasted = parseMarkdown(markdown);
     if (pasted.length === 1 && pasted[0].type === 'paragraph') {
@@ -521,6 +569,33 @@ function replaceLogicalSelection(blocks, selection, markdown) {
         handled: true,
       };
     }
+
+    const replacement = [];
+    if (before.length) replacement.push({ ...nextRange.start.block, inlines: before });
+    replacement.push(...pasted);
+    if (after.length) replacement.push({ ...nextRange.end.block, inlines: after });
+    if (!replacement.length) replacement.push(emptyParagraph());
+    const insertionIndex = nextRange.start.index + (before.length ? 1 : 0);
+    nextRange.start.container.splice(
+      nextRange.start.index,
+      nextRange.end.index - nextRange.start.index + 1,
+      ...replacement,
+    );
+    const selectedBlock = pasted.at(-1) ?? replacement[0];
+    const selectedIndex = pasted.length ? insertionIndex + pasted.length - 1 : nextRange.start.index;
+    const selectedPath = [...nextRange.start.path.slice(0, -1), selectedIndex];
+    if (pasted.length && !['paragraph', 'heading'].includes(selectedBlock.type)) {
+      const continued = ensureParagraphAfterBlockLocal(next, selectedPath);
+      return { blocks: continued.blocks, nextSelection: selectionAt(continued.nextPath, 0), handled: true };
+    }
+    return {
+      blocks: next,
+      nextSelection: selectionAt(
+        selectedPath,
+        pasted.length ? inlineText(selectedBlock.inlines).length : inlineText(before).length,
+      ),
+      handled: true,
+    };
   }
 
   const anchorTop = selection?.anchor?.path?.[0];
@@ -758,7 +833,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     return true;
   };
   const onPaste = (event) => {
-    if (!content || composing || event.isComposing) return;
+    if (!content || !content.contains(event.target) || composing || event.isComposing) return;
     const markdown = event.clipboardData?.getData('text/plain')?.replace(/\r\n?/g, '\n');
     if (!markdown) return;
     const selection = logicalSelection(content, blocks);
@@ -816,7 +891,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     return true;
   };
   const onBeforeInput = (event) => {
-    if (composing || event.isComposing) return;
+    if (!content || !content.contains(event.target) || composing || event.isComposing) return;
     if (event.inputType === 'insertParagraph' && handleEnter()) {
       event.preventDefault();
       return;
@@ -832,7 +907,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     if (event.inputType === 'insertText' && event.data && replaceSelection(event.data)) event.preventDefault();
   };
   const onKeyDown = (event) => {
-    if (!content || composing || event.isComposing || event.keyCode === 229) return;
+    if (!content || !content.contains(event.target) || composing || event.isComposing || event.keyCode === 229) return;
     if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'k'].includes(event.key.toLowerCase())) {
       event.preventDefault();
       applyInlineCommand(event.key.toLowerCase() === 'b' ? 'strong' : event.key.toLowerCase() === 'i' ? 'emphasis' : 'link');
