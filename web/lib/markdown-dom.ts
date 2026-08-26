@@ -262,7 +262,7 @@ function inlineChildren(element: HTMLElement, skipInputs = false): Inline[] {
   const result: Inline[] = [];
   Array.from(element.childNodes).forEach((child) => {
     if (skipInputs && child.nodeType === 1 && (child as HTMLElement).tagName === 'INPUT') return;
-    if (child.nodeType === 1 && blockTags.has((child as HTMLElement).tagName)) return;
+    if (child.nodeType === 1 && (blockTags.has((child as HTMLElement).tagName) || (skipInputs && !inlineTags.has((child as HTMLElement).tagName)))) return;
     result.push(...inlineValueFromDom(child));
   });
   return mergeTextInlines(result);

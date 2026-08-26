@@ -9,6 +9,7 @@ import {
   renderEditableBlocks,
   restoreEditorSelection,
 } from './markdown-dom.ts';
+import { readEditableBlocks as readExtensionEditableBlocks } from '../../extension/src/lib/markdown-dom.js';
 
 class FixtureText {
   constructor(value, ownerDocument) {
@@ -277,6 +278,30 @@ test('keeps unknown nested quote content as a paragraph', () => {
     type: 'quote',
     blocks: [{ type: 'paragraph', inlines: [{ type: 'text', value: 'nested text' }] }],
   }]);
+});
+
+test('matches the Extension adapter for unknown list descendants without duplicating inline text', () => {
+  const { document, root } = fixtureRoot();
+  const list = document.createElement('ul');
+  const item = document.createElement('li');
+  const unknown = document.createElement('div');
+  unknown.textContent = 'pasted child';
+  item.append('item ', unknown);
+  list.append(item);
+  root.append(list);
+
+  const expected = [{
+    type: 'list',
+    ordered: false,
+    items: [{
+      inlines: [{ type: 'text', value: 'item ' }],
+      children: [{ type: 'paragraph', inlines: [{ type: 'text', value: 'pasted child' }] }],
+    }],
+  }];
+  const webBlocks = readEditableBlocks(root, []);
+
+  assert.deepEqual(webBlocks, expected);
+  assert.deepEqual(webBlocks, readExtensionEditableBlocks(root, []));
 });
 
 test('converts direct root text into a paragraph instead of using fallback', () => {
