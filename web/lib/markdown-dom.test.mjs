@@ -37,6 +37,15 @@ class FixtureElement {
     this.parentElement = null;
     this.dataset = {};
     this.contentEditable = 'inherit';
+    this._href = '';
+  }
+
+  get href() {
+    return this._href;
+  }
+
+  set href(value) {
+    this._href = this.tagName === 'A' ? new URL(String(value), 'https://example.com/').toString() : String(value);
   }
 
   append(...nodes) {
@@ -239,6 +248,45 @@ test('reads inline marks and only retains safe links', () => {
     { type: 'link', url: 'https://example.com/docs', inlines: [{ type: 'text', value: 'docs' }] },
     { type: 'text', value: ' plain' },
   ]);
+});
+
+test('preserves the original safe Markdown URL when the browser normalizes href', () => {
+  const { root } = fixtureRoot();
+  const blocks = [{ type: 'paragraph', inlines: [{
+    type: 'link',
+    url: 'https://example.com/a/../docs',
+    inlines: [{ type: 'text', value: 'docs' }],
+  }] }];
+  renderEditableBlocks(root, blocks);
+
+  const link = root.querySelector('a');
+  assert.equal(link.href, 'https://example.com/docs');
+  assert.deepEqual(readEditableBlocks(root, []), blocks);
+});
+
+test('keeps unknown nested quote content as a paragraph', () => {
+  const { document, root } = fixtureRoot();
+  const quote = document.createElement('blockquote');
+  quote.dataset.blockPath = '0';
+  const unknown = document.createElement('aside');
+  unknown.textContent = 'nested text';
+  quote.append(unknown);
+  root.append(quote);
+
+  assert.deepEqual(readEditableBlocks(root, []), [{
+    type: 'quote',
+    blocks: [{ type: 'paragraph', inlines: [{ type: 'text', value: 'nested text' }] }],
+  }]);
+});
+
+test('converts direct root text into a paragraph instead of using fallback', () => {
+  const { root } = fixtureRoot();
+  root.textContent = 'direct text';
+
+  assert.deepEqual(readEditableBlocks(root, [{ type: 'heading', level: 1, inlines: [] }]), [{
+    type: 'paragraph',
+    inlines: [{ type: 'text', value: 'direct text' }],
+  }]);
 });
 
 test('maps and restores logical selections by counting text nodes inside a block', () => {

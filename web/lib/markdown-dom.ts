@@ -1,7 +1,7 @@
-import { isSafeUrl } from '../../shared/markdown/parser.js';
-import type { Block, EditorPoint, EditorSelection, Inline, TableAlignment } from '../../shared/markdown/index.js';
+import type { Block, EditorPoint, EditorSelection, Inline, ListItem, TableAlignment, TaskItem } from '../../shared/markdown/index.js';
 
 const blockTags = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'UL', 'OL', 'TABLE', 'HR']);
+const inlineTags = new Set(['STRONG', 'EM', 'CODE', 'A', 'INPUT']);
 
 export function renderEditableBlocks(root: HTMLElement, blocks: Block[]): void {
   root.contentEditable = 'true';
@@ -11,7 +11,10 @@ export function renderEditableBlocks(root: HTMLElement, blocks: Block[]): void {
 
 export function readEditableBlocks(root: HTMLElement, fallback: Block[]): Block[] {
   const children = elementChildren(root);
-  if (!children.length) return fallback;
+  if (!children.length) {
+    const inlines = inlineChildren(root);
+    return inlines.length ? [{ type: 'paragraph', inlines }] : fallback;
+  }
   return children.map(readBlock).filter((block): block is Block => block !== null);
 }
 
@@ -65,8 +68,12 @@ export function inlineValueFromDom(node: Node): Inline[] {
   if (element.tagName === 'STRONG') return [{ type: 'strong', inlines }];
   if (element.tagName === 'EM') return [{ type: 'emphasis', inlines }];
   if (element.tagName === 'CODE') return [{ type: 'code', inlines: element.textContent ?? '' }];
-  if (element.tagName === 'A' && isSafeUrl((element as HTMLAnchorElement).href)) {
-    return [{ type: 'link', url: (element as HTMLAnchorElement).href, inlines }];
+  if (element.tagName === 'A') {
+    const href = (element as HTMLAnchorElement).href;
+    const markdownUrl = element.dataset.markdownUrl ?? href;
+    if (isSafeUrl(markdownUrl) && isSafeUrl(href)) {
+      return [{ type: 'link', url: markdownUrl, inlines }];
+    }
   }
   return inlines;
 }
@@ -185,6 +192,7 @@ function appendInlines(ownerDocument: Document, parent: HTMLElement, inlines: In
       }
       const link = element as HTMLAnchorElement;
       link.href = inline.url;
+      link.dataset.markdownUrl = inline.url;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
     }
@@ -212,15 +220,19 @@ function readBlock(element: HTMLElement): Block | null {
 
 function readList(element: HTMLElement): Extract<Block, { type: 'list' | 'taskList' }> {
   const task = element.dataset.blockType === 'task-list';
-  const items = elementChildren(element).filter((child) => child.tagName === 'LI').map((item) => {
+  const listItems: ListItem[] = elementChildren(element).filter((child) => child.tagName === 'LI').map((item) => {
     const children = readChildBlocks(item);
     const inlines = inlineChildren(item, true);
-    const checkbox = item.querySelector('input') as HTMLInputElement | null;
-    return task
-      ? { checked: Boolean(checkbox?.checked), inlines, children }
-      : { inlines, children };
+    return { inlines, children };
   });
-  return task ? { type: 'taskList', items } : { type: 'list', ordered: element.tagName === 'OL', items };
+  if (task) {
+    const items: TaskItem[] = listItems.map((item, index) => {
+      const checkbox = elementChildren(element)[index]?.querySelector('input') as HTMLInputElement | null;
+      return { ...item, checked: Boolean(checkbox?.checked) };
+    });
+    return { type: 'taskList', items };
+  }
+  return { type: 'list', ordered: element.tagName === 'OL', items: listItems };
 }
 
 function readTable(table: HTMLElement): Extract<Block, { type: 'table' }> {
@@ -241,7 +253,7 @@ function readTableCell(cell: HTMLElement): Inline[] {
 
 function readChildBlocks(element: HTMLElement): Block[] {
   return elementChildren(element)
-    .filter((child) => blockTags.has(child.tagName))
+    .filter((child) => !inlineTags.has(child.tagName))
     .map(readBlock)
     .filter((block): block is Block => block !== null);
 }
@@ -412,4 +424,8 @@ function isWithin(root: HTMLElement, node: Node): boolean {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(Number.isFinite(value) ? value : 0, maximum));
+}
+
+function isSafeUrl(url: string): boolean {
+  return /^https:\/\/[^\s]+$/i.test(url);
 }
