@@ -11,6 +11,7 @@ import {
   pasteMarkdownAtTextBlock,
   serializeTaskCheckboxToggle,
   splitTextBlockAtOffset,
+  toolbarSelection,
   indentListItem,
   insertInlineTextAtSelection,
   isAfterInlineBoundary,
@@ -80,6 +81,19 @@ test('formats a selection as a Todo item without changing legacy commands', () =
     formatMarkdownSelection('Plan', 0, 4, 'bold'),
     { value: '**Plan**', selectionStart: 2, selectionEnd: 6 },
   );
+});
+
+test('keeps the editor selection when an Extension toolbar button moves browser focus', () => {
+  const remembered = {
+    anchor: { path: [0], offset: 2 },
+    focus: { path: [0], offset: 6 },
+  };
+
+  assert.deepEqual(toolbarSelection(null, remembered), remembered);
+  assert.deepEqual(toolbarSelection({
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [0], offset: 0 },
+  }, remembered), remembered);
 });
 
 test('creates an editable paragraph block for an empty Markdown value', () => {

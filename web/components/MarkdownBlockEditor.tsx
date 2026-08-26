@@ -46,6 +46,7 @@ import {
   inlineText,
   insertInlineTextAtRange,
   listItemPathAfterIndent,
+  toolbarSelection,
   type InlineCommand,
 } from '@/lib/markdown-editor';
 
@@ -169,6 +170,12 @@ function updateListItemInlines(blocks: Block[], path: number[], updater: (inline
   return next;
 }
 
+function elementForPath(root: HTMLElement, path: number[]): HTMLElement | null {
+  const expected = path.join('.');
+  return Array.from(root.querySelectorAll<HTMLElement>('[data-block-path]'))
+    .find((element) => element.dataset.blockPath === expected) ?? null;
+}
+
 function shortcutBlock(block: Block, value: string): Block | null {
   const shortcut = detectMarkdownShortcut(value) as
     | { type: 'heading'; level: number }
@@ -258,9 +265,10 @@ function tableCellTarget(blocks: Block[], element: HTMLElement, path: number[]):
   return { element, inlines: cells[column], kind: 'tableCell', path, column, row, section };
 }
 
-function inlineTarget(blocks: Block[], root: HTMLElement): InlineTarget | null {
-  const element = selectedElement(root);
-  const path = element ? parsePath(element.dataset.blockPath) : null;
+function inlineTarget(blocks: Block[], root: HTMLElement, selection?: EditorSelection | null): InlineTarget | null {
+  const current = selection ?? logicalSelection(root, blocks);
+  const element = current ? elementForPath(root, current.focus.path) : selectedElement(root);
+  const path = current?.focus.path ?? (element ? parsePath(element.dataset.blockPath) : null);
   if (!element || !path) return null;
   if (element.tagName === 'LI') {
     const inlines = listItemInlines(blocks, path);
@@ -339,6 +347,13 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const blocksRef = useRef<Block[]>(blocksFromValue(value));
   const composingRef = useRef(false);
   const emittedValueRef = useRef(value);
+  const selectionRef = useRef<EditorSelection | null>(null);
+
+  const rememberSelection = (root: HTMLElement): EditorSelection | null => {
+    const selection = logicalSelection(root, blocksRef.current);
+    selectionRef.current = selection;
+    return selection;
+  };
 
   useEffect(() => {
     const root = editorRef.current;
@@ -352,6 +367,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
       const synced = syncEditorValue(value, previous);
       blocksRef.current = synced.blocks;
       emittedValueRef.current = value;
+      selectionRef.current = synced.selection;
       setSourceValue(value);
       if (root) renderRoot(root, synced.blocks, synced.selection);
     }
@@ -365,6 +381,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     const nextValue = serializeMarkdown(blocks);
     blocksRef.current = blocks;
     emittedValueRef.current = nextValue;
+    if (options.selection) selectionRef.current = options.selection;
     setSourceValue(nextValue);
     const root = editorRef.current;
     if (root && options.render !== false) renderRoot(root, blocks, options.selection);
@@ -376,6 +393,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     const blocks = blocksFromValue(nextValue);
     blocksRef.current = blocks;
     emittedValueRef.current = nextValue;
+    selectionRef.current = null;
     setSourceValue(nextValue);
     const root = editorRef.current;
     if (root) renderRoot(root, blocks);
@@ -386,6 +404,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     if (composingRef.current) return;
     const blocks = readEditableBlocks(root, [emptyParagraph()]);
     const selection = logicalSelection(root, blocks);
+    if (selection) selectionRef.current = selection;
     const path = selection?.focus.path;
     const location = path ? blockLocation(blocks, path) : null;
     const converted = location && (location.block.type === 'paragraph' || location.block.type === 'heading')
@@ -498,8 +517,12 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const applyInlineFormatting = (command: InlineCommand): void => {
     const root = editorRef.current;
     if (!root) return;
-    const target = inlineTarget(blocksRef.current, root);
-    const offsets = target ? selectionOffsets(target.element) : null;
+    const selection = toolbarSelection(logicalSelection(root, blocksRef.current), selectionRef.current);
+    const target = inlineTarget(blocksRef.current, root, selection);
+    if (selection && !samePath(selection.anchor.path, selection.focus.path)) return;
+    const offsets = target && selection
+      ? { start: Math.min(selection.anchor.offset, selection.focus.offset), end: Math.max(selection.anchor.offset, selection.focus.offset) }
+      : target ? selectionOffsets(target.element) : null;
     if (!target || !offsets) return;
     const url = command === 'link'
       ? window.prompt('連結網址（僅支援 https://）', 'https://example.com') ?? 'https://example.com'
@@ -574,7 +597,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const applyBlockCommand = (command: 'paragraph' | 'heading' | 'list' | 'task' | 'quote' | 'code' | 'table' | 'rule'): void => {
     const root = editorRef.current;
     if (!root) return;
-    const selection = logicalSelection(root, blocksRef.current);
+    const selection = toolbarSelection(logicalSelection(root, blocksRef.current), selectionRef.current);
     const path = selection?.focus.path;
     const location = path ? blockLocation(blocksRef.current, path) : null;
     if (!path || !location || (location.block.type !== 'paragraph' && location.block.type !== 'heading')) return;
@@ -601,6 +624,12 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     }
     const changed = blockLocation(next, path)?.block;
     if (changed) commitBlocks(next, { selection: shortcutSelection(path, changed) });
+  };
+
+  const handleToolbarMouseDown = (event: MouseEvent<HTMLButtonElement>): void => {
+    const root = editorRef.current;
+    if (root) rememberSelection(root);
+    event.preventDefault();
   };
 
   useImperativeHandle(ref, () => ({
@@ -651,8 +680,8 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
 
   const modeToggle = (
     <>
-      <button aria-pressed={editorMode === 'blocks'} onClick={() => setEditorMode('blocks')} type="button">Blocks</button>
-      <button aria-pressed={editorMode === 'source'} onClick={() => setEditorMode('source')} type="button">Source</button>
+      <button aria-pressed={editorMode === 'blocks'} onMouseDown={handleToolbarMouseDown} onClick={() => setEditorMode('blocks')} type="button">Blocks</button>
+      <button aria-pressed={editorMode === 'source'} onMouseDown={handleToolbarMouseDown} onClick={() => setEditorMode('source')} type="button">Source</button>
     </>
   );
 
@@ -661,18 +690,18 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
       <div className="markdown-editor-toolbar" role="toolbar" aria-label={editorMode === 'source' ? 'Markdown 編輯模式' : 'Markdown 編輯工具'}>
         {modeToggle}
         {editorMode === 'blocks' && <>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('strong')} type="button"><strong>B</strong></button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('emphasis')} type="button"><em>I</em></button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('code')} type="button">行內碼</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('link')} type="button">連結</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('paragraph')} type="button">段落</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('heading')} type="button">標題</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('list')} type="button">清單</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('task')} type="button">待辦</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('quote')} type="button">引用</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('code')} type="button">程式碼區塊</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('table')} type="button">表格</button>
-          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('rule')} type="button">分隔線</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineFormatting('strong')} type="button"><strong>B</strong></button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineFormatting('emphasis')} type="button"><em>I</em></button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineFormatting('code')} type="button">行內碼</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineFormatting('link')} type="button">連結</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('paragraph')} type="button">段落</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('heading')} type="button">標題</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('list')} type="button">清單</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('task')} type="button">待辦</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('quote')} type="button">引用</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('code')} type="button">程式碼區塊</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('table')} type="button">表格</button>
+          <button onMouseDown={handleToolbarMouseDown} onClick={() => applyBlockCommand('rule')} type="button">分隔線</button>
         </>}
       </div>
       <div
@@ -684,10 +713,13 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
         onBeforeInput={handleBeforeInput}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
+        onKeyUp={(event) => rememberSelection(event.currentTarget)}
         onPaste={handlePaste}
         onCompositionStart={handleComposition}
         onCompositionEnd={handleComposition}
         onClick={handleClick}
+        onSelect={() => { if (editorRef.current) rememberSelection(editorRef.current); }}
+        onMouseUp={() => { if (editorRef.current) rememberSelection(editorRef.current); }}
         onChange={handleChange}
         style={{ minHeight: min, maxHeight: max }}
         suppressContentEditableWarning

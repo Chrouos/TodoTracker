@@ -453,6 +453,16 @@ function selectedElement(root) {
   return elementFromNode(root, root.ownerDocument.getSelection()?.focusNode ?? null);
 }
 
+function elementForPath(root, path) {
+  const expected = path.join('.');
+  return Array.from(root.querySelectorAll('[data-block-path]'))
+    .find((element) => element.dataset.blockPath === expected) ?? null;
+}
+
+export function toolbarSelection(live, remembered) {
+  return remembered ?? live;
+}
+
 function rootWideSelection(root, blocks) {
   const browserSelection = root.ownerDocument.getSelection();
   if (!browserSelection?.rangeCount || !blocks.length) return null;
@@ -701,6 +711,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   let content = null;
   let composing = false;
   let emitting = false;
+  let rememberedSelection = null;
 
   const emit = () => {
     textarea.value = serializeMarkdown(blocks);
@@ -720,6 +731,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   };
   const commitBlocks = (next, { render = true, selection } = {}) => {
     blocks = next;
+    if (selection) rememberedSelection = selection;
     emit();
     if (render) renderRoot(selection);
   };
@@ -728,13 +740,19 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     const nextValue = textarea.value;
     if (nextValue === serializeMarkdown(blocks)) return;
     blocks = blocksFromMarkdown(nextValue);
+    rememberedSelection = null;
     refresh();
+  };
+  const rememberSelection = () => {
+    const selection = content ? logicalSelection(content, blocks) : null;
+    rememberedSelection = selection;
+    return selection;
   };
   const applyInlineCommand = (command) => {
     if (!content) return;
-    const element = selectedElement(content);
-    const selection = logicalSelection(content, blocks);
-    const path = element ? blockPathForNode(element) : null;
+    const selection = toolbarSelection(logicalSelection(content, blocks), rememberedSelection);
+    const element = selection ? elementForPath(content, selection.focus.path) : selectedElement(content);
+    const path = selection?.focus.path ?? (element ? blockPathForNode(element) : null);
     if (!element || !selection || !path || !samePath(selection.anchor.path, selection.focus.path)) return;
     const start = Math.min(selection.anchor.offset, selection.focus.offset);
     const end = Math.max(selection.anchor.offset, selection.focus.offset);
@@ -770,7 +788,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   };
   const applyCommand = (command) => {
     if (!content) return;
-    const selection = logicalSelection(content, blocks);
+    const selection = toolbarSelection(logicalSelection(content, blocks), rememberedSelection);
     const path = selection?.focus.path ?? [0];
     const next = cloneBlocks(blocks);
     const location = blockLocationAtPath(next, path);
@@ -934,6 +952,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   };
   const onMouseDown = (event) => {
     if (!event.target.closest?.('[data-markdown-command]')) return;
+    rememberSelection();
     event.preventDefault();
   };
   const onTaskChange = (event) => {

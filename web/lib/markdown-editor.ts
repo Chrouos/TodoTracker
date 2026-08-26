@@ -1,5 +1,5 @@
 import { cloneBlocks, parseMarkdown } from '../../shared/markdown/index.js';
-import type { Block, Inline } from '../../shared/markdown/index.js';
+import type { Block, EditorSelection, Inline } from '../../shared/markdown/index.js';
 
 type ListBlock = Extract<Block, { type: 'list' | 'taskList' }>;
 type ListItem = ListBlock['items'][number];
@@ -12,6 +12,13 @@ type ListLocation = {
 };
 
 export type InlineCommand = 'strong' | 'emphasis' | 'code' | 'link';
+
+export function toolbarSelection(
+  live: EditorSelection | null,
+  remembered: EditorSelection | null,
+): EditorSelection | null {
+  return remembered ?? live;
+}
 
 export function inlineText(inlines: Inline[] = []): string {
   return inlines.map((inline) => {

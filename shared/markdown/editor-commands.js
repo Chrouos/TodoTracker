@@ -41,7 +41,12 @@ export function splitBlockAtSelection(blocks, selection) {
 
   const { start } = range;
   const [before, after] = splitInlinesAtOffset(start.block.inlines, start.offset);
-  start.container.splice(start.index, 1, { ...start.block, inlines: before }, { ...start.block, inlines: after });
+  const nextBlock = after.length
+    ? { ...start.block, inlines: after }
+    : start.block.type === 'heading'
+      ? { type: 'paragraph', inlines: [] }
+      : { ...start.block, inlines: after };
+  start.container.splice(start.index, 1, { ...start.block, inlines: before }, nextBlock);
   return { blocks: next, nextSelection: selectionAt([...start.path.slice(0, -1), start.index + 1], 0) };
 }
 

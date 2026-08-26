@@ -23,6 +23,7 @@ import {
   pasteMarkdownAtTextBlock,
   splitTextBlockAtOffset,
   timestampInsertionText,
+  toolbarSelection,
   updateInlinesForTextInput,
 } from './markdown-editor.ts';
 
@@ -299,4 +300,17 @@ test('prevents the native event only when the replacement transaction handled th
   assert.equal(shouldPreventEditorDefault(handled), true);
   assert.equal(shouldPreventEditorDefault(unhandled), false);
   assert.equal(serializeMarkdown(unhandled.blocks), '- one');
+});
+
+test('keeps the editor selection when a toolbar button moves browser focus', () => {
+  const remembered = {
+    anchor: { path: [0], offset: 2 },
+    focus: { path: [0], offset: 6 },
+  };
+
+  assert.deepEqual(toolbarSelection(null, remembered), remembered);
+  assert.deepEqual(toolbarSelection({
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [0], offset: 0 },
+  }, remembered), remembered);
 });

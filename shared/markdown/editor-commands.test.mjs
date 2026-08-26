@@ -198,6 +198,22 @@ test('splits a heading at its logical selection offset', () => {
   });
 });
 
+test('starts a paragraph when Enter exits a heading at its end', () => {
+  const result = splitBlockAtSelection([{ type: 'heading', level: 2, inlines: text('Title') }], {
+    anchor: { path: [0], offset: 5 },
+    focus: { path: [0], offset: 5 },
+  });
+
+  assert.deepEqual(result.blocks, [
+    { type: 'heading', level: 2, inlines: text('Title') },
+    { type: 'paragraph', inlines: [] },
+  ]);
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [1], offset: 0 },
+    focus: { path: [1], offset: 0 },
+  });
+});
+
 test('Backspace merges adjacent paragraphs and returns the join selection', () => {
   const result = deleteBackwardAtSelection([
     { type: 'paragraph', inlines: text('first') },
