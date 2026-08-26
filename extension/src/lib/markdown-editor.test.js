@@ -778,3 +778,23 @@ test('simple mode keeps the textarea and wraps selected Markdown directly', () =
     fixture.restore();
   }
 });
+
+test('simple mode inserts empty bold markers at the textarea caret', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'simple' });
+    const toolbarButton = fixture.host.querySelector('[data-markdown-command="bold"]');
+
+    fixture.textarea.focus();
+    fixture.textarea.setSelectionRange(4, 4);
+    toolbarButton.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    toolbarButton.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+
+    assert.equal(fixture.textarea.value, 'Text** **');
+    assert.equal(fixture.textarea.selectionStart, 6);
+    assert.equal(fixture.textarea.selectionEnd, 7);
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});

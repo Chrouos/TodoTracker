@@ -284,6 +284,13 @@ function mountSimpleMarkdownEditor(textarea, onChange) {
     event.preventDefault();
     const start = savedStart ?? textarea.selectionStart;
     const end = savedEnd ?? textarea.selectionEnd;
+    if (button.dataset.markdownCommand === 'bold' && start === end) {
+      const value = `${textarea.value.slice(0, start)}** **${textarea.value.slice(end)}`;
+      commit(value, start + 2, start + 3);
+      savedStart = null;
+      savedEnd = null;
+      return;
+    }
     const result = formatMarkdownSelection(textarea.value, start, end, button.dataset.markdownCommand);
     commit(result.value, result.selectionStart, result.selectionEnd);
     savedStart = null;
