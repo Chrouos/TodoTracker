@@ -308,6 +308,26 @@ test('keeps unknown nested quote content as a paragraph', () => {
   }]);
 });
 
+test('does not serialize unknown list descendants as both inline text and child blocks', () => {
+  const { document, root } = fixtureRoot();
+  const list = document.createElement('ul');
+  const item = document.createElement('li');
+  const unknown = document.createElement('div');
+  unknown.textContent = 'pasted child';
+  item.append('item ', unknown);
+  list.append(item);
+  root.append(list);
+
+  assert.deepEqual(readEditableBlocks(root, []), [{
+    type: 'list',
+    ordered: false,
+    items: [{
+      inlines: [{ type: 'text', value: 'item ' }],
+      children: [{ type: 'paragraph', inlines: [{ type: 'text', value: 'pasted child' }] }],
+    }],
+  }]);
+});
+
 test('uses nested quote and list item paths for blocks and task checkboxes', () => {
   const { root } = fixtureRoot();
   renderEditableBlocks(root, parseMarkdown('> - parent\n>   - [ ] child'));
