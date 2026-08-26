@@ -224,6 +224,93 @@ export function restoreTextareaFromEditor(marker, wrapper, textarea) {
   marker.remove();
 }
 
+function mountSimpleMarkdownEditor(textarea, onChange) {
+  const parent = textarea.parentNode;
+  const marker = document.createComment('markdown-editor');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'markdown-editor is-simple';
+  wrapper.dataset.editorMode = 'simple';
+  parent.insertBefore(marker, textarea);
+  parent.insertBefore(wrapper, textarea);
+  wrapper.appendChild(textarea);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'markdown-editor-toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Markdown editor');
+  const commands = [
+    ['bold', 'B', 'Bold'],
+    ['italic', 'I', 'Italic'],
+    ['link', '↗', 'Link'],
+    ['heading', 'H2', 'Heading'],
+    ['unordered-list', '•', 'List'],
+    ['ordered-list', '1.', 'Ordered list'],
+    ['todo', '☐', 'Todo'],
+    ['quote', '❞', 'Quote'],
+    ['code', '</>', 'Code'],
+    ['table', '▦', 'Table'],
+    ['rule', '—', 'Rule'],
+  ];
+  for (const [command, label, title] of commands) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.markdownCommand = command;
+    button.title = title;
+    button.setAttribute('aria-label', title);
+    button.textContent = label;
+    toolbar.appendChild(button);
+  }
+  wrapper.insertBefore(toolbar, textarea);
+
+  let savedStart = null;
+  let savedEnd = null;
+  const commit = (value, selectionStart, selectionEnd) => {
+    textarea.value = value;
+    textarea.focus();
+    textarea.setSelectionRange(selectionStart, selectionEnd);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    onChange?.(value);
+  };
+  const onMouseDown = (event) => {
+    const button = event.target.closest?.('[data-markdown-command]');
+    if (!button) return;
+    savedStart = textarea.selectionStart;
+    savedEnd = textarea.selectionEnd;
+    event.preventDefault();
+  };
+  const onClick = (event) => {
+    const button = event.target.closest?.('[data-markdown-command]');
+    if (!button) return;
+    event.preventDefault();
+    const start = savedStart ?? textarea.selectionStart;
+    const end = savedEnd ?? textarea.selectionEnd;
+    const result = formatMarkdownSelection(textarea.value, start, end, button.dataset.markdownCommand);
+    commit(result.value, result.selectionStart, result.selectionEnd);
+    savedStart = null;
+    savedEnd = null;
+  };
+  toolbar.addEventListener('mousedown', onMouseDown);
+  toolbar.addEventListener('click', onClick);
+
+  return {
+    destroy() {
+      toolbar.removeEventListener('mousedown', onMouseDown);
+      toolbar.removeEventListener('click', onClick);
+      restoreTextareaFromEditor(marker, wrapper, textarea);
+    },
+    focus() { textarea.focus(); },
+    sync() {},
+    insertText(text) {
+      if (!text) return;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      commit(`${textarea.value.slice(0, start)}${text}${textarea.value.slice(end)}`, start + text.length, start + text.length);
+    },
+    getValue() { return textarea.value; },
+    getSelectionContext() { return { value: textarea.value, offset: textarea.selectionStart }; },
+  };
+}
+
 function caretOffset(surface) {
   const selection = window.getSelection();
   if (!selection?.rangeCount) return (surface.textContent ?? '').length;
@@ -697,6 +784,7 @@ function deleteAtSelection(blocks, selection, direction) {
  */
 export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   if (!textarea?.parentNode) throw new TypeError('mountMarkdownEditor requires a connected textarea');
+  if (mode === 'simple') return mountSimpleMarkdownEditor(textarea, onChange);
   const editorMode = normalizeMarkdownEditorMode(mode);
   const parent = textarea.parentNode;
   const marker = document.createComment('markdown-editor');

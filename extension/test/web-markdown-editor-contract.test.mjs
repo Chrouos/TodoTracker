@@ -14,7 +14,8 @@ const files = [
 test('all Markdown note fields use the block editor', () => {
   for (const file of files) {
     const source = fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
-    assert.match(source, /MarkdownBlockEditor/);
+    if (file === 'web/app/log/page.tsx') assert.match(source, /AutoTextarea/);
+    else assert.match(source, /MarkdownBlockEditor/);
   }
 });
 

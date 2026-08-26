@@ -757,3 +757,24 @@ test('does not run editor keyboard transactions from the toolbar', () => {
     fixture.restore();
   }
 });
+
+test('simple mode keeps the textarea and wraps selected Markdown directly', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'simple' });
+    const toolbarButton = fixture.host.querySelector('[data-markdown-command="bold"]');
+
+    fixture.textarea.focus();
+    fixture.textarea.setSelectionRange(0, 4);
+    toolbarButton.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    toolbarButton.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+
+    assert.equal(fixture.textarea.value, '**Text**');
+    assert.equal(fixture.textarea.selectionStart, 2);
+    assert.equal(fixture.textarea.selectionEnd, 6);
+    assert.equal(fixture.host.querySelector('[data-markdown-editor-root="true"]'), null);
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});

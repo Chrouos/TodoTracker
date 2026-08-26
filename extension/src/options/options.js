@@ -42,8 +42,12 @@ function renderMarkdownPreview(markdown, className = '', { interactiveTasks = fa
 
 const markdownEditors = new Map();
 
+function markdownEditorMode(mode) {
+  return mode === 'source' ? 'source' : 'simple';
+}
+
 function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
-  const editorMode = normalizeMarkdownEditorMode(mode);
+  const editorMode = markdownEditorMode(mode);
   markdownEditors.forEach((editor, textarea) => {
     if (!document.contains(textarea)) { editor.destroy(); markdownEditors.delete(textarea); }
   });
@@ -1363,7 +1367,7 @@ function renderProjectNotes() {
     const ta = $('pjNoteList').querySelector(`[data-note-input="${noteEditingId}"]`);
     if (ta) {
       autoGrow(ta, { min: 72, max: 400 });
-      markdownEditors.set(ta, mountMarkdownEditor(ta, { mode: normalizeMarkdownEditorMode(S.settings.notesEditor) }));
+      markdownEditors.set(ta, mountMarkdownEditor(ta, { mode: markdownEditorMode(S.settings.notesEditor) }));
       markdownEditors.get(ta).focus();
     }
   }

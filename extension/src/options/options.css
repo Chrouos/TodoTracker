@@ -96,7 +96,7 @@ section[hidden] { display: none; }
 .timer-notes-mode .btn-sm.active { background: var(--ink); color: var(--canvas); }
 .markdown-editor { margin-top: var(--xs); }
 .markdown-editor textarea { width: 100%; box-sizing: border-box; }
-.markdown-editor:not(.is-source) textarea { display: none; }
+.markdown-editor:not(.is-source):not(.is-simple) textarea { display: none; }
 .markdown-editor.is-source textarea { display: block; }
 .markdown-editor-toolbar {
   display: flex;
