@@ -10,28 +10,40 @@ import {
   type CompositionEvent,
   type FormEvent,
   type KeyboardEvent,
-  type ReactNode,
+  type MouseEvent,
 } from 'react';
 import {
   cloneBlocks,
   continueBlock,
+  deleteBackwardAtSelection,
+  deleteForwardAtSelection,
   detectMarkdownShortcut,
+  ensureParagraphAfterBlock,
   exitEmptyBlock,
   indentListItem,
   parseMarkdown,
+  removeTableBeforeParagraph,
+  replaceEditorSelection,
   serializeMarkdown,
+  splitBlockAtSelection,
   toggleTaskItem,
   type Block,
+  type EditorPoint,
+  type EditorSelection,
   type Inline,
 } from '@/lib/markdown';
+import {
+  blockPathForNode,
+  readEditableBlocks,
+  readEditorSelection,
+  renderEditableBlocks,
+  restoreEditorSelection,
+} from '@/lib/markdown-dom';
 import {
   applyInlineCommand,
   inlineText,
   insertInlineTextAtRange,
   listItemPathAfterIndent,
-  pasteMarkdownAtTextBlock,
-  splitTextBlockAtOffset,
-  updateInlinesForTextInput,
   type InlineCommand,
 } from '@/lib/markdown-editor';
 
@@ -52,55 +64,59 @@ export type MarkdownEditorHandle = {
   getSelectionContext: () => { value: string; offset: number };
 };
 
-type EditorTarget = {
-  kind: 'block' | 'listItem' | 'codeBlock' | 'tableCell';
+type BlockLocation = {
+  container: Block[];
+  index: number;
+  block: Block;
+};
+
+type InlineTarget = {
+  element: HTMLElement;
+  inlines: Inline[];
+  kind: 'block' | 'listItem' | 'tableCell';
   path: number[];
-  row?: number;
   column?: number;
+  row?: number;
   section?: 'header' | 'body';
 };
 
+type CommitOptions = {
+  render?: boolean;
+  selection?: EditorSelection;
+};
+
+const emptyParagraph = (): Block => ({ type: 'paragraph', inlines: [] });
 const textInline = (value: string): Inline[] => value ? [{ type: 'text', value }] : [];
+const selectionAt = (path: number[], offset: number): EditorSelection => ({
+  anchor: { path: [...path], offset },
+  focus: { path: [...path], offset },
+});
 
 function blocksFromValue(value: string): Block[] {
   const parsed = parseMarkdown(value);
-  return parsed.length ? parsed : [{ type: 'paragraph', inlines: [] }];
+  return parsed.length ? parsed : [emptyParagraph()];
 }
 
-function toPath(value: string | undefined): number[] | null {
+function parsePath(value: string | undefined): number[] | null {
   if (!value || !/^\d+(?:\.\d+)*$/.test(value)) return null;
   return value.split('.').map(Number);
 }
 
-function pathLabel(path: number[]): string {
-  return path.join('.');
+function samePath(first: number[], second: number[]): boolean {
+  return first.length === second.length && first.every((part, index) => part === second[index]);
 }
 
-function getTarget(surface: HTMLElement): EditorTarget | null {
-  const path = toPath(surface.dataset.blockPath);
-  const kind = surface.dataset.editorKind as EditorTarget['kind'] | undefined;
-  if (!path || !kind) return null;
-  const target: EditorTarget = { kind, path };
-  if (kind === 'tableCell') {
-    const row = Number(surface.dataset.tableRow);
-    const column = Number(surface.dataset.tableColumn);
-    const section = surface.dataset.tableSection;
-    if (!Number.isInteger(row) || !Number.isInteger(column) || (section !== 'header' && section !== 'body')) return null;
-    target.row = row;
-    target.column = column;
-    target.section = section;
-  }
-  return target;
+function isCollapsed(selection: EditorSelection): boolean {
+  return samePath(selection.anchor.path, selection.focus.path)
+    && selection.anchor.offset === selection.focus.offset;
 }
 
-function blockLocation(blocks: Block[], path: number[]): { container: Block[]; index: number; block: Block } | null {
-  const visit = (container: Block[], index: number, remaining: number[]): { container: Block[]; index: number; block: Block } | null => {
+function blockLocation(blocks: Block[], path: number[]): BlockLocation | null {
+  const visit = (container: Block[], index: number, remaining: number[]): BlockLocation | null => {
     const block = container[index];
     if (!block) return null;
     if (!remaining.length) return { container, index, block };
-    if (block.type === 'quote') {
-      return block.blocks ? visit(block.blocks, remaining[0], remaining.slice(1)) : null;
-    }
+    if (block.type === 'quote') return visit(block.blocks ?? [], remaining[0], remaining.slice(1));
     if (block.type === 'list' || block.type === 'taskList') {
       const item = block.items[remaining[0]];
       const childIndex = remaining[1];
@@ -120,11 +136,24 @@ function updateBlockAtPath(blocks: Block[], path: number[], updater: (block: Blo
   return next;
 }
 
-function updateListItemAtPath(blocks: Block[], path: number[], updater: (inlines: Inline[]) => Inline[]): Block[] {
+function listItemInlines(blocks: Block[], path: number[]): Inline[] | null {
+  const visit = (block: Block | undefined, remaining: number[]): Inline[] | null => {
+    if (!block || !remaining.length) return null;
+    if (block.type === 'quote') return visit(block.blocks?.[remaining[0]], remaining.slice(1));
+    if (block.type !== 'list' && block.type !== 'taskList') return null;
+    const item = block.items[remaining[0]];
+    if (!item) return null;
+    if (remaining.length === 1) return item.inlines;
+    return visit(item.children[remaining[1]], remaining.slice(2));
+  };
+  return visit(blocks[path[0]], path.slice(1));
+}
+
+function updateListItemInlines(blocks: Block[], path: number[], updater: (inlines: Inline[]) => Inline[]): Block[] {
   const next = cloneBlocks(blocks);
-  const visitBlock = (block: Block | undefined, remaining: number[]): boolean => {
+  const visit = (block: Block | undefined, remaining: number[]): boolean => {
     if (!block || !remaining.length) return false;
-    if (block.type === 'quote') return visitBlock(block.blocks?.[remaining[0]], remaining.slice(1));
+    if (block.type === 'quote') return visit(block.blocks?.[remaining[0]], remaining.slice(1));
     if (block.type !== 'list' && block.type !== 'taskList') return false;
     const item = block.items[remaining[0]];
     if (!item) return false;
@@ -132,59 +161,10 @@ function updateListItemAtPath(blocks: Block[], path: number[], updater: (inlines
       item.inlines = updater(item.inlines);
       return true;
     }
-    const child = item.children[remaining[1]];
-    return visitBlock(child, remaining.slice(2));
+    return visit(item.children[remaining[1]], remaining.slice(2));
   };
-  visitBlock(next[path[0]], path.slice(1));
+  visit(next[path[0]], path.slice(1));
   return next;
-}
-
-function updateTableCell(blocks: Block[], target: EditorTarget, value: string): Block[] {
-  return updateBlockAtPath(blocks, target.path, (block) => {
-    if (block.type !== 'table' || target.row === undefined || target.column === undefined || !target.section) return block;
-    const cells = target.section === 'header' ? block.header : block.rows[target.row];
-    if (!cells || !cells[target.column]) return block;
-    cells[target.column] = updateInlinesForTextInput(cells[target.column], value);
-    return block;
-  });
-}
-
-function updateTargetInlines(blocks: Block[], target: EditorTarget, updater: (inlines: Inline[]) => Inline[]): Block[] {
-  if (target.kind === 'listItem') return updateListItemAtPath(blocks, target.path, updater);
-  if (target.kind === 'tableCell') {
-    return updateBlockAtPath(blocks, target.path, (block) => {
-      if (block.type !== 'table' || target.row === undefined || target.column === undefined || !target.section) return block;
-      const cells = target.section === 'header' ? block.header : block.rows[target.row];
-      if (cells?.[target.column]) cells[target.column] = updater(cells[target.column]);
-      return block;
-    });
-  }
-  return updateBlockAtPath(blocks, target.path, (block) => {
-    return block.type === 'paragraph' || block.type === 'heading'
-      ? { ...block, inlines: updater(block.inlines) }
-      : block;
-  });
-}
-
-function getTargetInlines(blocks: Block[], target: EditorTarget): Inline[] {
-  if (target.kind === 'listItem') {
-    const visit = (block: Block | undefined, remaining: number[]): Inline[] => {
-      if (!block || !remaining.length) return [];
-      if (block.type === 'quote') return visit(block.blocks?.[remaining[0]], remaining.slice(1));
-      if (block.type !== 'list' && block.type !== 'taskList') return [];
-      const item = block.items[remaining[0]];
-      if (!item) return [];
-      if (remaining.length === 1) return item.inlines;
-      return visit(item.children[remaining[1]], remaining.slice(2));
-    };
-    return visit(blocks[target.path[0]], target.path.slice(1));
-  }
-  const block = findBlockAtPath(blocks, target.path);
-  if (target.kind === 'tableCell' && block?.type === 'table' && target.row !== undefined && target.column !== undefined && target.section) {
-    const cells = target.section === 'header' ? block.header : block.rows[target.row];
-    return cells?.[target.column] ?? [];
-  }
-  return block?.type === 'paragraph' || block?.type === 'heading' ? block.inlines : [];
 }
 
 function shortcutBlock(block: Block, value: string): Block | null {
@@ -199,32 +179,35 @@ function shortcutBlock(block: Block, value: string): Block | null {
   if (shortcut.type === 'heading') return { type: 'heading', level: shortcut.level, inlines: [] };
   if (shortcut.type === 'task') return { type: 'taskList', items: [{ checked: shortcut.checked, inlines: [], children: [] }] };
   if (shortcut.type === 'list') return { type: 'list', ordered: shortcut.ordered, items: [{ inlines: [], children: [] }] };
-  if (shortcut.type === 'quote') return { type: 'quote', blocks: [{ type: 'paragraph', inlines: [] }] };
+  if (shortcut.type === 'quote') return { type: 'quote', blocks: [emptyParagraph()] };
   return { type: 'codeBlock', value: '' };
 }
 
-function isEmptySurface(surface: HTMLElement): boolean {
-  return !(surface.textContent ?? '').trim();
+function shortcutSelection(path: number[], block: Block): EditorSelection {
+  if (block.type === 'list' || block.type === 'taskList' || block.type === 'quote') {
+    return selectionAt([...path, 0], 0);
+  }
+  return selectionAt(path, 0);
 }
 
-function caretOffset(surface: HTMLElement): number {
-  const selection = window.getSelection();
-  if (!selection?.rangeCount) return (surface.textContent ?? '').length;
-  const range = selection.getRangeAt(0);
-  if (!surface.contains(range.startContainer)) return (surface.textContent ?? '').length;
-  const before = range.cloneRange();
-  before.selectNodeContents(surface);
-  before.setEnd(range.startContainer, range.startOffset);
-  return before.toString().length;
+function elementFromNode(root: HTMLElement, node: Node | null): HTMLElement | null {
+  const element = node?.nodeType === Node.ELEMENT_NODE ? node as HTMLElement : node?.parentElement;
+  const target = element?.closest<HTMLElement>('[data-block-path]') ?? null;
+  return target && root.contains(target) ? target : null;
 }
 
-function selectionOffsets(surface: HTMLElement): { start: number; end: number } | null {
-  const selection = window.getSelection();
+function selectedElement(root: HTMLElement): HTMLElement | null {
+  const selection = root.ownerDocument.getSelection();
+  return elementFromNode(root, selection?.focusNode ?? null);
+}
+
+function selectionOffsets(element: HTMLElement): { start: number; end: number } | null {
+  const selection = element.ownerDocument.getSelection();
   if (!selection?.rangeCount) return null;
   const range = selection.getRangeAt(0);
-  if (!surface.contains(range.startContainer) || !surface.contains(range.endContainer)) return null;
+  if (!element.contains(range.startContainer) || !element.contains(range.endContainer)) return null;
   const before = range.cloneRange();
-  before.selectNodeContents(surface);
+  before.selectNodeContents(element);
   before.setEnd(range.startContainer, range.startOffset);
   const start = before.toString().length;
   return { start, end: start + range.toString().length };
@@ -240,15 +223,15 @@ function isAtNodeEnd(node: Node, offset: number): boolean {
     : offset === node.childNodes.length;
 }
 
-function isSelectionAfterInlineMark(surface: HTMLElement): boolean {
-  const selection = window.getSelection();
+function isSelectionAfterInlineMark(element: HTMLElement): boolean {
+  const selection = element.ownerDocument.getSelection();
   if (!selection?.rangeCount) return false;
   const range = selection.getRangeAt(0);
-  if (!range.collapsed || !surface.contains(range.startContainer) || !isAtNodeEnd(range.startContainer, range.startOffset)) return false;
+  if (!range.collapsed || !element.contains(range.startContainer) || !isAtNodeEnd(range.startContainer, range.startOffset)) return false;
   let node: Node | null = range.startContainer;
-  if (node === surface) return isInlineMark(surface.childNodes[range.startOffset - 1] ?? null);
+  if (node === element) return isInlineMark(element.childNodes[range.startOffset - 1] ?? null);
   if (isInlineMark(node)) return true;
-  while (node && node !== surface) {
+  while (node && node !== element) {
     const parent: Node | null = node.parentNode;
     if (!parent || node.nextSibling) return false;
     if (isInlineMark(parent)) return true;
@@ -257,49 +240,85 @@ function isSelectionAfterInlineMark(surface: HTMLElement): boolean {
   return false;
 }
 
-function setSurfaceSelection(surface: HTMLElement, start: number, end = start): void {
-  const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT);
-  let cursor = 0;
-  let startNode: Node | null = null;
-  let endNode: Node | null = null;
-  let startOffset = 0;
-  let endOffset = 0;
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    const length = node.textContent?.length ?? 0;
-    if (!startNode && start <= cursor + length) {
-      startNode = node;
-      startOffset = Math.max(0, start - cursor);
-    }
-    if (!endNode && end <= cursor + length) {
-      endNode = node;
-      endOffset = Math.max(0, end - cursor);
-      break;
-    }
-    cursor += length;
-  }
-  if (!startNode) {
-    surface.focus();
-    return;
-  }
-  const range = document.createRange();
-  range.setStart(startNode, startOffset);
-  range.setEnd(endNode ?? startNode, endNode ? endOffset : startOffset);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-  surface.focus();
+function tableCellTarget(blocks: Block[], element: HTMLElement, path: number[]): InlineTarget | null {
+  if (element.tagName !== 'TH' && element.tagName !== 'TD') return null;
+  const table = blockLocation(blocks, path)?.block;
+  if (table?.type !== 'table') return null;
+  const rowElement = element.parentElement;
+  const sectionElement = rowElement?.parentElement;
+  const column = rowElement ? Array.from(rowElement.children).indexOf(element) : -1;
+  const section = sectionElement?.tagName === 'THEAD' ? 'header' : sectionElement?.tagName === 'TBODY' ? 'body' : null;
+  const row = section === 'body' && sectionElement && rowElement
+    ? Array.from(sectionElement.children).indexOf(rowElement)
+    : 0;
+  const cells = section === 'header' ? table.header : section === 'body' ? table.rows[row] : null;
+  if (!section || !cells || column < 0 || !cells[column]) return null;
+  return { element, inlines: cells[column], kind: 'tableCell', path, column, row, section };
 }
 
-function renderInlines(inlines: Inline[]): ReactNode {
-  return inlines.map((inline, index) => {
-    if (inline.type === 'text') return inline.value;
-    const content = typeof inline.inlines === 'string' ? inline.inlines : renderInlines(inline.inlines);
-    if (inline.type === 'strong') return <strong key={index}>{content}</strong>;
-    if (inline.type === 'emphasis') return <em key={index}>{content}</em>;
-    if (inline.type === 'code') return <code key={index}>{content}</code>;
-    if (inline.type === 'link') return <a href={inline.url} key={index} rel="noopener noreferrer" target="_blank">{content}</a>;
-    return null;
+function inlineTarget(blocks: Block[], root: HTMLElement): InlineTarget | null {
+  const element = selectedElement(root);
+  const path = element ? parsePath(element.dataset.blockPath) : null;
+  if (!element || !path) return null;
+  if (element.tagName === 'LI') {
+    const inlines = listItemInlines(blocks, path);
+    return inlines ? { element, inlines, kind: 'listItem', path } : null;
+  }
+  const tableTarget = tableCellTarget(blocks, element, path);
+  if (tableTarget) return tableTarget;
+  const block = blockLocation(blocks, path)?.block;
+  return block?.type === 'paragraph' || block?.type === 'heading'
+    ? { element, inlines: block.inlines, kind: 'block', path }
+    : null;
+}
+
+function updateInlineTarget(blocks: Block[], target: InlineTarget, updater: (inlines: Inline[]) => Inline[]): Block[] {
+  if (target.kind === 'listItem') return updateListItemInlines(blocks, target.path, updater);
+  if (target.kind === 'tableCell') {
+    return updateBlockAtPath(blocks, target.path, (block) => {
+      if (block.type !== 'table' || target.column === undefined || target.row === undefined || !target.section) return block;
+      const cells = target.section === 'header' ? block.header : block.rows[target.row];
+      if (cells?.[target.column]) cells[target.column] = updater(cells[target.column]);
+      return block;
+    });
+  }
+  return updateBlockAtPath(blocks, target.path, (block) => block.type === 'paragraph' || block.type === 'heading'
+    ? { ...block, inlines: updater(block.inlines) }
+    : block);
+}
+
+function textBlockPoint(blocks: Block[], point: EditorPoint): boolean {
+  const block = blockLocation(blocks, point.path)?.block;
+  return block?.type === 'paragraph' || block?.type === 'heading';
+}
+
+function rootWideSelection(root: HTMLElement, blocks: Block[]): EditorSelection | null {
+  const browserSelection = root.ownerDocument.getSelection();
+  if (!browserSelection?.rangeCount || blocks.length === 0) return null;
+  const range = browserSelection.getRangeAt(0);
+  const selectsRoot = range.startContainer === root
+    && range.startOffset === 0
+    && range.endContainer === root
+    && range.endOffset === root.childNodes.length;
+  const first = blocks[0];
+  const last = blocks.at(-1);
+  if (!selectsRoot || (first.type !== 'paragraph' && first.type !== 'heading') || (last?.type !== 'paragraph' && last?.type !== 'heading')) return null;
+  return {
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [blocks.length - 1], offset: inlineText(last.inlines).length },
+  };
+}
+
+function logicalSelection(root: HTMLElement, blocks: Block[]): EditorSelection | null {
+  return readEditorSelection(root) ?? rootWideSelection(root, blocks);
+}
+
+function renderRoot(root: HTMLElement, blocks: Block[], selection?: EditorSelection): void {
+  renderEditableBlocks(root, blocks);
+  if (!selection) return;
+  requestAnimationFrame(() => {
+    root.focus();
+    restoreEditorSelection(root, selection);
   });
 }
 
@@ -312,25 +331,27 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   mode = 'blocks',
   onTaskToggle,
 }, ref) {
-  const [blocks, setBlocks] = useState<Block[]>(() => blocksFromValue(value));
   const [sourceValue, setSourceValue] = useState(value);
   const [editorMode, setEditorMode] = useState<'blocks' | 'source'>(mode);
   const editorRef = useRef<HTMLDivElement>(null);
   const sourceRef = useRef<HTMLTextAreaElement>(null);
-  const dirtyRef = useRef(false);
-  const emittedValueRef = useRef(value);
+  const blocksRef = useRef<Block[]>(blocksFromValue(value));
   const composingRef = useRef(false);
-  const activeTargetRef = useRef<EditorTarget | null>(null);
+  const emittedValueRef = useRef(value);
 
   useEffect(() => {
-    if (value === emittedValueRef.current) {
-      dirtyRef.current = false;
-      return;
-    }
-    if (!dirtyRef.current) {
-      setBlocks(blocksFromValue(value));
-      setSourceValue(value);
+    const root = editorRef.current;
+    if (root) renderRoot(root, blocksRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (value !== emittedValueRef.current) {
+      const blocks = blocksFromValue(value);
+      blocksRef.current = blocks;
       emittedValueRef.current = value;
+      setSourceValue(value);
+      const root = editorRef.current;
+      if (root) renderRoot(root, blocks);
     }
   }, [value]);
 
@@ -338,195 +359,250 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     setEditorMode(mode);
   }, [mode]);
 
-  const commitBlocks = (next: Block[]) => {
-    const nextValue = serializeMarkdown(next);
-    setBlocks(next);
-    setSourceValue(nextValue);
-    dirtyRef.current = true;
+  const commitBlocks = (blocks: Block[], options: CommitOptions = {}): string => {
+    const nextValue = serializeMarkdown(blocks);
+    blocksRef.current = blocks;
     emittedValueRef.current = nextValue;
+    setSourceValue(nextValue);
+    const root = editorRef.current;
+    if (root && options.render !== false) renderRoot(root, blocks, options.selection);
     onChange(nextValue);
     return nextValue;
   };
 
-  const commitSource = (nextValue: string) => {
-    setSourceValue(nextValue);
-    setBlocks(blocksFromValue(nextValue));
-    dirtyRef.current = true;
+  const commitSource = (nextValue: string): void => {
+    const blocks = blocksFromValue(nextValue);
+    blocksRef.current = blocks;
     emittedValueRef.current = nextValue;
+    setSourceValue(nextValue);
+    const root = editorRef.current;
+    if (root) renderRoot(root, blocks);
     onChange(nextValue);
   };
 
-  const focusPath = (path: number[], start?: number, end = start) => {
-    requestAnimationFrame(() => {
-      const element = editorRef.current?.querySelector<HTMLElement>(`[data-editor-surface="true"][data-block-path="${pathLabel(path)}"]`);
-      if (!element) return;
-      if (start === undefined) element.focus();
-      else setSurfaceSelection(element, start, end);
-    });
-  };
-
-  const selectedSurface = (): HTMLElement | null => {
-    const selection = typeof window === 'undefined' ? null : window.getSelection();
-    const node = selection?.anchorNode;
-    const selected = node instanceof Element
-      ? node.closest<HTMLElement>('[data-editor-surface="true"]')
-      : node?.parentElement?.closest<HTMLElement>('[data-editor-surface="true"]');
-    if (selected && editorRef.current?.contains(selected)) return selected;
-    const target = activeTargetRef.current;
-    return target
-      ? editorRef.current?.querySelector<HTMLElement>(`[data-editor-surface="true"][data-block-path="${pathLabel(target.path)}"]`) ?? null
-      : editorRef.current?.querySelector<HTMLElement>('[data-editor-surface="true"]') ?? null;
-  };
-
-  const commitSurface = (surface: HTMLElement) => {
-    const target = getTarget(surface);
-    if (!target) return;
-    activeTargetRef.current = target;
-    const nextText = surface.textContent ?? '';
-    if (target.kind === 'listItem') {
-      commitBlocks(updateListItemAtPath(blocks, target.path, (inlines) => updateInlinesForTextInput(inlines, nextText)));
+  const commitDom = (root: HTMLElement): void => {
+    if (composingRef.current) return;
+    const blocks = readEditableBlocks(root, [emptyParagraph()]);
+    const selection = logicalSelection(root, blocks);
+    const path = selection?.focus.path;
+    const location = path ? blockLocation(blocks, path) : null;
+    const converted = location && (location.block.type === 'paragraph' || location.block.type === 'heading')
+      ? shortcutBlock(location.block, inlineText(location.block.inlines))
+      : null;
+    if (location && path && converted) {
+      location.container[location.index] = converted;
+      commitBlocks(blocks, { selection: shortcutSelection(path, converted) });
       return;
     }
-    if (target.kind === 'codeBlock') {
-      commitBlocks(updateBlockAtPath(blocks, target.path, (block) => block.type === 'codeBlock' ? { ...block, value: nextText } : block));
-      return;
-    }
-    if (target.kind === 'tableCell') {
-      commitBlocks(updateTableCell(blocks, target, nextText));
-      return;
-    }
-    const current = findBlockAtPath(blocks, target.path);
-    const converted = current ? shortcutBlock(current, nextText) : null;
-    const next = updateBlockAtPath(blocks, target.path, (block) => {
-      if (converted) return converted;
-      return block.type === 'heading' || block.type === 'paragraph'
-        ? { ...block, inlines: updateInlinesForTextInput(block.inlines, nextText) }
-        : block;
-    });
-    commitBlocks(next);
+    commitBlocks(blocks, { render: false });
   };
 
-  const onSurfaceInput = (surface: HTMLElement) => {
-    if (!composingRef.current) commitSurface(surface);
+  const handleInput = (event: FormEvent<HTMLDivElement>): void => {
+    const target = event.target as HTMLInputElement;
+    if (target.dataset?.markdownEditorTask === 'true') return;
+    commitDom(event.currentTarget);
   };
 
-  const onSurfaceBeforeInput = (event: FormEvent<HTMLElement>) => {
+  const replaceLogicalSelection = (text: string): boolean => {
+    const root = editorRef.current;
+    if (!root) return false;
+    const blocks = blocksRef.current;
+    const selection = logicalSelection(root, blocks);
+    if (!selection || !textBlockPoint(blocks, selection.anchor) || !textBlockPoint(blocks, selection.focus)) return false;
+    const replaced = replaceEditorSelection(blocks, selection, text);
+    commitBlocks(replaced.blocks, { selection: replaced.nextSelection });
+    return true;
+  };
+
+  const handleEnter = (root: HTMLElement): boolean => {
+    const blocks = blocksRef.current;
+    const element = selectedElement(root);
+    const selection = logicalSelection(root, blocks);
+    const path = selection?.focus.path ?? (element ? blockPathForNode(element) : null);
+    if (!element || !path) return false;
+
+    if (element.tagName === 'TH' || element.tagName === 'TD') {
+      const continued = ensureParagraphAfterBlock(blocks, path);
+      commitBlocks(continued.blocks, { selection: selectionAt(continued.nextPath, 0) });
+      return true;
+    }
+
+    if (element.tagName === 'LI') {
+      const inlines = listItemInlines(blocks, path);
+      if (!inlines) return false;
+      if (!inlineText(inlines).trim()) {
+        const next = exitEmptyBlock(blocks, path);
+        commitBlocks(next, { selection: selectionAt(path, 0) });
+        return true;
+      }
+      const nextPath = [...path];
+      nextPath[nextPath.length - 1] += 1;
+      commitBlocks(continueBlock(blocks, path), { selection: selectionAt(nextPath, 0) });
+      return true;
+    }
+
+    if (!selection || !isCollapsed(selection) || !textBlockPoint(blocks, selection.focus)) return false;
+    const split = splitBlockAtSelection(blocks, selection);
+    commitBlocks(split.blocks, { selection: split.nextSelection });
+    return true;
+  };
+
+  const handleDelete = (direction: 'backward' | 'forward'): boolean => {
+    const root = editorRef.current;
+    if (!root) return false;
+    const blocks = blocksRef.current;
+    const selection = logicalSelection(root, blocks);
+    if (!selection || !textBlockPoint(blocks, selection.anchor) || !textBlockPoint(blocks, selection.focus)) return false;
+    const result = direction === 'backward'
+      ? deleteBackwardAtSelection(blocks, selection)
+      : deleteForwardAtSelection(blocks, selection);
+    if (result.changed) {
+      commitBlocks(result.blocks, { selection: result.nextSelection });
+      return true;
+    }
+    if (direction === 'backward' && isCollapsed(selection) && selection.anchor.offset === 0) {
+      const removed = removeTableBeforeParagraph(blocks, selection.anchor.path);
+      if (serializeMarkdown(removed.blocks) !== serializeMarkdown(blocks)) {
+        commitBlocks(removed.blocks, { selection: selectionAt(removed.nextPath, 0) });
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleBeforeInput = (event: FormEvent<HTMLDivElement>): void => {
     if (composingRef.current) return;
     const input = event.nativeEvent as InputEvent;
-    if (input.inputType !== 'insertText' || !input.data || !isSelectionAfterInlineMark(event.currentTarget)) return;
-    const target = getTarget(event.currentTarget);
-    const selection = selectionOffsets(event.currentTarget);
-    if (!target || !selection || !['block', 'listItem', 'tableCell'].includes(target.kind)) return;
-    event.preventDefault();
-    activeTargetRef.current = target;
-    commitBlocks(updateTargetInlines(
-      blocks,
-      target,
-      (inlines) => insertInlineTextAtRange(inlines, selection.start, selection.end, input.data ?? '', true),
-    ));
-    focusPath(target.path, selection.start + input.data.length);
+    if (input.inputType === 'insertParagraph' && handleEnter(event.currentTarget)) {
+      event.preventDefault();
+      return;
+    }
+    if (input.inputType === 'deleteContentBackward' && handleDelete('backward')) {
+      event.preventDefault();
+      return;
+    }
+    if (input.inputType === 'deleteContentForward' && handleDelete('forward')) {
+      event.preventDefault();
+      return;
+    }
+    const selection = logicalSelection(event.currentTarget, blocksRef.current);
+    if (input.inputType === 'insertText' && input.data && selection && !isCollapsed(selection) && replaceLogicalSelection(input.data)) {
+      event.preventDefault();
+    }
   };
 
-  const onSurfacePaste = (event: ClipboardEvent<HTMLElement>) => {
-    const markdown = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
-    if (!markdown.includes('\n')) return;
-    const target = getTarget(event.currentTarget);
-    const selection = selectionOffsets(event.currentTarget);
-    if (!target || target.kind !== 'block' || !selection) return;
-    event.preventDefault();
-    const pasted = pasteMarkdownAtTextBlock(blocks, target.path, selection.start, selection.end, markdown);
-    commitBlocks(pasted.blocks);
-    focusPath(pasted.nextPath);
-  };
-
-  const onSurfaceComposition = (event: CompositionEvent<HTMLElement>) => {
-    composingRef.current = event.type === 'compositionstart';
-    if (event.type === 'compositionend') commitSurface(event.currentTarget);
-  };
-
-  const applyInlineFormatting = (command: InlineCommand) => {
-    const surface = selectedSurface();
-    const target = surface ? getTarget(surface) : null;
-    const selection = surface ? selectionOffsets(surface) : null;
-    if (!target || !selection || !['block', 'listItem', 'tableCell'].includes(target.kind)) return;
+  const applyInlineFormatting = (command: InlineCommand): void => {
+    const root = editorRef.current;
+    if (!root) return;
+    const target = inlineTarget(blocksRef.current, root);
+    const offsets = target ? selectionOffsets(target.element) : null;
+    if (!target || !offsets) return;
     const url = command === 'link'
       ? window.prompt('連結網址（僅支援 https://）', 'https://example.com') ?? 'https://example.com'
       : undefined;
-    const formatted = applyInlineCommand(
-      getTargetInlines(blocks, target),
-      selection.start,
-      selection.end,
-      command,
-      url,
-    );
-    commitBlocks(updateTargetInlines(blocks, target, () => formatted.inlines));
-    focusPath(target.path, formatted.selectionStart, formatted.selectionEnd);
+    const formatted = applyInlineCommand(target.inlines, offsets.start, offsets.end, command, url);
+    const next = updateInlineTarget(blocksRef.current, target, () => formatted.inlines);
+    commitBlocks(next, {
+      selection: {
+        anchor: { path: target.path, offset: formatted.selectionStart },
+        focus: { path: target.path, offset: formatted.selectionEnd },
+      },
+    });
   };
 
-  const onSurfaceKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    const target = getTarget(event.currentTarget);
-    if (!target || composingRef.current) return;
-    activeTargetRef.current = target;
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (composingRef.current) return;
     if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'k'].includes(event.key.toLowerCase())) {
       event.preventDefault();
       applyInlineFormatting(event.key.toLowerCase() === 'b' ? 'strong' : event.key.toLowerCase() === 'i' ? 'emphasis' : 'link');
       return;
     }
-    if (target.kind === 'block' && event.key === 'Enter') {
-      event.preventDefault();
-      const split = splitTextBlockAtOffset(blocks, target.path, caretOffset(event.currentTarget));
-      commitBlocks(split.blocks);
-      focusPath(split.nextPath);
-      return;
-    }
-    if (target.kind !== 'listItem') return;
-
-    if (event.key === 'Tab') {
+    const root = event.currentTarget;
+    const element = selectedElement(root);
+    const path = element ? blockPathForNode(element) : null;
+    if (event.key === 'Tab' && element?.tagName === 'LI' && path) {
       event.preventDefault();
       const direction = event.shiftKey ? 'out' : 'in';
-      const nextPath = listItemPathAfterIndent(blocks, target.path, direction);
-      commitBlocks(indentListItem(blocks, target.path, direction));
-      focusPath(nextPath);
+      const nextPath = listItemPathAfterIndent(blocksRef.current, path, direction);
+      commitBlocks(indentListItem(blocksRef.current, path, direction), { selection: selectionAt(nextPath, 0) });
       return;
     }
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    if (isEmptySurface(event.currentTarget)) {
-      commitBlocks(exitEmptyBlock(blocks, target.path));
+    if (event.key === 'Enter' && handleEnter(root)) {
+      event.preventDefault();
       return;
     }
-    commitBlocks(continueBlock(blocks, target.path));
-    const nextPath = [...target.path];
-    nextPath[nextPath.length - 1] += 1;
-    focusPath(nextPath);
+    if (event.key === 'Backspace' && handleDelete('backward')) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'Delete' && handleDelete('forward')) event.preventDefault();
   };
 
-  const toggleTask = (path: number[]) => {
-    const nextValue = commitBlocks(toggleTaskItem(blocks, path));
+  const handlePaste = (event: ClipboardEvent<HTMLDivElement>): void => {
+    const markdown = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
+    const selection = logicalSelection(event.currentTarget, blocksRef.current);
+    if ((!markdown.includes('\n') && (!selection || isCollapsed(selection))) || !replaceLogicalSelection(markdown)) return;
+    event.preventDefault();
+  };
+
+  const handleComposition = (event: CompositionEvent<HTMLDivElement>): void => {
+    composingRef.current = event.type === 'compositionstart';
+    if (event.type === 'compositionend') {
+      composingRef.current = false;
+      commitDom(event.currentTarget);
+    }
+  };
+
+  const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'A' && !event.metaKey && !event.ctrlKey) event.preventDefault();
+  };
+
+  const handleChange = (event: FormEvent<HTMLDivElement>): void => {
+    const checkbox = event.target as HTMLInputElement;
+    if (checkbox.tagName !== 'INPUT' || checkbox.type !== 'checkbox' || checkbox.dataset.markdownEditorTask !== 'true') return;
+    const path = parsePath(checkbox.dataset.markdownTaskPath);
+    if (!path) return;
+    const nextValue = commitBlocks(toggleTaskItem(blocksRef.current, path), { render: false });
     onTaskToggle?.(nextValue);
   };
 
-  const applyBlockCommand = (command: 'paragraph' | 'heading' | 'list' | 'task' | 'quote' | 'code' | 'table' | 'rule') => {
-    const target = activeTargetRef.current;
-    if (!target || target.kind !== 'block') return;
-    const next = updateBlockAtPath(blocks, target.path, (block) => {
-      const content = block.type === 'paragraph' || block.type === 'heading' ? block.inlines : textInline('');
+  const applyBlockCommand = (command: 'paragraph' | 'heading' | 'list' | 'task' | 'quote' | 'code' | 'table' | 'rule'): void => {
+    const root = editorRef.current;
+    if (!root) return;
+    const selection = logicalSelection(root, blocksRef.current);
+    const path = selection?.focus.path;
+    const location = path ? blockLocation(blocksRef.current, path) : null;
+    if (!path || !location || (location.block.type !== 'paragraph' && location.block.type !== 'heading')) return;
+    const content = location.block.inlines;
+    const next = updateBlockAtPath(blocksRef.current, path, () => {
       if (command === 'paragraph') return { type: 'paragraph', inlines: content };
       if (command === 'heading') return { type: 'heading', level: 2, inlines: content };
       if (command === 'list') return { type: 'list', ordered: false, items: [{ inlines: content, children: [] }] };
       if (command === 'task') return { type: 'taskList', items: [{ checked: false, inlines: content, children: [] }] };
       if (command === 'quote') return { type: 'quote', blocks: [{ type: 'paragraph', inlines: content }] };
       if (command === 'code') return { type: 'codeBlock', value: inlineText(content) };
-      if (command === 'table') return { type: 'table', header: [textInline('欄位 1'), textInline('欄位 2')], alignments: ['left', 'left'], rows: [[textInline(''), textInline('')]] };
+      if (command === 'table') return {
+        type: 'table',
+        header: [textInline('欄位 1'), textInline('欄位 2')],
+        alignments: ['left', 'left'],
+        rows: [[[], []]],
+      };
       return { type: 'horizontalRule' };
     });
-    commitBlocks(next);
+    if (command === 'table' || command === 'rule') {
+      const continued = ensureParagraphAfterBlock(next, path);
+      commitBlocks(continued.blocks, { selection: selectionAt(continued.nextPath, 0) });
+      return;
+    }
+    const changed = blockLocation(next, path)?.block;
+    if (changed) commitBlocks(next, { selection: shortcutSelection(path, changed) });
   };
 
   useImperativeHandle(ref, () => ({
     focus: () => {
       if (editorMode === 'source') sourceRef.current?.focus();
-      else editorRef.current?.querySelector<HTMLElement>('[data-editor-surface="true"]')?.focus();
+      else editorRef.current?.focus();
     },
     insertText: (text: string) => {
       if (!text) return;
@@ -543,99 +619,31 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
         });
         return;
       }
-      const surface = selectedSurface();
-      if (!surface) return;
-      const target = getTarget(surface);
-      const selection = selectionOffsets(surface) ?? { start: 0, end: 0 };
-      if (!target) return;
-      if (target.kind === 'codeBlock') {
-        commitBlocks(updateBlockAtPath(blocks, target.path, (block) => {
-          if (block.type !== 'codeBlock') return block;
-          const current = block.value ?? '';
-          return { ...block, value: `${current.slice(0, selection.start)}${text}${current.slice(selection.end)}` };
-        }));
-      } else if (['block', 'listItem', 'tableCell'].includes(target.kind)) {
-        commitBlocks(updateTargetInlines(
-          blocks,
-          target,
-          (inlines) => insertInlineTextAtRange(inlines, selection.start, selection.end, text, isSelectionAfterInlineMark(surface)),
-        ));
-      } else {
-        return;
-      }
-      focusPath(target.path, selection.start + text.length);
+      if (replaceLogicalSelection(text)) return;
+      const root = editorRef.current;
+      const target = root ? inlineTarget(blocksRef.current, root) : null;
+      const offsets = target ? selectionOffsets(target.element) : null;
+      if (!target || !offsets) return;
+      const next = updateInlineTarget(blocksRef.current, target, (inlines) => insertInlineTextAtRange(
+        inlines,
+        offsets.start,
+        offsets.end,
+        text,
+        isSelectionAfterInlineMark(target.element),
+      ));
+      commitBlocks(next, { selection: selectionAt(target.path, offsets.start + text.length) });
     },
-    getValue: () => editorMode === 'source' ? sourceValue : serializeMarkdown(blocks),
+    getValue: () => editorMode === 'source' ? sourceValue : serializeMarkdown(blocksRef.current),
     getSelectionContext: () => {
       if (editorMode === 'source') {
-        const offset = sourceRef.current?.selectionStart ?? 0;
-        return { value: sourceValue, offset };
+        return { value: sourceValue, offset: sourceRef.current?.selectionStart ?? 0 };
       }
-      const surface = selectedSurface();
-      if (!surface) return { value: '', offset: 0 };
-      const offset = selectionOffsets(surface)?.start ?? 0;
-      return { value: surface.textContent ?? '', offset };
+      const root = editorRef.current;
+      const target = root ? inlineTarget(blocksRef.current, root) : null;
+      if (!target) return { value: '', offset: 0 };
+      return { value: target.element.textContent ?? '', offset: selectionOffsets(target.element)?.start ?? 0 };
     },
-  }), [blocks, editorMode, sourceValue]);
-
-  const renderTextSurface = (content: ReactNode, target: EditorTarget, className = '') => (
-    <div
-      className={`markdown-editor-surface ${className}`.trim()}
-      contentEditable
-      data-block-path={pathLabel(target.path)}
-      data-editor-kind={target.kind}
-      data-editor-surface="true"
-      data-table-row={target.row}
-      data-table-column={target.column}
-      data-table-section={target.section}
-      onFocus={(event) => { activeTargetRef.current = getTarget(event.currentTarget); }}
-      onBeforeInput={onSurfaceBeforeInput}
-      onInput={(event) => onSurfaceInput(event.currentTarget)}
-      onPaste={onSurfacePaste}
-      onCompositionStart={onSurfaceComposition}
-      onCompositionEnd={onSurfaceComposition}
-      onKeyDown={onSurfaceKeyDown}
-      suppressContentEditableWarning
-    >
-      {content}
-    </div>
-  );
-
-  const renderBlock = (block: Block, path: number[], blockPath = path): ReactNode => {
-    const key = pathLabel(blockPath);
-    if (block.type === 'paragraph' || block.type === 'heading') {
-      const surface = renderTextSurface(renderInlines(block.inlines), { kind: 'block', path });
-      if (block.type === 'paragraph') return <p className="markdown-editor-block" data-block-path={key} key={key}>{surface}</p>;
-      const headingProps = { className: 'markdown-editor-block', 'data-block-path': key, key };
-      switch (Math.min(6, Math.max(1, block.level ?? 1))) {
-        case 1: return <h1 {...headingProps}>{surface}</h1>;
-        case 2: return <h2 {...headingProps}>{surface}</h2>;
-        case 3: return <h3 {...headingProps}>{surface}</h3>;
-        case 4: return <h4 {...headingProps}>{surface}</h4>;
-        case 5: return <h5 {...headingProps}>{surface}</h5>;
-        default: return <h6 {...headingProps}>{surface}</h6>;
-      }
-    }
-    if (block.type === 'quote') return <blockquote className="markdown-editor-block" data-block-path={key} key={key}>{(block.blocks ?? []).map((child, index) => renderBlock(child, [...path, index], [...blockPath, index]))}</blockquote>;
-    if (block.type === 'codeBlock') return <pre className="markdown-editor-block" data-block-path={key} key={key}><code>{renderTextSurface(block.value ?? '', { kind: 'codeBlock', path }, 'markdown-editor-code')}</code></pre>;
-    if (block.type === 'list' || block.type === 'taskList') {
-      const ListTag = block.type === 'list' && block.ordered ? 'ol' : 'ul';
-      return <ListTag className={`markdown-editor-block ${block.type === 'taskList' ? 'markdown-task-list' : ''}`} data-block-path={key} key={key}>{block.items.map((item, index) => {
-        const itemPath = [...path, index];
-        return <li data-block-path={pathLabel(itemPath)} key={pathLabel(itemPath)}>
-          {block.type === 'taskList' && <input aria-label="切換待辦事項" checked={'checked' in item && item.checked} onChange={() => toggleTask(itemPath)} type="checkbox" />}
-          {renderTextSurface(renderInlines(item.inlines), { kind: 'listItem', path: itemPath })}
-          {item.children.map((child, childIndex) => renderBlock(
-            child,
-            [...itemPath, childIndex],
-            [...blockPath, index, childIndex],
-          ))}
-        </li>;
-      })}</ListTag>;
-    }
-    if (block.type === 'table') return <div className="markdown-editor-table-wrap" data-block-path={key} key={key}><table className="markdown-editor-block"><thead><tr>{block.header.map((cell, column) => <th key={column}>{renderTextSurface(renderInlines(cell), { kind: 'tableCell', path, section: 'header', row: 0, column })}</th>)}</tr></thead><tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, column) => <td key={column}>{renderTextSurface(renderInlines(cell), { kind: 'tableCell', path, section: 'body', row: rowIndex, column })}</td>)}</tr>)}</tbody></table></div>;
-    return <hr className="markdown-editor-block" data-block-path={key} key={key} />;
-  };
+  }), [editorMode, sourceValue]);
 
   const modeToggle = (
     <>
@@ -644,50 +652,53 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     </>
   );
 
-  if (editorMode === 'source') {
-    return (
-      <div className="markdown-block-editor" style={{ minHeight: min, maxHeight: max }}>
-        <div className="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯模式">
-          {modeToggle}
-        </div>
-        <textarea
-          ref={sourceRef}
-          className="markdown-block-editor-source"
-          value={sourceValue}
-          placeholder={placeholder}
-          style={{ minHeight: min, maxHeight: max, border: 0, borderRadius: 0, background: 'transparent' }}
-          onChange={(event) => commitSource(event.target.value)}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="markdown-block-editor" style={{ minHeight: min, maxHeight: max }}>
-      <div className="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯工具">
+      <div className="markdown-editor-toolbar" role="toolbar" aria-label={editorMode === 'source' ? 'Markdown 編輯模式' : 'Markdown 編輯工具'}>
         {modeToggle}
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('strong')} type="button"><strong>B</strong></button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('emphasis')} type="button"><em>I</em></button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('code')} type="button">行內碼</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('link')} type="button">連結</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('paragraph')} type="button">段落</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('heading')} type="button">標題</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('list')} type="button">清單</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('task')} type="button">待辦</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('quote')} type="button">引用</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('code')} type="button">程式碼區塊</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('table')} type="button">表格</button>
-        <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('rule')} type="button">分隔線</button>
+        {editorMode === 'blocks' && <>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('strong')} type="button"><strong>B</strong></button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('emphasis')} type="button"><em>I</em></button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('code')} type="button">行內碼</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyInlineFormatting('link')} type="button">連結</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('paragraph')} type="button">段落</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('heading')} type="button">標題</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('list')} type="button">清單</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('task')} type="button">待辦</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('quote')} type="button">引用</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('code')} type="button">程式碼區塊</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('table')} type="button">表格</button>
+          <button onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockCommand('rule')} type="button">分隔線</button>
+        </>}
       </div>
-      <div className="markdown-editor-content" ref={editorRef} data-placeholder={placeholder}>
-        {blocks.map((block, index) => renderBlock(block, [index]))}
-      </div>
+      <div
+        ref={editorRef}
+        className="markdown-editor-content"
+        contentEditable
+        data-placeholder={placeholder}
+        hidden={editorMode === 'source'}
+        onBeforeInput={handleBeforeInput}
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        onCompositionStart={handleComposition}
+        onCompositionEnd={handleComposition}
+        onClick={handleClick}
+        onChange={handleChange}
+        style={{ minHeight: min, maxHeight: max }}
+        suppressContentEditableWarning
+      />
+      <textarea
+        ref={sourceRef}
+        className="markdown-block-editor-source"
+        hidden={editorMode === 'blocks'}
+        value={sourceValue}
+        placeholder={placeholder}
+        style={{ minHeight: min, maxHeight: max, border: 0, borderRadius: 0, background: 'transparent' }}
+        onChange={(event) => commitSource(event.target.value)}
+      />
     </div>
   );
 });
-
-function findBlockAtPath(blocks: Block[], path: number[]): Block | null {
-  return blockLocation(blocks, path)?.block ?? null;
-}
 
 export default MarkdownBlockEditor;

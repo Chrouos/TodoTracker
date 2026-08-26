@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
-import { indentListItem, parseMarkdown, pathToItem, serializeMarkdown, toggleTaskItem } from '../../shared/markdown/index.js';
+import {
+  ensureParagraphAfterBlock,
+  indentListItem,
+  parseMarkdown,
+  pathToItem,
+  replaceEditorSelection,
+  serializeMarkdown,
+  toggleTaskItem,
+} from './markdown.ts';
 import {
   applyInlineCommand,
   collectTaskItemPaths,
@@ -148,4 +157,71 @@ test('adds a timestamp newline only away from a line start', () => {
   assert.equal(timestampInsertionText('first\nsecond', 6, '09:30 '), '09:30 ');
   assert.equal(timestampInsertionText('first\nsecond', 8, '09:30 '), '\n09:30 ');
   assert.equal(timestampInsertionText('first', 5, '09:30 '), '\n09:30 ');
+});
+
+test('replaces a native whole-editor selection through the Web Markdown facade', () => {
+  const source = parseMarkdown('First\n\nSecond');
+  const result = replaceEditorSelection(source, {
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [1], offset: 6 },
+  }, 'Replacement');
+
+  assert.equal(serializeMarkdown(result.blocks), 'Replacement');
+  assert.deepEqual(result.nextSelection, {
+    anchor: { path: [0], offset: 11 },
+    focus: { path: [0], offset: 11 },
+  });
+});
+
+test('parses multiline paste and keeps a paragraph after a terminal table', () => {
+  const pasted = replaceEditorSelection(parseMarkdown('Replace me'), {
+    anchor: { path: [0], offset: 0 },
+    focus: { path: [0], offset: 10 },
+  }, '# Pasted\n\n| Name |\n| --- |\n| Ada |');
+  const tablePath = [1];
+  const continued = ensureParagraphAfterBlock(pasted.blocks, tablePath);
+
+  assert.deepEqual(continued.blocks.map((block) => block.type), ['heading', 'table', 'paragraph']);
+  assert.deepEqual(continued.nextPath, [2]);
+  assert.equal(serializeMarkdown(continued.blocks), '# Pasted\n\n| Name |\n| --- |\n| Ada |\n\n');
+});
+
+test('wires one persistent Web root to the DOM adapter and shared transactions', () => {
+  const source = fs.readFileSync(new URL('../components/MarkdownBlockEditor.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /renderEditableBlocks\(root, blocks\)/);
+  assert.match(source, /readEditableBlocks\(root,/);
+  assert.match(source, /readEditorSelection\(root\)/);
+  assert.match(source, /restoreEditorSelection\(root, selection\)/);
+  assert.equal((source.match(/contentEditable/g) ?? []).length, 1);
+  assert.doesNotMatch(source, /data-editor-surface|activeTargetRef|focusPath|onSurface/);
+  for (const handler of [
+    'onBeforeInput',
+    'onInput',
+    'onKeyDown',
+    'onPaste',
+    'onCompositionStart',
+    'onCompositionEnd',
+    'onClick',
+    'onChange',
+  ]) assert.match(source, new RegExp(`${handler}=`));
+});
+
+test('preserves toolbar, source mode, imperative, task, and external-sync hooks', () => {
+  const source = fs.readFileSync(new URL('../components/MarkdownBlockEditor.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /role="toolbar"/);
+  assert.match(source, /MarkdownBlockEditorProps/);
+  assert.match(source, /MarkdownEditorHandle/);
+  assert.match(source, /focus:\s*\(\)\s*=>/);
+  assert.match(source, /insertText:\s*\(text: string\)\s*=>/);
+  assert.match(source, /getValue:\s*\(\)\s*=>/);
+  assert.match(source, /getSelectionContext:\s*\(\)\s*=>/);
+  assert.match(source, /className="markdown-block-editor-source"/);
+  assert.match(source, /value !== emittedValueRef\.current/);
+  assert.match(source, /dataset\.markdownEditorTask/);
+  assert.match(source, /onInput=\{handleInput\}/);
+  assert.match(source, /const handleInput[\s\S]*?markdownEditorTask[\s\S]*?commitDom/);
+  assert.match(source, /toggleTaskItem\(/);
+  assert.match(source, /ensureParagraphAfterBlock\(/);
 });
