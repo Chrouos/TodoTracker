@@ -17,3 +17,20 @@ test('all Markdown note fields use the block editor', () => {
     assert.match(source, /MarkdownBlockEditor/);
   }
 });
+
+test('Extension and Web editors expose one delegated editable root contract', () => {
+  const extensionEditor = fs.readFileSync(
+    new URL('../src/lib/markdown-editor.js', import.meta.url),
+    'utf8',
+  );
+  const webEditor = fs.readFileSync(
+    new URL('../../web/components/MarkdownBlockEditor.tsx', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(extensionEditor, /renderEditableBlocks\(content, blocks\)/);
+  assert.match(extensionEditor, /readEditableBlocks\(content,/);
+  assert.match(extensionEditor, /content\.dataset\.markdownEditorRoot = 'true'/);
+  assert.doesNotMatch(extensionEditor, /data-editor-surface|editorSurface|activeSurface/);
+  assert.match(webEditor, /contentEditable[\s\S]*onBeforeInput=[\s\S]*onInput=/);
+});

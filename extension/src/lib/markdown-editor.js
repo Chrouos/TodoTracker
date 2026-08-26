@@ -5,6 +5,13 @@ import {
   serializeMarkdown,
   toggleTaskItem,
 } from './markdown.js';
+import {
+  blockPathForNode,
+  readEditableBlocks,
+  readEditorSelection,
+  renderEditableBlocks,
+  restoreEditorSelection,
+} from './markdown-dom.js';
 
 const DEFAULT_MODE = 'toolbar';
 
@@ -235,15 +242,6 @@ function selectionOffsets(surface) {
   return { start: before.toString().length, end: before.toString().length + range.toString().length, range };
 }
 
-function selectionSurface(root) {
-  const selection = window.getSelection();
-  const node = selection?.anchorNode;
-  const surface = node instanceof Element
-    ? node.closest('[data-editor-surface="true"]')
-    : node?.parentElement?.closest('[data-editor-surface="true"]');
-  return surface && root.contains(surface) ? surface : null;
-}
-
 export function isTextNodeEndAtOffset(node, offset) {
   return node?.nodeType === 3 && offset === (node.nodeValue ?? '').length;
 }
@@ -399,80 +397,213 @@ export function listItemPathAfterIndent(blocks, path, direction) {
   return [...location.blockPath, location.index - 1, childIndex < 0 ? previous.children.length : childIndex, nestedIndex];
 }
 
-function renderBlocks(container, blocks) {
-  container.replaceChildren(...blocks.map((block, index) => renderBlock(block, [index])));
+const emptyParagraph = () => ({ type: 'paragraph', inlines: [] });
+const selectionAt = (path, offset) => ({
+  anchor: { path: [...path], offset },
+  focus: { path: [...path], offset },
+});
+
+function samePath(first, second) {
+  return first.length === second.length && first.every((part, index) => part === second[index]);
 }
 
-function surface(kind, path, value, extra = {}) {
-  const element = document.createElement('div');
-  element.className = 'markdown-editor-surface';
-  element.contentEditable = 'true';
-  element.spellcheck = true;
-  element.dataset.editorSurface = 'true';
-  element.dataset.editorKind = kind;
-  element.dataset.blockPath = pathLabel(path);
-  Object.entries(extra).forEach(([key, entry]) => { element.dataset[key] = String(entry); });
-  if (Array.isArray(value)) appendInlines(element, value);
-  else element.textContent = value;
-  return element;
+function collapsedSelection(selection) {
+  return samePath(selection.anchor.path, selection.focus.path)
+    && selection.anchor.offset === selection.focus.offset;
 }
 
-function appendInlines(parent, inlines) {
-  inlines.forEach((inline) => {
-    if (inline.type === 'text') { parent.append(document.createTextNode(inline.value)); return; }
-    const tag = inline.type === 'strong' ? 'strong' : inline.type === 'emphasis' ? 'em' : inline.type === 'code' ? 'code' : inline.type === 'link' ? 'a' : null;
-    if (!tag) return;
-    const element = document.createElement(tag);
-    if (inline.type === 'link') { element.href = inline.url; element.target = '_blank'; element.rel = 'noopener noreferrer'; }
-    if (typeof inline.inlines === 'string') element.textContent = inline.inlines;
-    else appendInlines(element, inline.inlines);
-    parent.append(element);
-  });
+function blockLocationAtPath(blocks, path) {
+  const visit = (container, index, remaining) => {
+    const block = container[index];
+    if (!block) return null;
+    if (!remaining.length) return { container, index, block };
+    if (block.type === 'quote') return visit(block.blocks ?? [], remaining[0], remaining.slice(1));
+    if (block.type === 'list' || block.type === 'taskList') {
+      const item = block.items[remaining[0]];
+      const childIndex = remaining[1];
+      return item && childIndex !== undefined
+        ? visit(item.children, childIndex, remaining.slice(2))
+        : null;
+    }
+    return null;
+  };
+  return path.length ? visit(blocks, path[0], path.slice(1)) : null;
 }
 
-function renderBlock(block, path) {
-  if (block.type === 'paragraph' || block.type === 'heading') {
-    const element = document.createElement(block.type === 'heading' ? `h${Math.min(6, Math.max(1, block.level ?? 1))}` : 'p');
-    element.className = 'markdown-editor-block';
-    element.appendChild(surface('block', path, block.inlines));
-    return element;
+function listItemInlinesAtPath(blocks, path) {
+  const visit = (block, remaining) => {
+    if (!block || !remaining.length) return null;
+    if (block.type === 'quote') return visit(block.blocks?.[remaining[0]], remaining.slice(1));
+    if (block.type !== 'list' && block.type !== 'taskList') return null;
+    const item = block.items[remaining[0]];
+    if (!item) return null;
+    if (remaining.length === 1) return item.inlines;
+    return visit(item.children[remaining[1]], remaining.slice(2));
+  };
+  return visit(blocks[path[0]], path.slice(1));
+}
+
+function elementFromNode(root, node) {
+  const element = node?.nodeType === 1 ? node : node?.parentElement;
+  const target = element?.closest?.('[data-block-path]') ?? null;
+  return target && root.contains(target) ? target : null;
+}
+
+function selectedElement(root) {
+  return elementFromNode(root, root.ownerDocument.getSelection()?.focusNode ?? null);
+}
+
+function rootWideSelection(root, blocks) {
+  const browserSelection = root.ownerDocument.getSelection();
+  if (!browserSelection?.rangeCount || !blocks.length) return null;
+  const range = browserSelection.getRangeAt(0);
+  if (range.startContainer !== root || range.startOffset !== 0
+    || range.endContainer !== root || range.endOffset !== root.childNodes.length) return null;
+  const last = blocks.at(-1);
+  return {
+    anchor: { path: [0], offset: 0 },
+    focus: {
+      path: [blocks.length - 1],
+      offset: last?.type === 'paragraph' || last?.type === 'heading' ? inlineText(last.inlines).length : 0,
+    },
+  };
+}
+
+function logicalSelection(root, blocks) {
+  return readEditorSelection(root) ?? rootWideSelection(root, blocks);
+}
+
+function textSelectionRange(blocks, selection) {
+  const anchor = blockLocationAtPath(blocks, selection.anchor.path);
+  const focus = blockLocationAtPath(blocks, selection.focus.path);
+  if (!anchor || !focus || anchor.container !== focus.container
+    || !['paragraph', 'heading'].includes(anchor.block.type)
+    || !['paragraph', 'heading'].includes(focus.block.type)) return null;
+  const anchorFirst = anchor.index < focus.index
+    || (anchor.index === focus.index && selection.anchor.offset <= selection.focus.offset);
+  const start = anchorFirst
+    ? { ...anchor, path: selection.anchor.path, offset: selection.anchor.offset }
+    : { ...focus, path: selection.focus.path, offset: selection.focus.offset };
+  const end = anchorFirst
+    ? { ...focus, path: selection.focus.path, offset: selection.focus.offset }
+    : { ...anchor, path: selection.anchor.path, offset: selection.anchor.offset };
+  if (start.container.slice(start.index, end.index + 1).some((block) => !['paragraph', 'heading'].includes(block.type))) return null;
+  return { start, end };
+}
+
+function ensureParagraphAfterBlockLocal(blocks, path) {
+  const next = cloneBlocks(blocks);
+  const location = blockLocationAtPath(next, path);
+  if (!location) return { blocks: next, nextPath: path };
+  if (location.container[location.index + 1]?.type !== 'paragraph') {
+    location.container.splice(location.index + 1, 0, emptyParagraph());
   }
-  if (block.type === 'quote') {
-    const element = document.createElement('blockquote');
-    element.className = 'markdown-editor-block';
-    (block.blocks ?? []).forEach((child, index) => element.appendChild(renderBlock(child, [...path, index])));
-    return element;
+  return { blocks: next, nextPath: [...path.slice(0, -1), location.index + 1] };
+}
+
+function replaceLogicalSelection(blocks, selection, markdown) {
+  const range = textSelectionRange(blocks, selection);
+  if (range) {
+    const next = cloneBlocks(blocks);
+    const nextRange = textSelectionRange(next, selection);
+    const [before] = splitInlinesAtOffset(nextRange.start.block.inlines, Math.max(0, selection === null ? 0 : nextRange.start.offset));
+    const [, after] = splitInlinesAtOffset(nextRange.end.block.inlines, Math.max(0, nextRange.end.offset));
+    const pasted = parseMarkdown(markdown);
+    if (pasted.length === 1 && pasted[0].type === 'paragraph') {
+      const inlines = mergeInlines([...before, ...pasted[0].inlines, ...after]);
+      nextRange.start.container.splice(nextRange.start.index, nextRange.end.index - nextRange.start.index + 1, {
+        ...nextRange.start.block,
+        inlines,
+      });
+      return {
+        blocks: next,
+        nextSelection: selectionAt(nextRange.start.path, inlineText(before).length + inlineText(pasted[0].inlines).length),
+        handled: true,
+      };
+    }
   }
-  if (block.type === 'codeBlock') {
-    const pre = document.createElement('pre'); const code = document.createElement('code');
-    pre.className = 'markdown-editor-block'; code.appendChild(surface('code', path, block.value ?? ''));
-    pre.appendChild(code); return pre;
+
+  const anchorTop = selection?.anchor?.path?.[0];
+  const focusTop = selection?.focus?.path?.[0];
+  if (!Number.isInteger(anchorTop) || !Number.isInteger(focusTop)
+    || !blocks[anchorTop] || !blocks[focusTop]) {
+    return { blocks: cloneBlocks(blocks), nextSelection: selection, handled: false };
   }
-  if (block.type === 'list' || block.type === 'taskList') {
-    const list = document.createElement(block.type === 'list' && block.ordered ? 'ol' : 'ul');
-    list.className = `markdown-editor-block${block.type === 'taskList' ? ' markdown-task-list' : ''}`;
-    block.items.forEach((item, index) => {
-      const itemPath = [...path, index]; const li = document.createElement('li');
-      if (block.type === 'taskList') {
-        const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = item.checked;
-        checkbox.setAttribute('aria-label', `Toggle task ${inlineText(item.inlines)} (${pathLabel(itemPath)})`);
-        checkbox.dataset.markdownEditorTask = 'true'; checkbox.dataset.markdownTaskPath = pathLabel(itemPath); li.appendChild(checkbox);
-      }
-      li.appendChild(surface('list-item', itemPath, item.inlines));
-      item.children.forEach((child, childIndex) => li.appendChild(renderBlock(child, [...itemPath, childIndex])));
-      list.appendChild(li);
-    });
-    return list;
+  const next = cloneBlocks(blocks);
+  const startIndex = Math.min(anchorTop, focusTop);
+  const endIndex = Math.max(anchorTop, focusTop);
+  const pasted = parseMarkdown(markdown);
+  const replacement = pasted.length ? pasted : [emptyParagraph()];
+  next.splice(startIndex, endIndex - startIndex + 1, ...replacement);
+  const selectedIndex = startIndex + replacement.length - 1;
+  const selected = replacement.at(-1);
+  if (!['paragraph', 'heading'].includes(selected.type)) {
+    const continued = ensureParagraphAfterBlockLocal(next, [selectedIndex]);
+    return { blocks: continued.blocks, nextSelection: selectionAt(continued.nextPath, 0), handled: true };
   }
-  if (block.type === 'table') {
-    const wrap = document.createElement('div'); const table = document.createElement('table'); const head = document.createElement('thead'); const body = document.createElement('tbody'); const headerRow = document.createElement('tr');
-    wrap.className = 'markdown-editor-table-wrap'; table.className = 'markdown-editor-block';
-    block.header.forEach((cell, column) => { const th = document.createElement('th'); th.appendChild(surface('table-cell', path, cell, { tableSection: 'header', tableRow: 0, tableColumn: column })); headerRow.appendChild(th); });
-    head.appendChild(headerRow);
-    block.rows.forEach((row, rowIndex) => { const tr = document.createElement('tr'); row.forEach((cell, column) => { const td = document.createElement('td'); td.appendChild(surface('table-cell', path, cell, { tableSection: 'body', tableRow: rowIndex, tableColumn: column })); tr.appendChild(td); }); body.appendChild(tr); });
-    table.append(head, body); wrap.appendChild(table); return wrap;
+  return {
+    blocks: next,
+    nextSelection: selectionAt([selectedIndex], inlineText(selected.inlines).length),
+    handled: true,
+  };
+}
+
+function splitListItemAtSelectionLocal(blocks, selection) {
+  if (!collapsedSelection(selection)) return { blocks: cloneBlocks(blocks), handled: false };
+  const next = cloneBlocks(blocks);
+  const location = listLocation(next, selection.anchor.path);
+  if (!location) return { blocks: next, handled: false };
+  const [left, right] = splitInlinesAtOffset(location.item.inlines, selection.anchor.offset);
+  const nextItem = location.block.type === 'taskList'
+    ? { checked: false, inlines: right, children: [] }
+    : { inlines: right, children: [] };
+  location.item.inlines = left;
+  location.block.items.splice(location.index + 1, 0, nextItem);
+  const nextPath = [...selection.anchor.path];
+  nextPath[nextPath.length - 1] += 1;
+  return { blocks: next, nextSelection: selectionAt(nextPath, 0), handled: true };
+}
+
+function deleteAtSelection(blocks, selection, direction) {
+  if (!collapsedSelection(selection)) {
+    const replaced = replaceLogicalSelection(blocks, selection, '');
+    return { ...replaced, changed: replaced.handled };
   }
-  return document.createElement('hr');
+  const next = cloneBlocks(blocks);
+  const location = blockLocationAtPath(next, selection.anchor.path);
+  if (!location || !['paragraph', 'heading'].includes(location.block.type)) {
+    return { blocks: next, nextSelection: selection, changed: false };
+  }
+  if (direction === 'backward' && selection.anchor.offset === 0) {
+    const previous = location.container[location.index - 1];
+    if (location.block.type === 'paragraph' && previous?.type === 'table') {
+      location.container.splice(location.index - 1, 1);
+      return {
+        blocks: next,
+        nextSelection: selectionAt([...selection.anchor.path.slice(0, -1), location.index - 1], 0),
+        changed: true,
+      };
+    }
+    if (location.block.type === 'paragraph' && previous?.type === 'paragraph') {
+      const offset = inlineText(previous.inlines).length;
+      previous.inlines = mergeInlines([...previous.inlines, ...location.block.inlines]);
+      location.container.splice(location.index, 1);
+      return {
+        blocks: next,
+        nextSelection: selectionAt([...selection.anchor.path.slice(0, -1), location.index - 1], offset),
+        changed: true,
+      };
+    }
+  }
+  if (direction === 'forward' && selection.anchor.offset === inlineText(location.block.inlines).length) {
+    const following = location.container[location.index + 1];
+    if (location.block.type === 'paragraph' && following?.type === 'paragraph') {
+      location.block.inlines = mergeInlines([...location.block.inlines, ...following.inlines]);
+      location.container.splice(location.index + 1, 1);
+      return { blocks: next, nextSelection: selection, changed: true };
+    }
+  }
+  return { blocks: next, nextSelection: selection, changed: false };
 }
 
 /**
@@ -494,8 +625,6 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   let blocks = blocksFromMarkdown(textarea.value);
   let content = null;
   let composing = false;
-  let activeSurface = null;
-  let toolbarSelection = null;
   let emitting = false;
 
   const emit = () => {
@@ -505,30 +634,19 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     emitting = false;
     onChange?.(textarea.value);
   };
-  const refresh = () => { if (content) renderBlocks(content, blocks); };
-  const commitSurface = (element, refreshAfter = false) => {
-    const path = parsePath(element.dataset.blockPath);
-    if (!path) return;
-    const kind = element.dataset.editorKind;
-    const value = element.textContent ?? '';
-    if (kind === 'list-item') blocks = updateListItemAtPath(blocks, path, (inlines) => updateInlinesForTextInput(inlines, value));
-    else if (kind === 'code') blocks = updateBlockAtPath(blocks, path, (block) => block.type === 'codeBlock' ? { ...block, value } : block);
-    else if (kind === 'table-cell') {
-      blocks = updateBlockAtPath(blocks, path, (block) => {
-        if (block.type !== 'table') return block;
-        const cells = element.dataset.tableSection === 'header' ? block.header : block.rows[Number(element.dataset.tableRow)];
-        const column = Number(element.dataset.tableColumn);
-        if (cells?.[column]) cells[column] = updateInlinesForTextInput(cells[column], value);
-        return block;
-      });
-    } else {
-      const current = findBlockAtPath(blocks, path);
-      const converted = current && ['paragraph', 'heading'].includes(current.type) ? markdownShortcutToBlock(value) : null;
-      blocks = updateBlockAtPath(blocks, path, (block) => converted || ((block.type === 'paragraph' || block.type === 'heading') ? { ...block, inlines: updateInlinesForTextInput(block.inlines, value) } : block));
-      if (converted) refreshAfter = true;
-    }
+  const refresh = () => { if (content) renderEditableBlocks(content, blocks); };
+  const renderRoot = (selection) => {
+    refresh();
+    if (!content || !selection) return;
+    requestAnimationFrame(() => {
+      content.focus();
+      restoreEditorSelection(content, selection);
+    });
+  };
+  const commitBlocks = (next, { render = true, selection } = {}) => {
+    blocks = next;
     emit();
-    if (refreshAfter) refresh();
+    if (render) renderRoot(selection);
   };
   const onTextareaInput = () => {
     if (emitting || editorMode === 'source') return;
@@ -537,35 +655,53 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     blocks = blocksFromMarkdown(nextValue);
     refresh();
   };
-  const focusPath = (path, offset = 0, end = offset) => requestAnimationFrame(() => {
-    const element = content?.querySelector(`[data-editor-surface="true"][data-block-path="${pathLabel(path)}"]`);
-    if (element) setSurfaceSelection(element, offset, end);
-  });
   const applyInlineCommand = (command) => {
-    const element = toolbarSelection?.element || selectionSurface(content) || activeSurface;
-    const path = element && parsePath(element.dataset.blockPath);
-    const selection = toolbarSelection || (element && selectionOffsets(element));
-    if (!element || !path || !selection || !['block', 'list-item', 'table-cell'].includes(element.dataset.editorKind)) return;
-    const update = (inlines) => wrapInlineRange(inlines, selection.start, selection.end, command);
-    if (element.dataset.editorKind === 'list-item') blocks = updateListItemAtPath(blocks, path, update);
-    else if (element.dataset.editorKind === 'table-cell') {
-      blocks = updateBlockAtPath(blocks, path, (block) => {
-        if (block.type !== 'table') return block;
-        const cells = element.dataset.tableSection === 'header' ? block.header : block.rows[Number(element.dataset.tableRow)];
-        const column = Number(element.dataset.tableColumn);
-        if (cells?.[column]) cells[column] = update(cells[column]);
-        return block;
-      });
-    } else blocks = updateBlockAtPath(blocks, path, (block) => ['paragraph', 'heading'].includes(block.type) ? { ...block, inlines: update(block.inlines) } : block);
-    emit(); refresh(); focusPath(path, selection.start, selection.end); toolbarSelection = null;
+    if (!content) return;
+    const element = selectedElement(content);
+    const selection = logicalSelection(content, blocks);
+    const path = element ? blockPathForNode(element) : null;
+    if (!element || !selection || !path || !samePath(selection.anchor.path, selection.focus.path)) return;
+    const start = Math.min(selection.anchor.offset, selection.focus.offset);
+    const end = Math.max(selection.anchor.offset, selection.focus.offset);
+    const update = (inlines) => wrapInlineRange(inlines, start, end, command);
+    const next = cloneBlocks(blocks);
+    if (element.tagName === 'LI') {
+      const location = listLocation(next, path);
+      if (!location) return;
+      location.item.inlines = update(location.item.inlines);
+    } else if (element.tagName === 'TH' || element.tagName === 'TD') {
+      const location = blockLocationAtPath(next, path);
+      if (location?.block.type !== 'table') return;
+      const rowElement = element.parentElement;
+      const sectionElement = rowElement?.parentElement;
+      const column = rowElement ? Array.from(rowElement.children).indexOf(element) : -1;
+      const row = sectionElement?.tagName === 'TBODY' && rowElement
+        ? Array.from(sectionElement.children).indexOf(rowElement)
+        : 0;
+      const cells = sectionElement?.tagName === 'THEAD' ? location.block.header : location.block.rows[row];
+      if (!cells?.[column]) return;
+      cells[column] = update(cells[column]);
+    } else {
+      const location = blockLocationAtPath(next, path);
+      if (!location || !['paragraph', 'heading'].includes(location.block.type)) return;
+      location.block.inlines = update(location.block.inlines);
+    }
+    commitBlocks(next, {
+      selection: {
+        anchor: { path, offset: start },
+        focus: { path, offset: end },
+      },
+    });
   };
   const applyCommand = (command) => {
-    const target = activeSurface && parsePath(activeSurface.dataset.blockPath);
-    const path = target ?? [0];
-    const current = findBlockAtPath(blocks, path);
-    if (!current || !['paragraph', 'heading'].includes(current.type)) return;
-    const inlines = current.inlines;
-    blocks = updateBlockAtPath(blocks, path, () => {
+    if (!content) return;
+    const selection = logicalSelection(content, blocks);
+    const path = selection?.focus.path ?? [0];
+    const next = cloneBlocks(blocks);
+    const location = blockLocationAtPath(next, path);
+    if (!location || !['paragraph', 'heading'].includes(location.block.type)) return;
+    const inlines = location.block.inlines;
+    location.container[location.index] = (() => {
       if (command === 'paragraph') return { type: 'paragraph', inlines };
       if (command === 'heading') return { type: 'heading', level: 2, inlines };
       if (command === 'unordered-list') return { type: 'list', ordered: false, items: [{ inlines, children: [] }] };
@@ -575,88 +711,167 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
       if (command === 'code') return { type: 'codeBlock', value: inlineText(inlines) };
       if (command === 'table') return { type: 'table', header: [textInlines('Column 1'), textInlines('Column 2')], alignments: ['left', 'left'], rows: [[[], []]] };
       return { type: 'horizontalRule' };
-    });
-    emit(); refresh(); focusPath(path);
+    })();
+    if (command === 'table' || command === 'rule') {
+      const continued = ensureParagraphAfterBlockLocal(next, path);
+      commitBlocks(continued.blocks, { selection: selectionAt(continued.nextPath, 0) });
+      return;
+    }
+    const changed = location.container[location.index];
+    const nextPath = ['list', 'taskList', 'quote'].includes(changed.type) ? [...path, 0] : path;
+    commitBlocks(next, { selection: selectionAt(nextPath, 0) });
   };
   const onClick = (event) => {
-    const button = event.target.closest('[data-markdown-command]');
+    const button = event.target.closest?.('[data-markdown-command]');
     if (button && wrapper.contains(button)) {
       event.preventDefault();
       if (['bold', 'italic', 'link'].includes(button.dataset.markdownCommand)) applyInlineCommand(button.dataset.markdownCommand === 'bold' ? 'strong' : button.dataset.markdownCommand === 'italic' ? 'emphasis' : 'link');
       else applyCommand(button.dataset.markdownCommand);
       return;
     }
-    const checkbox = event.target.closest('[data-markdown-editor-task]');
-    if (!checkbox || !wrapper.contains(checkbox)) return;
-    const path = parsePath(checkbox.dataset.markdownTaskPath);
-    if (!path) return;
-    try { blocks = toggleTaskItem(blocks, path); emit(); refresh(); } catch { refresh(); }
+    if (event.target.closest?.('a') && !event.metaKey && !event.ctrlKey) event.preventDefault();
   };
   const onInput = (event) => {
-    const element = event.target.closest?.('[data-editor-surface="true"]');
-    if (!element || composing) return;
-    activeSurface = element; commitSurface(element);
+    if (!content || !content.contains(event.target) || composing || event.target.closest?.('[data-markdown-editor-task="true"]')) return;
+    blocks = readEditableBlocks(content, [{ type: 'paragraph', inlines: [] }]);
+    const selection = logicalSelection(content, blocks);
+    const path = selection?.focus.path;
+    const location = path ? blockLocationAtPath(blocks, path) : null;
+    const converted = location && ['paragraph', 'heading'].includes(location.block.type)
+      ? markdownShortcutToBlock(inlineText(location.block.inlines))
+      : null;
+    if (location && converted) {
+      location.container[location.index] = converted;
+      const nextPath = ['list', 'taskList', 'quote'].includes(converted.type) ? [...path, 0] : path;
+      commitBlocks(blocks, { selection: selectionAt(nextPath, 0) });
+      return;
+    }
+    emit();
+  };
+  const replaceSelection = (markdown, allowCollapsed = false) => {
+    if (!content) return false;
+    const selection = logicalSelection(content, blocks);
+    if (!selection || (collapsedSelection(selection) && !allowCollapsed)) return false;
+    const result = replaceLogicalSelection(blocks, selection, markdown);
+    if (!result.handled) return false;
+    commitBlocks(result.blocks, { selection: result.nextSelection });
+    return true;
   };
   const onPaste = (event) => {
-    const element = event.target.closest?.('[data-editor-surface="true"]');
-    if (!element || composing || event.isComposing || element.dataset.editorKind !== 'block') return;
-    const markdown = event.clipboardData?.getData('text/plain');
-    if (!markdown || !/\r?\n/.test(markdown)) return;
-    const path = parsePath(element.dataset.blockPath);
-    const offsets = selectionOffsets(element);
-    if (!path || !offsets) return;
+    if (!content || composing || event.isComposing) return;
+    const markdown = event.clipboardData?.getData('text/plain')?.replace(/\r\n?/g, '\n');
+    if (!markdown) return;
+    const selection = logicalSelection(content, blocks);
+    if ((!markdown.includes('\n') && (!selection || collapsedSelection(selection)))
+      || !replaceSelection(markdown, markdown.includes('\n'))) return;
     event.preventDefault();
-    const result = pasteMarkdownAtTextBlock(blocks, path, offsets.start, offsets.end, markdown);
-    blocks = result.blocks;
-    emit(); refresh(); focusPath(result.nextPath);
   };
   const onComposition = (event) => {
-    const element = event.target.closest?.('[data-editor-surface="true"]');
     composing = event.type === 'compositionstart';
-    if (event.type === 'compositionend' && element) { activeSurface = element; commitSurface(element); }
+    if (event.type === 'compositionend' && content) {
+      composing = false;
+      blocks = readEditableBlocks(content, [emptyParagraph()]);
+      emit();
+    }
+  };
+  const handleEnter = () => {
+    if (!content) return false;
+    const element = selectedElement(content);
+    const selection = logicalSelection(content, blocks);
+    const path = selection?.focus.path ?? (element ? blockPathForNode(element) : null);
+    if (!element || !path) return false;
+    if (element.tagName === 'TH' || element.tagName === 'TD') {
+      const continued = ensureParagraphAfterBlockLocal(blocks, path);
+      commitBlocks(continued.blocks, { selection: selectionAt(continued.nextPath, 0) });
+      return true;
+    }
+    if (element.tagName === 'LI') {
+      const inlines = listItemInlinesAtPath(blocks, path);
+      if (!inlines) return false;
+      if (!inlineText(inlines).trim()) {
+        const next = exitEmptyListItem(blocks, path);
+        commitBlocks(next, { selection: selectionAt(path, 0) });
+        return true;
+      }
+      if (!selection) return false;
+      const split = splitListItemAtSelectionLocal(blocks, selection);
+      if (!split.handled) return false;
+      commitBlocks(split.blocks, { selection: split.nextSelection });
+      return true;
+    }
+    if (!selection || !collapsedSelection(selection)) return false;
+    const location = blockLocationAtPath(blocks, selection.focus.path);
+    if (!location || !['paragraph', 'heading'].includes(location.block.type)) return false;
+    const split = splitTextBlockAtOffset(blocks, selection.focus.path, selection.focus.offset);
+    commitBlocks(split.blocks, { selection: selectionAt(split.nextPath, 0) });
+    return true;
+  };
+  const handleDelete = (direction) => {
+    if (!content) return false;
+    const selection = logicalSelection(content, blocks);
+    if (!selection) return false;
+    const result = deleteAtSelection(blocks, selection, direction);
+    if (!result.changed) return false;
+    commitBlocks(result.blocks, { selection: result.nextSelection });
+    return true;
+  };
+  const onBeforeInput = (event) => {
+    if (composing || event.isComposing) return;
+    if (event.inputType === 'insertParagraph' && handleEnter()) {
+      event.preventDefault();
+      return;
+    }
+    if (event.inputType === 'deleteContentBackward' && handleDelete('backward')) {
+      event.preventDefault();
+      return;
+    }
+    if (event.inputType === 'deleteContentForward' && handleDelete('forward')) {
+      event.preventDefault();
+      return;
+    }
+    if (event.inputType === 'insertText' && event.data && replaceSelection(event.data)) event.preventDefault();
   };
   const onKeyDown = (event) => {
-    const element = event.target.closest?.('[data-editor-surface="true"]');
-    if (!element || composing || event.isComposing || event.keyCode === 229) return;
-    activeSurface = element;
+    if (!content || composing || event.isComposing || event.keyCode === 229) return;
     if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'k'].includes(event.key.toLowerCase())) {
       event.preventDefault();
       applyInlineCommand(event.key.toLowerCase() === 'b' ? 'strong' : event.key.toLowerCase() === 'i' ? 'emphasis' : 'link');
       return;
     }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') return;
-    const path = parsePath(element.dataset.blockPath);
-    if (!path) return;
-    if (element.dataset.editorKind === 'list-item' && event.key === 'Tab') {
+    const element = selectedElement(content);
+    const path = element ? blockPathForNode(element) : null;
+    if (event.key === 'Tab' && element?.tagName === 'LI' && path) {
       event.preventDefault();
       const direction = event.shiftKey ? 'out' : 'in';
       const nextPath = listItemPathAfterIndent(blocks, path, direction);
-      blocks = indentListItem(blocks, path, direction); emit(); refresh(); focusPath(nextPath);
+      commitBlocks(indentListItem(blocks, path, direction), { selection: selectionAt(nextPath, 0) });
       return;
     }
-    if (element.dataset.editorKind === 'list-item' && event.key === 'Enter') {
+    if (event.key === 'Enter' && handleEnter()) {
       event.preventDefault();
-      if (!(element.textContent ?? '').trim()) { blocks = exitEmptyListItem(blocks, path); emit(); refresh(); return; }
-      blocks = continueListItem(blocks, path); emit(); refresh();
-      const nextPath = [...path]; nextPath[nextPath.length - 1] += 1; focusPath(nextPath);
       return;
     }
-    if (event.key !== 'Enter') return;
-    if (element.dataset.editorKind !== 'block') return;
-    event.preventDefault();
-    const split = splitTextBlockAtOffset(blocks, path, caretOffset(element));
-    blocks = split.blocks; emit(); refresh(); focusPath(split.nextPath);
+    if (event.key === 'Backspace' && handleDelete('backward')) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'Delete' && handleDelete('forward')) event.preventDefault();
   };
   const onMouseDown = (event) => {
     if (!event.target.closest?.('[data-markdown-command]')) return;
-    const element = selectionSurface(content) || activeSurface;
-    const selection = element && selectionOffsets(element);
-    toolbarSelection = selection && element ? { ...selection, element } : null;
     event.preventDefault();
   };
-  const onFocusIn = (event) => {
-    const element = event.target.closest?.('[data-editor-surface="true"]');
-    if (element) activeSurface = element;
+  const onTaskChange = (event) => {
+    const checkbox = event.target.closest?.('[data-markdown-editor-task="true"]');
+    if (!checkbox || !content?.contains(checkbox)) return;
+    const path = parsePath(checkbox.dataset.markdownTaskPath);
+    if (!path) return;
+    try {
+      blocks = toggleTaskItem(blocks, path);
+      emit();
+    } catch {
+      // Ignore stale task paths from a browser event queued before a sync.
+    }
   };
 
   if (editorMode === 'toolbar') {
@@ -665,11 +880,12 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     [['bold', 'B', 'Bold'], ['italic', 'I', 'Italic'], ['link', '↗', 'Link'], ['paragraph', 'P', 'Paragraph'], ['heading', 'H2', 'Heading'], ['unordered-list', '•', 'List'], ['ordered-list', '1.', 'Ordered list'], ['todo', '☐', 'Todo'], ['quote', '❞', 'Quote'], ['code', '</>', 'Code'], ['table', '▦', 'Table'], ['rule', '—', 'Rule']].forEach(([command, label, title]) => {
       const button = document.createElement('button'); button.type = 'button'; button.dataset.markdownCommand = command; button.title = title; button.setAttribute('aria-label', title); button.textContent = label; toolbar.appendChild(button);
     });
-    content = document.createElement('div'); content.className = 'markdown-editor-content'; content.dataset.markdownEditorBlocks = 'true';
+    content = document.createElement('div'); content.className = 'markdown-editor-content'; content.dataset.markdownEditorRoot = 'true';
     wrapper.append(toolbar, content); refresh();
     wrapper.addEventListener('click', onClick);
     wrapper.addEventListener('mousedown', onMouseDown);
-    wrapper.addEventListener('focusin', onFocusIn);
+    wrapper.addEventListener('change', onTaskChange);
+    wrapper.addEventListener('beforeinput', onBeforeInput);
     wrapper.addEventListener('input', onInput);
     wrapper.addEventListener('compositionstart', onComposition);
     wrapper.addEventListener('compositionend', onComposition);
@@ -680,13 +896,13 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
 
   return {
     destroy() {
-      wrapper.removeEventListener('click', onClick); wrapper.removeEventListener('mousedown', onMouseDown); wrapper.removeEventListener('focusin', onFocusIn); wrapper.removeEventListener('input', onInput);
+      wrapper.removeEventListener('click', onClick); wrapper.removeEventListener('mousedown', onMouseDown); wrapper.removeEventListener('change', onTaskChange); wrapper.removeEventListener('beforeinput', onBeforeInput); wrapper.removeEventListener('input', onInput);
       wrapper.removeEventListener('compositionstart', onComposition); wrapper.removeEventListener('compositionend', onComposition); wrapper.removeEventListener('keydown', onKeyDown);
       wrapper.removeEventListener('paste', onPaste);
       textarea.removeEventListener('input', onTextareaInput);
       restoreTextareaFromEditor(marker, wrapper, textarea);
     },
-    focus() { if (editorMode === 'source') textarea.focus(); else content?.querySelector('[data-editor-surface="true"]')?.focus(); },
+    focus() { if (editorMode === 'source') textarea.focus(); else content?.focus(); },
     sync() {
       if (editorMode === 'toolbar') { blocks = blocksFromMarkdown(textarea.value); refresh(); }
     },
@@ -698,28 +914,41 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
         textarea.setSelectionRange(start + text.length, start + text.length);
         textarea.dispatchEvent(new Event('input', { bubbles: true })); onChange?.(textarea.value); return;
       }
-      const selected = typeof window === 'undefined' ? null : window.getSelection();
-      const selectedSurface = selected?.anchorNode instanceof Element
-        ? selected.anchorNode.closest('[data-editor-surface="true"]')
-        : selected?.anchorNode?.parentElement?.closest('[data-editor-surface="true"]');
-      const target = selectedSurface && content?.contains(selectedSurface) ? selectedSurface : activeSurface || content?.querySelector('[data-editor-surface="true"]');
-      if (!target) return;
-      const offsets = selectionOffsets(target);
-      if (!offsets) { target.append(document.createTextNode(text)); activeSurface = target; commitSurface(target); return; }
-      const path = parsePath(target.dataset.blockPath);
-      if (!path) return;
-      const update = (inlines) => insertInlineTextAtSelection(inlines, offsets.start, offsets.end, text, { range: offsets.range, surface: target });
-      if (target.dataset.editorKind === 'list-item') blocks = updateListItemAtPath(blocks, path, update);
-      else if (target.dataset.editorKind === 'table-cell') {
-        blocks = updateBlockAtPath(blocks, path, (block) => {
-          if (block.type !== 'table') return block;
-          const cells = target.dataset.tableSection === 'header' ? block.header : block.rows[Number(target.dataset.tableRow)];
-          const column = Number(target.dataset.tableColumn);
-          if (cells?.[column]) cells[column] = update(cells[column]);
-          return block;
-        });
-      } else blocks = updateBlockAtPath(blocks, path, (block) => ['paragraph', 'heading'].includes(block.type) ? { ...block, inlines: update(block.inlines) } : block);
-      emit(); refresh(); focusPath(path, offsets.start + text.length);
+      if (replaceSelection(text)) return;
+      if (!content) return;
+      const selection = logicalSelection(content, blocks);
+      const target = selectedElement(content);
+      const path = target ? blockPathForNode(target) : null;
+      if (!selection || !target || !path || !samePath(selection.anchor.path, selection.focus.path)) return;
+      const start = Math.min(selection.anchor.offset, selection.focus.offset);
+      const end = Math.max(selection.anchor.offset, selection.focus.offset);
+      const range = content.ownerDocument.getSelection()?.rangeCount
+        ? content.ownerDocument.getSelection().getRangeAt(0)
+        : null;
+      const update = (inlines) => insertInlineTextAtSelection(inlines, start, end, text, { range, surface: target });
+      const next = cloneBlocks(blocks);
+      if (target.tagName === 'LI') {
+        const location = listLocation(next, path);
+        if (!location) return;
+        location.item.inlines = update(location.item.inlines);
+      } else if (target.tagName === 'TH' || target.tagName === 'TD') {
+        const location = blockLocationAtPath(next, path);
+        if (location?.block.type !== 'table') return;
+        const rowElement = target.parentElement;
+        const sectionElement = rowElement?.parentElement;
+        const column = rowElement ? Array.from(rowElement.children).indexOf(target) : -1;
+        const row = sectionElement?.tagName === 'TBODY' && rowElement
+          ? Array.from(sectionElement.children).indexOf(rowElement)
+          : 0;
+        const cells = sectionElement?.tagName === 'THEAD' ? location.block.header : location.block.rows[row];
+        if (!cells?.[column]) return;
+        cells[column] = update(cells[column]);
+      } else {
+        const location = blockLocationAtPath(next, path);
+        if (!location || !['paragraph', 'heading'].includes(location.block.type)) return;
+        location.block.inlines = update(location.block.inlines);
+      }
+      commitBlocks(next, { selection: selectionAt(path, start + text.length) });
     },
   };
 }

@@ -130,6 +130,10 @@ assert.match(collapse, /collapseDefault/, 'Collapse should support a default clo
 assert.match(css, /\.markdown-editor-toolbar\s*\{/, 'Markdown fields should render an editor toolbar');
 assert.match(editor, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
 assert.match(options, /mountMarkdownEditor/, 'Options should mount the native Markdown block editor');
+assert.match(editor, /dataset\.markdownEditorRoot\s*=\s*'true'/,
+  'Options Markdown editors should mount one delegated editable root');
+assert.doesNotMatch(editor, /data-editor-surface|editorSurface|activeSurface/,
+  'Options Markdown editors should not reintroduce independent editable surfaces');
 assert.match(editor, /\['todo',/, 'Markdown editor should expose a Todo command');
 assert.match(editor, /\['table',/, 'Markdown editor should expose a table command');
 assert.match(css, /\.markdown-editor-content\s*\{/, 'Markdown editor should expose a block content surface');
