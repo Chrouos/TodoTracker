@@ -208,12 +208,27 @@ function parseTaskMarker(content) { const match = content.match(/^\[([ xX])\]\s+
 function parseList(lines, start, indent) {
   const first = matchListItem(lines[start]); const task = parseTaskMarker(first.content); const items = []; let index = start;
   while (index < lines.length) {
-    const current = matchListItem(lines[index]);
+    let current = matchListItem(lines[index]);
+    if (!current) {
+      let next = index;
+      while (next < lines.length && !lines[next].trim()) next += 1;
+      const candidate = matchListItem(lines[next]);
+      if (!candidate || candidate.indent !== indent || candidate.ordered !== first.ordered) break;
+      index = next;
+      current = candidate;
+    }
     if (!current || current.indent !== indent || current.ordered !== first.ordered || Boolean(parseTaskMarker(current.content)) !== Boolean(task)) break;
     const taskItem = parseTaskMarker(current.content);
     const item = task ? { checked: taskItem.checked, inlines: parseInlines(taskItem.content), children: [] } : { inlines: parseInlines(current.content), children: [] };
     items.push(item); index += 1;
-    while (index < lines.length) { const child = matchListItem(lines[index]); if (!child || child.indent <= indent) break; const nested = parseList(lines, index, child.indent); item.children.push(nested.block); index = nested.next; }
+    while (index < lines.length) {
+      let childIndex = index;
+      while (childIndex < lines.length && !lines[childIndex].trim()) childIndex += 1;
+      const child = matchListItem(lines[childIndex]);
+      if (!child || child.indent <= indent) break;
+      const nested = parseList(lines, childIndex, child.indent);
+      item.children.push(nested.block); index = nested.next;
+    }
   }
   return { block: task ? { type: 'taskList', items } : { type: 'list', ordered: first.ordered, items }, next: index };
 }

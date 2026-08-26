@@ -29,6 +29,21 @@ test('parses and serializes the supported Markdown block fixture', () => {
   assert.equal(serializeMarkdown(blocks), source);
 });
 
+test('keeps indented list children across blank lines', () => {
+  const blocks = parseMarkdown([
+    '* Parent',
+    '',
+    '  * Child',
+    '',
+    '    * Grandchild',
+  ].join('\n'));
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'list');
+  assert.equal(blocks[0].items[0].children[0].type, 'list');
+  assert.equal(blocks[0].items[0].children[0].items[0].children[0].type, 'list');
+});
+
 test('keeps non-task ordered and unordered lists plus unsupported syntax as semantic text', () => {
   const blocks = parseMarkdown(['1. First', '2. Second', '', '- Plain', '  - Child', '', '~~not supported~~'].join('\n'));
 

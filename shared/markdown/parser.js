@@ -89,7 +89,15 @@ function parseList(lines, start, indent) {
   let index = start;
 
   while (index < lines.length) {
-    const current = matchListItem(lines[index]);
+    let current = matchListItem(lines[index]);
+    if (!current) {
+      let next = index;
+      while (next < lines.length && !lines[next].trim()) next += 1;
+      const candidate = matchListItem(lines[next]);
+      if (!candidate || candidate.indent !== indent || candidate.ordered !== ordered) break;
+      index = next;
+      current = candidate;
+    }
     if (!current || current.indent !== indent || current.ordered !== ordered) break;
     const taskItem = parseTaskMarker(current.content);
     if (Boolean(taskItem) !== Boolean(task)) break;
@@ -101,9 +109,11 @@ function parseList(lines, start, indent) {
     index += 1;
 
     while (index < lines.length) {
-      const child = matchListItem(lines[index]);
+      let childIndex = index;
+      while (childIndex < lines.length && !lines[childIndex].trim()) childIndex += 1;
+      const child = matchListItem(lines[childIndex]);
       if (!child || child.indent <= indent) break;
-      const nested = parseList(lines, index, child.indent);
+      const nested = parseList(lines, childIndex, child.indent);
       item.children.push(nested.block);
       index = nested.next;
     }
