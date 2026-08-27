@@ -42,6 +42,7 @@ assert.match(options, /applyTranslations/, 'Options should apply static translat
 assert.match(options, /language:\s*normalizeLanguagePreference/, 'Options should persist the normalized language preference');
 assert.match(db, /language:\s*'auto'/, 'Settings should default to the automatic browser language');
 assert.match(options, /formatDuration/, 'Options should use the shared duration formatter');
+assert.match(options, /statusLabel/, 'Options should use the shared status label formatter');
 for (const key of [
   'report.completed', 'todo.noTodos', 'schedule.noSchedules', 'entry.noEntries', 'common.confirmDelete',
 ]) {

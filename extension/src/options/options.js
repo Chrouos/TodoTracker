@@ -22,7 +22,7 @@ import { taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabe
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, TODO_STATUSES, filterTasks, normalizePriority, normalizeStatus,
-  priorityLabel, taskCountLabel,
+  priorityLabel, statusLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
