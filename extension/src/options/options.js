@@ -54,7 +54,7 @@ autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const t = (key, variables) => translate(currentLocale, key, variables);
+const translateText = (key, variables) => translate(currentLocale, key, variables);
 const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
 const displayDate = (value) => formatDisplayDate(value, currentLocale);
 const displayClock = (value) => formatDisplayTime(value, currentLocale);
@@ -1804,7 +1804,7 @@ function renderTodos() {
               ${t.scheduleId ? '<span class="badge" title="由排程自動產生">排程</span>' : ''}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
-              ${m.leadMs !== null ? `<span class="badge">${t('summary.lead', { duration: leadLabel(m.leadMs, currentLocale) })}</span>` : ''}
+              ${m.leadMs !== null ? `<span class="badge">${translateText('summary.lead', { duration: leadLabel(m.leadMs, currentLocale) })}</span>` : ''}
               ${t.reopenCount ? `<span class="badge">重開 ${t.reopenCount} 次</span>` : ''}
             </div>
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
