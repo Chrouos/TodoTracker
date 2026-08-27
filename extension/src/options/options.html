@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="options.css" />
 </head>
 <body>
+<div id="initialLoading" class="initial-loading" data-i18n="app.loading">載入中…</div>
 <div class="wrap">
   <header>
     <h1>TodoTracker</h1>
@@ -371,6 +372,15 @@
   <section id="p-settings" hidden>
     <div class="card">
       <div class="grid4">
+        <label class="field">
+          <span data-i18n="settings.language">語言</span>
+          <select id="stLanguage">
+            <option value="auto" data-i18n="settings.language.auto">依瀏覽器語言</option>
+            <option value="zh-TW" data-i18n="settings.language.zhTW">繁體中文</option>
+            <option value="en" data-i18n="settings.language.en">English</option>
+            <option value="ja" data-i18n="settings.language.ja">日本語</option>
+          </select>
+        </label>
         <label class="field">
           <span>閒置提醒（分）</span>
           <input id="stIdle" type="number" min="1" step="1" />

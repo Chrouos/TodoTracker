@@ -1,5 +1,12 @@
 import * as db from '../lib/db.js';
 import {
+  applyTranslations,
+  getBrowserLocale,
+  normalizeLanguagePreference,
+  resolveLocale,
+  translate,
+} from '../lib/i18n.js';
+import {
   fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
   dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
@@ -126,6 +133,7 @@ document.addEventListener('click', (event) => {
   setMarkdownPreviewExpanded(preview, !preview.classList.contains('is-expanded'));
 });
 
+let currentLocale = 'zh-TW';
 let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
 function renderEntryTasks(selectedTaskId = '') {
   const projectId = $('enProject').value;
@@ -169,7 +177,10 @@ async function load() {
     db.listTasks(), db.listEntries(), db.listSchedules(), db.getTimer(), db.getSettings(),
   ]);
   S = { projects, tags, tasks, entries, schedules, timer, settings };
+  currentLocale = resolveLocale(settings.language, getBrowserLocale());
+  applyTranslations(document, currentLocale);
   renderAll();
+  $('initialLoading').hidden = true;
 }
 
 function rangeStart() {
@@ -2265,6 +2276,7 @@ function renderSettings() {
   $('stIdle').value = S.settings.idleThresholdMin;
   $('stRound').value = String(S.settings.roundToMin);
   $('stNotesEditor').value = normalizeMarkdownEditorMode(S.settings.notesEditor);
+  $('stLanguage').value = normalizeLanguagePreference(S.settings.language);
   initializeMarkdownEditors(S.settings.notesEditor);
 }
 $('saveSettings').addEventListener('click', async () => {
@@ -2272,9 +2284,10 @@ $('saveSettings').addEventListener('click', async () => {
     idleThresholdMin: Math.max(1, Number($('stIdle').value) || 15),
     roundToMin: Number($('stRound').value) || 0,
     notesEditor: normalizeMarkdownEditorMode($('stNotesEditor').value),
+    language: normalizeLanguagePreference($('stLanguage').value),
   });
   await load();
-  alert('已儲存');
+  alert(translate(currentLocale, 'settings.saved'));
 });
 
 /* ---------------- 匯出 / 匯入 ---------------- */

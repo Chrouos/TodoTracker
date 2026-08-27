@@ -29,9 +29,18 @@ for (const id of ['mgTimerNotes', 'tdNotes', 'enNotes', 'pjNoteDraft', 'scNotes'
   assert.match(html, new RegExp(`id="${id}"[^>]*data-markdown-editor-input`), `${id} should use the shared Markdown editor`);
 }
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
+const db = await readFile(new URL('../src/lib/db.js', import.meta.url), 'utf8');
 const editor = await readFile(new URL('../src/lib/markdown-editor.js', import.meta.url), 'utf8');
 assert.match(options, /projectIdForTask/, 'Entry Todo selection should synchronize its project');
 assert.match(options, /normalizeMarkdownEditorMode/, 'Options should normalize the shared Markdown editor setting');
+assert.match(html, /id="stLanguage"/, 'Settings should expose a language selector');
+for (const value of ['auto', 'zh-TW', 'en', 'ja']) {
+  assert.match(html, new RegExp(`<option value="${value}"`), `Language selector should include ${value}`);
+}
+assert.match(options, /from ['"]\.\.\/lib\/i18n\.js['"]/, 'Options should import the shared locale engine');
+assert.match(options, /applyTranslations/, 'Options should apply static translations');
+assert.match(options, /language:\s*normalizeLanguagePreference/, 'Options should persist the normalized language preference');
+assert.match(db, /language:\s*'auto'/, 'Settings should default to the automatic browser language');
 assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selection should update the project selector');
 assert.match(options, /tasksForProject/, 'Manual entry Todo options should use the selected project');
 assert.match(options, /sortTasksForManualEntry/, 'Manual entry Todo options should prioritize recent activity');
