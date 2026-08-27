@@ -102,13 +102,26 @@
       <div class="kpi"><span class="cap">有紀錄天數</span><span id="kDays" class="num">0</span></div>
     </div>
 
-    <h2 class="sec" data-collapse="rep-health">
-      <span class="mark">[-]</span> Todo 健康度
+    <h2 class="sec" data-collapse="rep-insights" data-collapse-default="closed">
+      <span class="mark">[+]</span> 工作區狀態
+    </h2>
+    <div id="reportInsights" data-collapse-body="rep-insights" class="report-insights" aria-label="Todo 健康狀態與專案狀況"></div>
+
+    <h2 class="sec" data-collapse="rep-health" data-collapse-default="closed">
+      <span class="mark">[+]</span> Todo 健康度
     </h2>
     <div id="todoHealth" data-collapse-body="rep-health"></div>
-    <div id="reportInsights" class="report-insights" aria-label="報表資料品質與 Todo 績效"></div>
 
-    <h2 class="sec" data-collapse="rep-donut"><span class="mark">[-]</span> 專案時間與每日趨勢</h2>
+    <h2 class="sec" data-collapse="rep-review">
+      <span class="mark">[-]</span> 每日工作回顧 <span id="reviewLabel" class="mute"></span>
+      <span class="review-mode" id="reviewMode">
+        <button class="btn-sm" type="button" data-review-mode="list">清單</button>
+        <button class="btn-sm active" type="button" data-review-mode="calendar">日曆</button>
+      </span>
+    </h2>
+    <div id="dailyReview" data-collapse-body="rep-review"></div>
+
+    <h2 class="sec" data-collapse="rep-donut" data-collapse-default="closed"><span class="mark">[+]</span> 專案時間與每日趨勢</h2>
     <div id="byProject" data-collapse-body="rep-donut">
       <div id="projectTrend"></div>
       <div id="projectHeatmap"></div>
@@ -120,15 +133,6 @@
         <div id="todoTrackerDetail" hidden></div>
       </div>
     </div>
-
-    <h2 class="sec" data-collapse="rep-review">
-      <span class="mark">[-]</span> 每日工作回顧 <span id="reviewLabel" class="mute"></span>
-      <span class="review-mode" id="reviewMode">
-        <button class="btn-sm" type="button" data-review-mode="list">清單</button>
-        <button class="btn-sm active" type="button" data-review-mode="calendar">日曆</button>
-      </span>
-    </h2>
-    <div id="dailyReview" data-collapse-body="rep-review"></div>
 
   </section>
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildTodoTrackerData } from './todo-tracker.js';
+import { buildTodoTrackerData, syncTodoTrackerCollapseState } from './todo-tracker.js';
 
 const local = (value) => new Date(value);
 const durationSec = (entry) => Math.max(0,
@@ -349,4 +349,17 @@ test('sorts tracker items by latest activity descending', () => {
   });
 
   assert.deepEqual(result.items.map((item) => item.id), ['worked-longest', 'opened-first']);
+});
+
+test('defaults new tracker rows to collapsed while preserving manual expansion', () => {
+  const initial = syncTodoTrackerCollapseState(new Set(), new Set(), [{ id: 'first' }, { id: 'second' }]);
+  assert.deepEqual([...initial.collapsedIds], ['first', 'second']);
+
+  const afterOpening = syncTodoTrackerCollapseState(
+    new Set(['second']),
+    initial.knownIds,
+    [{ id: 'first' }, { id: 'second' }, { id: 'new' }],
+  );
+  assert.deepEqual([...afterOpening.collapsedIds], ['second', 'new']);
+  assert.deepEqual([...afterOpening.knownIds], ['first', 'second', 'new']);
 });

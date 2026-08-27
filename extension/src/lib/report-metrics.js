@@ -42,26 +42,93 @@ export function buildReportQuality(entries, tasks, today) {
   let unclassifiedSeconds = 0;
   let missingNotesCount = 0;
   let unlinkedTaskSeconds = 0;
+  const unclassifiedEntryIds = [];
+  const missingNotesEntryIds = [];
+  const unlinkedTaskEntryIds = [];
 
   for (const entry of entries) {
     const valid = validEntry(entry);
     if (!valid) continue;
     const seconds = Math.max(0, Math.round((valid.end - valid.start) / 1000));
-    if (!entry.projectId) unclassifiedSeconds += seconds;
-    if (!String(entry.notes || '').trim()) missingNotesCount += 1;
-    if (entry.projectId && !entry.taskId) unlinkedTaskSeconds += seconds;
+    if (!entry.projectId) {
+      unclassifiedSeconds += seconds;
+      unclassifiedEntryIds.push(entry.id);
+    }
+    if (!String(entry.notes || '').trim()) {
+      missingNotesCount += 1;
+      missingNotesEntryIds.push(entry.id);
+    }
+    if (entry.projectId && !entry.taskId) {
+      unlinkedTaskSeconds += seconds;
+      unlinkedTaskEntryIds.push(entry.id);
+    }
   }
 
   const overdueTodoCount = tasks.filter((task) =>
     task.status !== 'done' && task.status !== 'archived' && task.dueDate && task.dueDate < today,
   ).length;
+  const overdueTaskIds = tasks
+    .filter((task) => task.status !== 'done' && task.status !== 'archived' && task.dueDate && task.dueDate < today)
+    .map((task) => task.id);
 
   return {
     unclassifiedSeconds,
     missingNotesCount,
     unlinkedTaskSeconds,
     overdueTodoCount,
+    overdueTaskIds,
+    unclassifiedEntryIds,
+    missingNotesEntryIds,
+    unlinkedTaskEntryIds,
   };
+}
+
+export function buildReportActionItems(quality) {
+  const items = [];
+  if (quality.overdueTodoCount > 0) {
+    items.push({ kind: 'overdue', tone: 'danger', label: '逾期 Todo', value: quality.overdueTodoCount });
+  }
+  if (quality.unlinkedTaskSeconds > 0) {
+    items.push({ kind: 'unlinked', tone: 'warning', label: '未綁定 Todo', value: quality.unlinkedTaskSeconds });
+  }
+  if (quality.unclassifiedSeconds > 0) {
+    items.push({ kind: 'unclassified', tone: 'warning', label: '未分類工時', value: quality.unclassifiedSeconds });
+  }
+  if (quality.missingNotesCount > 0) {
+    items.push({ kind: 'missing-notes', tone: 'muted', label: '未填寫工作備註', value: quality.missingNotesCount });
+  }
+  return items.length ? items : [{ kind: 'clear', tone: 'success', label: '目前沒有待處理項目', value: 0 }];
+}
+
+export function buildProjectHealthRows(metrics, limit = 8) {
+  const weekMs = 7 * 86400000;
+  return metrics
+    .map((metric) => {
+      const remaining = Math.max(0, metric.total - metric.done);
+      let status = '進行中';
+      let tone = 'muted';
+      let riskScore = 100;
+      if (metric.overdue > 0) {
+        status = '逾期';
+        tone = 'danger';
+        riskScore = 4000 + metric.overdue;
+      } else if (metric.total > 1 && metric.completionRate < 0.5) {
+        status = '進度偏低';
+        tone = 'warning';
+        riskScore = 3000 + Math.round((1 - metric.completionRate) * 100);
+      } else if (metric.averageLeadMs !== null && metric.averageLeadMs >= weekMs) {
+        status = '週期偏長';
+        tone = 'warning';
+        riskScore = 2000 + Math.round(metric.averageLeadMs / weekMs);
+      } else if (metric.total > 0 && metric.done === metric.total) {
+        status = '已完成';
+        tone = 'success';
+        riskScore = 0;
+      }
+      return { ...metric, remaining, status, tone, riskScore };
+    })
+    .sort((a, b) => b.riskScore - a.riskScore || b.workedSeconds - a.workedSeconds || b.total - a.total)
+    .slice(0, limit);
 }
 
 export function buildProjectTaskMetrics(tasks, entries, today) {
@@ -112,6 +179,39 @@ export function buildProjectTaskMetrics(tasks, entries, today) {
       averageLeadMs: row.leadCount ? Math.round(row.leadTotalMs / row.leadCount) : null,
     }))
     .sort((a, b) => b.workedSeconds - a.workedSeconds || b.total - a.total);
+}
+
+function chartRows(metrics, valueKey, sortDirection = 'desc', limit = 8) {
+  const rows = metrics
+    .filter((metric) => Number.isFinite(metric[valueKey]) && metric[valueKey] > 0)
+    .sort((a, b) => sortDirection === 'asc'
+      ? a[valueKey] - b[valueKey]
+      : b[valueKey] - a[valueKey])
+    .slice(0, limit);
+  const max = rows.reduce((highest, row) => Math.max(highest, row[valueKey]), 0);
+  return rows.map((row) => ({
+    projectId: row.projectId,
+    value: row[valueKey],
+    percentage: max ? Math.round((row[valueKey] / max) * 100) : 0,
+  }));
+}
+
+export function buildProjectMetricChartData(metrics, limit = 8) {
+  const visible = metrics.filter((metric) => Number(metric.total) > 0);
+  const completion = visible
+    .map((metric) => ({
+      projectId: metric.projectId,
+      value: Math.min(1, Math.max(0, Number(metric.completionRate) || 0)),
+    }))
+    .sort((a, b) => a.value - b.value)
+    .slice(0, limit)
+    .map((row) => ({ ...row, percentage: Math.round(row.value * 100) }));
+
+  return {
+    completion,
+    worked: chartRows(visible, 'workedSeconds', 'desc', limit),
+    lead: chartRows(visible, 'averageLeadMs', 'desc', limit),
+  };
 }
 
 export function compareSeconds(currentSeconds, previousSeconds) {

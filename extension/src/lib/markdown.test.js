@@ -107,7 +107,7 @@ test('renders escaped table pipes as cell content rather than delimiters', () =>
 test('uses the shared renderer for disabled read-only task checkboxes', () => {
   assert.equal(
     markdownToHTML('- [ ] Open\n- [x] Done'),
-    '<ul class="markdown-task-list"><li><input type="checkbox" disabled>Open</li><li><input type="checkbox" disabled checked>Done</li></ul>',
+    '<ul class="markdown-task-list"><li><input type="checkbox" class="task-checkbox" disabled>Open</li><li><input type="checkbox" class="task-checkbox" disabled checked>Done</li></ul>',
   );
 });
 

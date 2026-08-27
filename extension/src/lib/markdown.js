@@ -150,7 +150,7 @@ function renderList(block, options, path) {
   return `<${tag}${className}>${block.items.map((item, index) => {
     const itemPath = [...path, index];
     const task = block.type === 'taskList'
-      ? `<input type="checkbox"${options.interactiveTasks ? ` aria-label="${escapeHTML(`Toggle task ${inlineText(item.inlines)} (${itemPath.join('.')})`)}" data-markdown-task-path="${itemPath.join('.')}" data-markdown-task-checked="${item.checked}"` : ' disabled'}${item.checked ? ' checked' : ''}>`
+      ? `<input type="checkbox" class="task-checkbox"${options.interactiveTasks ? ` aria-label="${escapeHTML(`Toggle task ${inlineText(item.inlines)} (${itemPath.join('.')})`)}" data-markdown-task-path="${itemPath.join('.')}" data-markdown-task-checked="${item.checked}"` : ' disabled'}${item.checked ? ' checked' : ''}>`
       : '';
     return `<li>${task}${renderInlines(item.inlines)}${item.children.map((child, childIndex) => {
       return renderBlock(child, options, [...itemPath, childIndex]);

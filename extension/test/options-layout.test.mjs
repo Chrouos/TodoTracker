@@ -81,10 +81,19 @@ assert.match(css, /\.project-trend-tooltip\s*\{[^}]*height:\s*\d+px/s, 'Trend to
 assert.match(css, /\.project-trend-tooltip\s*\{[^}]*overflow:\s*hidden/s, 'Trend tooltip should hide overflow instead of growing');
 assert.match(css, /\.project-trend-tooltip\s*>\s*(?:strong|span)[^{]*\{[^}]*white-space:\s*nowrap/s, 'Trend tooltip summary lines should not wrap');
 assert.match(css, /\.project-trend-tooltip\s*>\s*(?:strong|span)[^{]*\{[^}]*text-overflow:\s*ellipsis/s, 'Trend tooltip summary lines should ellipsize');
+assert.match(css, /\.markdown-editor-content \.markdown-task-list input\[type="checkbox"\]\s*\{[^}]*width:\s*13px[^}]*height:\s*13px[^}]*flex:\s*0 0 13px/s,
+  'Editable Markdown task checkboxes should remain compact');
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
 assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');
 assert.match(html, /id="reportInsights"/, 'Report should expose data quality and Todo performance insights');
+assert.match(html, /data-collapse="rep-insights"/, 'Workspace status should have its own collapsible heading');
+assert.match(html, /data-collapse-body="rep-insights"/, 'Workspace status should have a collapsible body');
+assert.match(html, /data-collapse="rep-insights"[^>]*data-collapse-default="closed"/, 'Workspace status should default to collapsed');
+assert.match(html, /data-collapse="rep-health"[^>]*data-collapse-default="closed"/, 'Todo health should default to collapsed');
+assert.match(html, /data-collapse="rep-donut"[^>]*data-collapse-default="closed"/, 'Project analytics should default to collapsed');
+assert.doesNotMatch(html, /data-collapse="rep-review"[^>]*data-collapse-default="closed"/, 'Daily review should remain open by default');
+assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-health"[\s\S]*data-collapse="rep-review"[\s\S]*data-collapse="rep-donut"/, 'Report panels should put the important sections first');
 assert.match(html, /data-collapse="rep-todo-tracker"[\s\S]*data-collapse-default="closed"/, 'Todo Tracker should default to collapsed');
 assert.match(html, /data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should have a collapsible body');
 assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
@@ -93,17 +102,58 @@ assert.match(options, /buildProjectTrendData/, 'Report should build the fused pr
 assert.match(options, /data-trend-date/, 'Report should wire date hover interaction');
 assert.match(options, /highlightProjectId/, 'Project selection should highlight without changing the data range');
 assert.match(options, /trendOverview/, 'Report should show a useful summary before hover');
-assert.doesNotMatch(options, /focusId/, 'Report should not retain the removed drill-down state');
+assert.match(options, /focusReportEntry/, 'Report should navigate directly to work records');
+assert.match(options, /focusReportTodo/, 'Report should navigate directly to Todo items');
+assert.match(options, /function clearFocusedReportTarget\(\)/,
+  'Report navigation should expose one way to clear a stale focused target');
+assert.match(options, /function selectTab\(name, preserveFocus = false\)/,
+  'Normal tab changes should clear a focused report target');
+assert.match(options, /if \(!preserveFocus\) \{[\s\S]{0,220}clearFocusedReportTarget\(\)/,
+  'Tab changes should clear report focus unless navigation explicitly preserves it');
+assert.match(options, /const hadFocusedTarget = hasReportFocus\(\{ entryId: enUI\.focusId, todoId: todoFocusId \}\)/,
+  'Tab changes should detect whether a focused list needs to be refreshed');
+assert.match(options, /if \(hadFocusedTarget\) \{ renderEntries\(\); renderTodos\(\); \}/,
+  'Tab changes should refresh lists after clearing a focused target');
+assert.match(options, /selectTab\('entries', true\)/,
+  'Entry report navigation should preserve focus while switching tabs');
+assert.match(options, /selectTab\('todos', true\)/,
+  'Todo report navigation should preserve focus while switching tabs');
+assert.match(options, /clearReportFocus/,
+  'Entry and Todo filters should use the shared report focus reset');
+assert.match(options, /enUI\.focusId = next\.entryId/,
+  'Entry report navigation should apply the shared focus state');
+assert.match(options, /todoFocusId = next\.todoId/,
+  'Todo report navigation should apply the shared focus state');
+assert.match(options, /\$\('enSearch'\)\.value = '';[\s\S]{0,80}\$\('enFilter'\)\.value = '';/,
+  'Entry report navigation should reset visible entry filters');
+assert.match(options, /\$\('entriesApplyRange'\)\.addEventListener\('click', \(\) => \{ clearFocusedReportTarget\(\); applyCustomRange\('entries'\); \}\)/,
+  'Applying a custom entry range should clear a stale focused entry');
 assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'Report should not use a meaningless hover placeholder');
 assert.match(options, /buildProjectDetailData/, 'Project selection should render project detail data');
 assert.match(options, /buildReportQuality/, 'Report should render data quality metrics');
 assert.match(options, /buildProjectTaskMetrics/, 'Report should render project Todo performance metrics');
+assert.match(options, /buildProjectHealthRows/, 'Report should sort project status by attention');
+assert.match(options, /buildReportActionItems/, 'Report should render actionable data quality items');
+assert.match(options, /reportActionTarget/, 'Report action items should expose navigation targets');
+assert.match(options, /data-report-entry-id/, 'Report should expose a direct target for work records');
+assert.match(options, /data-report-task-id/, 'Report should expose a direct target for Todo items');
+assert.match(options, /需要注意/, 'Report should show actionable attention items');
+assert.match(options, /專案狀況/, 'Report should show a scannable project status list');
+assert.match(options, /查看完整專案報表/, 'Report should keep detailed project metrics behind an expandable section');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /createReportChartSection/, 'Report charts should be wrapped in independent collapse sections');
 assert.match(options, /dataset\.reportChart = id/, 'Report chart sections should expose a collapse identity');
 assert.match(options, /wrapReportChartContent/, 'Report charts should be grouped after rendering');
 assert.match(options, /reportChartCollapsed/, 'Report chart collapse state should be tracked');
+assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap', 'tracker'\]\)/, 'Report chart sections should default to collapsed');
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
+assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
+assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
+assert.match(css, /\.report-details-collapse\s*>\s*summary/, 'Detailed project metrics should be expandable');
+assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/s,
+  'Report action cards should remain compact on narrow screens');
+assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-project-row\s*\{[^}]*grid-template-columns:/s,
+  'Report project rows should reflow on narrow screens');
 assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
 assert.match(options, /let reviewMode = 'calendar'/, 'Report should initialize the review in calendar mode');
 assert.doesNotMatch(options, /groups\.length\s*<=\s*7/, 'Calendar should remain available for ranges longer than one week');

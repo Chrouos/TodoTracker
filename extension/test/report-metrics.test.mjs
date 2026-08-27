@@ -4,6 +4,9 @@ import {
   overlapSeconds,
   buildReportQuality,
   buildProjectTaskMetrics,
+  buildProjectMetricChartData,
+  buildReportActionItems,
+  buildProjectHealthRows,
   compareSeconds,
 } from '../src/lib/report-metrics.js';
 
@@ -48,6 +51,10 @@ test('buildReportQuality counts unclassified, missing-note, and unlinked-task wo
     missingNotesCount: 2,
     unlinkedTaskSeconds: 3600,
     overdueTodoCount: 2,
+    overdueTaskIds: ['t1', 't2'],
+    unclassifiedEntryIds: ['unclassified'],
+    missingNotesEntryIds: ['unclassified', 'missing-note'],
+    unlinkedTaskEntryIds: ['missing-note'],
   });
 });
 
@@ -81,4 +88,84 @@ test('compareSeconds returns a safe percentage when the previous period is empty
     deltaSeconds: 3600,
     percent: null,
   });
+});
+
+test('buildProjectMetricChartData prepares comparable completion, work, and lead charts', () => {
+  const metrics = [
+    { projectId: 'slow', total: 4, done: 1, completionRate: 0.25, workedSeconds: 3600, averageLeadMs: 4 * 86400000 },
+    { projectId: 'fast', total: 8, done: 8, completionRate: 1, workedSeconds: 7200, averageLeadMs: 86400000 },
+    { projectId: null, total: 2, done: 0, completionRate: 0, workedSeconds: 0, averageLeadMs: null },
+  ];
+
+  assert.deepEqual(buildProjectMetricChartData(metrics), {
+    completion: [
+      { projectId: null, value: 0, percentage: 0 },
+      { projectId: 'slow', value: 0.25, percentage: 25 },
+      { projectId: 'fast', value: 1, percentage: 100 },
+    ],
+    worked: [
+      { projectId: 'fast', value: 7200, percentage: 100 },
+      { projectId: 'slow', value: 3600, percentage: 50 },
+    ],
+    lead: [
+      { projectId: 'slow', value: 4 * 86400000, percentage: 100 },
+      { projectId: 'fast', value: 86400000, percentage: 25 },
+    ],
+  });
+});
+
+test('buildReportQuality keeps entry ids for actionable data issues', () => {
+  const quality = buildReportQuality([
+    entry({ id: 'missing-note', projectId: 'p1', taskId: 't1' }),
+    entry({ id: 'unlinked', projectId: 'p1' }),
+    entry({ id: 'unclassified' }),
+  ], [], '2026-08-21');
+
+  assert.deepEqual(quality.missingNotesEntryIds, ['missing-note', 'unlinked', 'unclassified']);
+  assert.deepEqual(quality.unlinkedTaskEntryIds, ['unlinked']);
+  assert.deepEqual(quality.unclassifiedEntryIds, ['unclassified']);
+});
+
+test('buildReportActionItems puts actionable data issues before informational ones', () => {
+  assert.deepEqual(buildReportActionItems({
+    overdueTodoCount: 2,
+    unlinkedTaskSeconds: 3600,
+    unclassifiedSeconds: 900,
+    missingNotesCount: 1,
+  }), [
+    { kind: 'overdue', tone: 'danger', label: '逾期 Todo', value: 2 },
+    { kind: 'unlinked', tone: 'warning', label: '未綁定 Todo', value: 3600 },
+    { kind: 'unclassified', tone: 'warning', label: '未分類工時', value: 900 },
+    { kind: 'missing-notes', tone: 'muted', label: '未填寫工作備註', value: 1 },
+  ]);
+});
+
+test('buildReportActionItems returns a clear state when there is nothing to fix', () => {
+  assert.deepEqual(buildReportActionItems({
+    overdueTodoCount: 0,
+    unlinkedTaskSeconds: 0,
+    unclassifiedSeconds: 0,
+    missingNotesCount: 0,
+  }), [
+    { kind: 'clear', tone: 'success', label: '目前沒有待處理項目', value: 0 },
+  ]);
+});
+
+test('buildProjectHealthRows sorts projects by attention before workload', () => {
+  const metrics = [
+    { projectId: 'busy', total: 8, done: 7, completionRate: 0.875, overdue: 0, workedSeconds: 7200, averageLeadMs: 86400000 },
+    { projectId: 'late', total: 2, done: 1, completionRate: 0.5, overdue: 1, workedSeconds: 1800, averageLeadMs: 86400000 },
+    { projectId: 'slow', total: 4, done: 1, completionRate: 0.25, overdue: 0, workedSeconds: 3600, averageLeadMs: 8 * 86400000 },
+  ];
+
+  assert.deepEqual(buildProjectHealthRows(metrics).map((row) => ({
+    projectId: row.projectId,
+    status: row.status,
+    tone: row.tone,
+    remaining: row.remaining,
+  })), [
+    { projectId: 'late', status: '逾期', tone: 'danger', remaining: 1 },
+    { projectId: 'slow', status: '進度偏低', tone: 'warning', remaining: 3 },
+    { projectId: 'busy', status: '進行中', tone: 'muted', remaining: 1 },
+  ]);
 });

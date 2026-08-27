@@ -21,6 +21,20 @@ function isValidDate(date) {
   return date instanceof Date && !Number.isNaN(date.getTime());
 }
 
+export function syncTodoTrackerCollapseState(collapsedIds = new Set(), knownIds = new Set(), items = []) {
+  const nextCollapsedIds = new Set(collapsedIds);
+  const nextKnownIds = new Set(items.map((item) => item.id));
+
+  for (const id of nextKnownIds) {
+    if (!knownIds.has(id)) nextCollapsedIds.add(id);
+  }
+  for (const id of knownIds) {
+    if (!nextKnownIds.has(id)) nextCollapsedIds.delete(id);
+  }
+
+  return { collapsedIds: nextCollapsedIds, knownIds: nextKnownIds };
+}
+
 export function countCompletedToday(tasks = [], now = new Date()) {
   const nowDate = new Date(now);
   if (!isValidDate(nowDate)) return 0;

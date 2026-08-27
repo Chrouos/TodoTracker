@@ -17,8 +17,19 @@ import {
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
-import { buildTodoTrackerData } from '../lib/todo-tracker.js';
-import { buildProjectTaskMetrics, buildReportQuality } from '../lib/report-metrics.js';
+import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
+import {
+  clearReportFocus,
+  hasReportFocus,
+  reportActionTarget,
+  setReportFocus,
+} from '../lib/report-navigation.js';
+import {
+  buildProjectTaskMetrics,
+  buildProjectHealthRows,
+  buildReportActionItems,
+  buildReportQuality,
+} from '../lib/report-metrics.js';
 import {
   mountMarkdownEditor,
   normalizeMarkdownEditorMode,
@@ -710,7 +721,7 @@ let highlightProjectId = null;
 
 let projectTrendState = null;
 let projectTrendSource = null;
-let reportChartCollapsed = new Set();
+let reportChartCollapsed = new Set(['trend', 'heatmap', 'tracker']);
 let todoTrackerState = null;
 let todoTrackerSource = null;
 let todoTrackerSelectedId = null;
@@ -719,6 +730,8 @@ let todoTrackerViewStart = null;
 let todoTrackerRefreshTimer = null;
 let todoTrackerHoveredTarget = null;
 let todoTrackerCollapsedIds = new Set();
+let todoTrackerKnownIds = new Set();
+let todoFocusId = null;
 
 function sameTrendProject(left, right) {
   return (left || null) === (right || null);
@@ -855,6 +868,71 @@ function renderReportInsights(rows) {
   if (!mount) return;
   const quality = buildReportQuality(S.entries.filter((entry) => rows.includes(entry)), S.tasks, fmtDate(new Date().toISOString()));
   const metrics = buildProjectTaskMetrics(S.tasks, rows, fmtDate(new Date().toISOString()));
+  const actionItems = buildReportActionItems(quality);
+  const healthRows = buildProjectHealthRows(metrics);
+  const projectLabel = (projectId) => {
+    const project = projectId && S.projects.find((item) => item.id === projectId);
+    return project ? pathOf(S.projects, project.id).join(' / ') : '未分類';
+  };
+  const actionValue = (item) => {
+    if (item.kind === 'overdue') return `${item.value} 個`;
+    if (item.kind === 'missing-notes') return `${item.value} 筆`;
+    if (item.kind === 'clear') return '✓';
+    return fmtHM(item.value);
+  };
+  const issueEntryIds = {
+    unlinked: quality.unlinkedTaskEntryIds,
+    unclassified: quality.unclassifiedEntryIds,
+    'missing-notes': quality.missingNotesEntryIds,
+  };
+  const actionDetails = (item) => {
+    const target = reportActionTarget(item.kind);
+    const ids = target?.type === 'entry'
+      ? issueEntryIds[item.kind]
+      : target?.type === 'todo' ? quality.overdueTaskIds : null;
+    if (!ids?.length) return '';
+    const details = target.type === 'entry'
+      ? rows.filter((entry) => ids.includes(entry.id)).slice(0, 2).map((entry) =>
+        `<button type="button" class="report-action-detail" data-report-entry-id="${esc(entry.id)}">${esc(entry.description || '未命名工作')} · ${esc(fmtDate(entry.startedAt))} · ${esc(fmtHM(db.durationSec(entry)))}</button>`
+      ).join('')
+      : ids.map((id) => S.tasks.find((task) => task.id === id)).filter(Boolean).slice(0, 2).map((task) =>
+        `<button type="button" class="report-action-detail" data-report-task-id="${esc(task.id)}">${esc(task.title)} · 截止 ${esc(task.dueDate || '未設定')}</button>`
+      ).join('');
+    const matchingCount = target.type === 'entry'
+      ? rows.filter((entry) => ids.includes(entry.id)).length
+      : ids.filter((id) => S.tasks.some((task) => task.id === id)).length;
+    const rest = matchingCount - Math.min(2, matchingCount);
+    return details + (rest > 0 ? `<div>另有 ${rest} 筆</div>` : '');
+  };
+  const statusItem = actionItems[0];
+  const statusLabel = statusItem.kind === 'clear'
+    ? '狀態良好'
+    : statusItem.tone === 'danger' ? '需要處理' : '有待整理';
+  const statusDetail = statusItem.kind === 'clear'
+    ? '目前沒有逾期或未整理的資料'
+    : `最優先：${statusItem.label}`;
+  const actionMarkup = actionItems.map((item) => `
+    <div class="report-action report-action-${item.tone}">
+      <span class="report-action-label">${esc(item.label)}</span>
+      <strong>${esc(actionValue(item))}</strong>
+      <span class="report-action-hint">${item.kind === 'clear' ? '可以繼續工作' : '建議整理'}</span>
+      ${actionDetails(item) ? `<div class="report-action-details">${actionDetails(item)}</div>` : ''}
+    </div>`).join('');
+  const projectMarkup = healthRows.length
+    ? healthRows.map((row) => {
+      const label = projectLabel(row.projectId);
+      const percentage = Math.round(Math.max(0, Math.min(1, row.completionRate)) * 100);
+      return `<div class="report-project-row">
+        <div class="report-project-name" title="${esc(label)}">${esc(label)}</div>
+        <span class="report-project-status report-project-status-${row.tone}">${esc(row.status)}</span>
+        <div class="report-project-progress">
+          <span class="report-project-track"><span style="--bar-width:${percentage}%"></span></span>
+          <span class="report-project-count num">${row.done} / ${row.total}</span>
+        </div>
+        <span class="report-project-work num">${fmtHM(row.workedSeconds)}</span>
+      </div>`;
+    }).join('')
+    : '<div class="report-empty">目前沒有 Todo 績效資料</div>';
   const metricRows = metrics.slice(0, 8).map((metric) => {
     const project = metric.projectId && S.projects.find((item) => item.id === metric.projectId);
     return `<tr>
@@ -866,16 +944,28 @@ function renderReportInsights(rows) {
       <td>${metric.averageLeadMs === null ? '—' : fmtHM(metric.averageLeadMs / 1000)}</td>
     </tr>`;
   }).join('');
-  mount.innerHTML = `<div class="report-insights-grid">
-    <div><span class="cap">未分類工時</span><strong>${fmtHM(quality.unclassifiedSeconds)}</strong></div>
-    <div><span class="cap">沒有 notes</span><strong>${quality.missingNotesCount} 筆</strong></div>
-    <div><span class="cap">未綁定 Todo</span><strong>${fmtHM(quality.unlinkedTaskSeconds)}</strong></div>
-    <div class="report-warning"><span class="cap">逾期 Todo</span><strong>${quality.overdueTodoCount}</strong></div>
+  mount.innerHTML = `<div class="report-status">
+    <div>
+      <span class="cap">工作區狀態</span>
+      <strong class="report-status-label report-status-${statusItem.tone}">${statusLabel}</strong>
+    </div>
+    <span class="report-status-detail">${statusDetail}</span>
   </div>
-  <div class="report-metrics-table-wrap">
-    <table class="report-metrics-table"><thead><tr><th>專案</th><th>Todo</th><th>完成率</th><th>逾期</th><th>實際工時</th><th>平均完成週期</th></tr></thead>
-    <tbody>${metricRows || '<tr><td colspan="6" class="mute">目前沒有 Todo 績效資料</td></tr>'}</tbody></table>
-  </div>`;
+  <section class="report-attention" aria-label="需要注意">
+    <div class="report-section-heading"><strong>需要注意</strong><span class="cap">先處理上面的項目</span></div>
+    <div class="report-action-grid">${actionMarkup}</div>
+  </section>
+  <section class="report-projects" aria-label="專案狀況">
+    <div class="report-section-heading"><strong>專案狀況</strong><span class="cap">按需處理程度排序 · 完成 / 總數 · 工時</span></div>
+    <div class="report-project-list">${projectMarkup}</div>
+  </section>
+  <details class="report-details-collapse">
+    <summary><span class="mark">[+]</span><span>查看完整專案報表</span></summary>
+    <div class="report-metrics-table-wrap">
+      <table class="report-metrics-table"><thead><tr><th>專案</th><th>Todo</th><th>完成率</th><th>逾期</th><th>實際工時</th><th>平均完成週期</th></tr></thead>
+      <tbody>${metricRows || '<tr><td colspan="6" class="mute">目前沒有 Todo 績效資料</td></tr>'}</tbody></table>
+    </div>
+  </details>`;
 }
 
 function todoTrackerColor(project) {
@@ -1038,9 +1128,12 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       dates: trackerDates,
       now: new Date(),
       durationSec: db.durationSec,
-    });
+  });
   todoTrackerState = data;
   todoTrackerSource = { entries };
+  const collapseState = syncTodoTrackerCollapseState(todoTrackerCollapsedIds, todoTrackerKnownIds, data.items);
+  todoTrackerCollapsedIds = collapseState.collapsedIds;
+  todoTrackerKnownIds = collapseState.knownIds;
   const visibleDays = todoTrackerVisibleDays(mount, data.dates.length);
   if (todoTrackerViewStart === null) todoTrackerViewStart = todoTrackerDefaultStart(data.dates, visibleDays);
   todoTrackerViewStart = Math.max(0, Math.min(data.dates.length - visibleDays, todoTrackerViewStart));
@@ -1638,6 +1731,7 @@ function renderTodos() {
     priority: keepPriorityFilter,
     status: statusFilter,
   })
+    .filter((task) => !todoFocusId || task.id === todoFocusId)
     .sort((a, b) =>
       Number(a.status === 'done') - Number(b.status === 'done')
       || ({ urgent: 0, high: 1, normal: 2, low: 3 }[a.priority || 'normal'] - { urgent: 0, high: 1, normal: 2, low: 3 }[b.priority || 'normal'])
@@ -1676,7 +1770,7 @@ function renderTodos() {
         ].join(' · ');
 
         return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>` : ''}
-        <div class="row-item todo-card task-item activity-row priority-${t.priority || 'normal'}${done ? ' done' : ''}" style="--task-depth:${t.depth}">
+        <div class="row-item todo-card task-item activity-row priority-${t.priority || 'normal'}${done ? ' done' : ''}" data-todo-id="${esc(t.id)}" style="--task-depth:${t.depth}">
           ${t.depth ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
           <button class="btn-sm btn-ghost activity-status" data-check="${t.id}"
             title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
@@ -1746,9 +1840,9 @@ $('todoForm').addEventListener('submit', async (e) => {
 
 $('tdCancel').addEventListener('click', resetTodoForm);
 $('tdProject').addEventListener('change', renderTodos);
-$('tdFilter').addEventListener('change', renderTodos);
-$('tdStatusFilter').addEventListener('change', renderTodos);
-$('tdPriorityFilter').addEventListener('change', renderTodos);
+$('tdFilter').addEventListener('change', () => { clearFocusedReportTarget(); renderTodos(); });
+$('tdStatusFilter').addEventListener('change', () => { clearFocusedReportTarget(); renderTodos(); });
+$('tdPriorityFilter').addEventListener('change', () => { clearFocusedReportTarget(); renderTodos(); });
 
 $('todoList').addEventListener('click', async (e) => {
   const check = e.target.closest('[data-check]')?.dataset.check;
@@ -1964,7 +2058,7 @@ $('tagList').addEventListener('click', async (e) => {
 
 /* ---------------- 紀錄 ---------------- */
 /* 紀錄分頁的篩選狀態 */
-const enUI = { q: '', projectId: '', range: 'all', limit: 50, expanded: new Set(), allOpen: false };
+const enUI = { q: '', projectId: '', range: 'all', limit: 50, expanded: new Set(), allOpen: false, focusId: null };
 
 /** 套用搜尋 / 專案 / 區間之後的紀錄，新的在前 */
 function filteredEntries() {
@@ -1988,6 +2082,7 @@ function filteredEntries() {
     .filter((e) => !to || new Date(e.startedAt) < to)
     .filter((e) => !scope || (e.projectId && scope.has(e.projectId)))
     .filter((e) => !kw || `${e.description} ${e.notes || ''}`.toLowerCase().includes(kw))
+    .filter((e) => !enUI.focusId || e.id === enUI.focusId)
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
@@ -2029,7 +2124,7 @@ function renderEntries() {
             const notes = e.notes || '';
             // 太長的工作紀錄預設收起來，不然一筆就吃掉整個畫面
             
-            return `<div class="row-item activity-row entry-row">
+            return `<div class="row-item activity-row entry-row" data-entry-id="${esc(e.id)}">
               <span class="activity-time num mute">
                 ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</span>
               <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
@@ -2059,14 +2154,17 @@ function renderEntries() {
 
 /* 篩選事件 */
 $('enSearch').addEventListener('input', (e) => {
+  clearFocusedReportTarget();
   enUI.q = e.target.value; enUI.limit = 50; renderEntries();
 });
 $('enFilter').addEventListener('change', (e) => {
+  clearFocusedReportTarget();
   enUI.projectId = e.target.value; enUI.limit = 50; renderEntries();
 });
 $('enRange').addEventListener('click', (e) => {
   const r = e.target.dataset.erange;
   if (!r) return;
+  clearFocusedReportTarget();
   if (r === 'back') { closeCustomRange(); return; }
   if (r === 'custom') { openCustomRange(); return; }
   enUI.range = r; enUI.limit = 50;
@@ -2074,14 +2172,15 @@ $('enRange').addEventListener('click', (e) => {
   syncRangeControls();
   renderEntries();
 });
-$('entriesApplyRange').addEventListener('click', () => applyCustomRange('entries'));
+$('entriesApplyRange').addEventListener('click', () => { clearFocusedReportTarget(); applyCustomRange('entries'); });
 $('enExpandAll').addEventListener('click', () => {
+  clearFocusedReportTarget();
   enUI.allOpen = !enUI.allOpen;
   enUI.expanded.clear();
   renderEntries();
 });
 $('entryMore').addEventListener('click', (e) => {
-  if (e.target.id === 'enMore') { enUI.limit += 50; renderEntries(); }
+  if (e.target.id === 'enMore') { clearFocusedReportTarget(); enUI.limit += 50; renderEntries(); }
 });
 
 $('entryList').addEventListener('click', async (e) => {
@@ -2240,13 +2339,73 @@ $('wipe').addEventListener('click', async () => {
 });
 
 /* ---------------- 分頁 / 區間 ---------------- */
-$('tabs').addEventListener('click', (e) => {
-  const name = e.target.dataset.tab;
+function clearFocusedReportTarget() {
+  const next = clearReportFocus({ entryId: enUI.focusId, todoId: todoFocusId });
+  enUI.focusId = next.entryId;
+  todoFocusId = next.todoId;
+}
+
+function selectTab(name, preserveFocus = false) {
   if (!name) return;
+  if (!preserveFocus) {
+    const hadFocusedTarget = hasReportFocus({ entryId: enUI.focusId, todoId: todoFocusId });
+    clearFocusedReportTarget();
+    if (hadFocusedTarget) { renderEntries(); renderTodos(); }
+  }
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   ['report', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
+}
+
+function focusReportEntry(id) {
+  const entry = S.entries.find((item) => item.id === id);
+  if (!entry) return;
+  const next = setReportFocus({ entryId: enUI.focusId, todoId: todoFocusId }, 'entry', id);
+  enUI.focusId = next.entryId;
+  todoFocusId = next.todoId;
+  enUI.q = '';
+  enUI.projectId = '';
+  enUI.range = 'all';
+  $('enSearch').value = '';
+  $('enFilter').value = '';
+  customRangeOpen = false;
+  syncRangeControls();
+  selectTab('entries', true);
+  renderEntries();
+  requestAnimationFrame(() => {
+    const row = [...document.querySelectorAll('#entryList [data-entry-id]')]
+      .find((item) => item.dataset.entryId === id);
+    row?.classList.add('report-focus');
+    row?.scrollIntoView({ block: 'center' });
+  });
+}
+
+function focusReportTodo(id) {
+  const task = S.tasks.find((item) => item.id === id);
+  if (!task) return;
+  const next = setReportFocus({ entryId: enUI.focusId, todoId: todoFocusId }, 'todo', id);
+  enUI.focusId = next.entryId;
+  todoFocusId = next.todoId;
+  $('tdFilter').value = '';
+  $('tdStatusFilter').value = 'active';
+  $('tdPriorityFilter').value = '';
+  selectTab('todos', true);
+  renderTodos();
+  requestAnimationFrame(() => {
+    const row = [...document.querySelectorAll('#todoList [data-todo-id]')]
+      .find((item) => item.dataset.todoId === id);
+    row?.classList.add('report-focus');
+    row?.scrollIntoView({ block: 'center' });
+  });
+}
+
+$('tabs').addEventListener('click', (e) => selectTab(e.target.dataset.tab));
+$('reportInsights').addEventListener('click', (e) => {
+  const entryId = e.target.closest('[data-report-entry-id]')?.dataset.reportEntryId;
+  if (entryId) { focusReportEntry(entryId); return; }
+  const taskId = e.target.closest('[data-report-task-id]')?.dataset.reportTaskId;
+  if (taskId) focusReportTodo(taskId);
 });
 
 $('range').addEventListener('click', (e) => {
