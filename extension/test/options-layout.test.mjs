@@ -41,6 +41,15 @@ assert.match(options, /from ['"]\.\.\/lib\/i18n\.js['"]/, 'Options should import
 assert.match(options, /applyTranslations/, 'Options should apply static translations');
 assert.match(options, /language:\s*normalizeLanguagePreference/, 'Options should persist the normalized language preference');
 assert.match(db, /language:\s*'auto'/, 'Settings should default to the automatic browser language');
+assert.match(options, /formatDuration/, 'Options should use the shared duration formatter');
+for (const key of [
+  'report.completed', 'todo.noTodos', 'schedule.noSchedules', 'entry.noEntries', 'common.confirmDelete',
+]) {
+  assert.match(options, new RegExp(`translate\\(currentLocale, ['"]${key}['"]`), `Options should translate ${key}`);
+}
+for (const key of ['nav.report', 'nav.projects', 'nav.todos', 'nav.settings', 'common.save']) {
+  assert.match(html, new RegExp(`data-i18n="${key}"`), `Options markup should mark ${key}`);
+}
 assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selection should update the project selector');
 assert.match(options, /tasksForProject/, 'Manual entry Todo options should use the selected project');
 assert.match(options, /sortTasksForManualEntry/, 'Manual entry Todo options should prioritize recent activity');

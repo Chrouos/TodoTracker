@@ -10,19 +10,19 @@
 <div id="initialLoading" class="initial-loading" data-i18n="app.loading">載入中…</div>
 <div class="wrap">
   <header>
-    <h1>TodoTracker</h1>
+    <h1 data-i18n="app.name">TodoTracker</h1>
     <p class="cap">本機時間追蹤 · 資料存在這台瀏覽器</p>
   </header>
 
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="report">報表</button>
-    <button class="tab" data-tab="timer">計時</button>
-    <button class="tab" data-tab="projects">專案</button>
-    <button class="tab" data-tab="todos">Todo</button>
-    <button class="tab" data-tab="entries">紀錄</button>
-    <button class="tab" data-tab="schedules">排程</button>
-    <button class="tab" data-tab="tags">標籤</button>
-    <button class="tab" data-tab="settings">設定</button>
+    <button class="tab active" data-tab="report" data-i18n="nav.report">報表</button>
+    <button class="tab" data-tab="timer" data-i18n="timer.running">計時</button>
+    <button class="tab" data-tab="projects" data-i18n="nav.projects">專案</button>
+    <button class="tab" data-tab="todos" data-i18n="nav.todos">Todo</button>
+    <button class="tab" data-tab="entries" data-i18n="nav.entries">紀錄</button>
+    <button class="tab" data-tab="schedules" data-i18n="nav.schedules">排程</button>
+    <button class="tab" data-tab="tags" data-i18n="nav.tags">標籤</button>
+    <button class="tab" data-tab="settings" data-i18n="nav.settings">設定</button>
   </nav>
 
   <section id="p-timer" hidden>
@@ -403,7 +403,7 @@
           <span class="hint">工具列會幫你插入粗體、斜體、標題、清單等 Markdown；資料仍以 Markdown 儲存。</span>
         </label>
       </div>
-      <div class="actions"><button id="saveSettings" class="btn-primary">儲存設定</button></div>
+      <div class="actions"><button id="saveSettings" class="btn-primary" data-i18n="common.save">儲存設定</button></div>
     </div>
 
     <h2 class="sec" data-collapse="set-data"><span class="mark">[-]</span> 資料</h2>

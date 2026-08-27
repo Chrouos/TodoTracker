@@ -1,13 +1,19 @@
 import * as db from '../lib/db.js';
 import {
   applyTranslations,
+  formatDisplayDate,
+  formatDisplayTime,
+  formatDuration,
   getBrowserLocale,
+  formatDisplayDate,
+  formatDisplayTime,
+  formatDuration,
   normalizeLanguagePreference,
   resolveLocale,
   translate,
 } from '../lib/i18n.js';
 import {
-  fmtHM, fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
+  fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
   dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
 } from '../lib/time.js';
 import { timelineSVG, stackedAreaSVG, heatmapSVG } from '../lib/charts.js';
@@ -51,6 +57,14 @@ autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const t = (key, variables) => translate(currentLocale, key, variables);
+const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
+const displayDate = (value) => formatDisplayDate(value, currentLocale);
+const displayClock = (value) => formatDisplayTime(value, currentLocale);
+const t = (key, variables) => translate(currentLocale, key, variables);
+const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
+const displayDate = (value) => formatDisplayDate(value, currentLocale);
+const displayClock = (value) => formatDisplayTime(value, currentLocale);
 
 function renderMarkdownPreview(markdown, className = '', { interactiveTasks = false, inputId = '' } = {}) {
   return `<div class="${className} markdown-preview" data-markdown-preview${inputId ? ` data-markdown-preview-input="${inputId}"` : ''}>
@@ -705,6 +719,9 @@ function renderReviewList(groups) {
 function renderTodoHealth() {
   const health = todoHealth(S.tasks);
   const completionRate = health.total ? `${Math.round(health.completionRate * 100)}%` : '—';
+  const completedLabel = translate(currentLocale, 'report.completed');
+  const activeLabel = translate(currentLocale, 'report.inProgress');
+  const overdueLabel = translate(currentLocale, 'report.overdue');
 
   $('todoHealth').innerHTML = `<div class="todo-health">
     <div class="todo-health-item">
@@ -712,15 +729,15 @@ function renderTodoHealth() {
       <span class="num">${health.total}</span>
     </div>
     <div class="todo-health-item todo-health-complete">
-      <span class="cap">已完成</span>
+      <span class="cap">${completedLabel}</span>
       <span class="num">${health.done}<small>${completionRate}</small></span>
     </div>
     <div class="todo-health-item">
-      <span class="cap">進行中</span>
+      <span class="cap">${activeLabel}</span>
       <span class="num">${health.active}</span>
     </div>
     <div class="todo-health-item todo-health-overdue">
-      <span class="cap">逾期未完成</span>
+      <span class="cap">${overdueLabel}</span>
       <span class="num">${health.overdue}</span>
     </div>
   </div>`;
@@ -1139,7 +1156,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       dates: trackerDates,
       now: new Date(),
       durationSec: db.durationSec,
-  });
+  }, currentLocale);
   todoTrackerState = data;
   todoTrackerSource = { entries };
   const collapseState = syncTodoTrackerCollapseState(todoTrackerCollapsedIds, todoTrackerKnownIds, data.items);
@@ -1245,7 +1262,7 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
 
   $('byProject').innerHTML = `<div class="project-trend-wrap">
     <div class="project-trend-toolbar"><span class="mute">全部專案</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
-    <div id="projectTrend">${stackedAreaSVG(data)}</div>
+    <div id="projectTrend">${stackedAreaSVG(data, currentLocale)}</div>
     <div id="projectTrendTooltip" class="project-trend-tooltip"></div>
     <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
     <div class="project-heatmap-title">專案 × 日期</div>
@@ -1657,7 +1674,8 @@ $('projList').addEventListener('click', async (e) => {
     await db.upsertProject({ ...p, archivedAt: p.archivedAt ? null : new Date().toISOString() });
     await load();
   } else if (dl) {
-    if (!confirm('刪除專案？既有紀錄會保留但變成「未分類」，該專案的 todo 會一併刪除。')) return;
+    const project = S.projects.find((item) => item.id === dl);
+    if (!confirm(translate(currentLocale, 'common.confirmDelete', { name: project?.name || 'project' }))) return;
     await db.deleteProject(dl);
     await load();
   }
@@ -1691,13 +1709,14 @@ function flattenTodoTree(tasks) {
 }
 
 function renderTodos() {
+  const noTodosLabel = translate(currentLocale, 'todo.noTodos');
   const tree = flattenTree(S.projects);
   const opts = (blank) => `<option value="">${blank}</option>` +
     tree.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   const priorityOpts = (blank = null) => (blank === null ? '' : `<option value="">${blank}</option>`) +
-    TODO_PRIORITIES.map((p) => `<option value="${p.value}">${p.label}</option>`).join('');
+    TODO_PRIORITIES.map((p) => `<option value="${p.value}">${priorityLabel(p.value, currentLocale)}</option>`).join('');
   const statusOpts = TODO_STATUSES
-    .map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+    .map((item) => `<option value="${item.value}">${statusLabel(item.value, currentLocale)}</option>`).join('');
 
   const keepP = $('tdProject').value;
   $('tdProject').innerHTML = opts('— 未分類 —');
@@ -1753,7 +1772,7 @@ function renderTodos() {
     flattenTodoTree(list.filter((task) => task.projectId === project.id))
   ).concat(flattenTodoTree(list.filter((task) => !task.projectId)));
 
-  $('tdCount').textContent = taskCountLabel(list, statusFilter === 'all', statusFilter);
+  $('tdCount').textContent = taskCountLabel(list, statusFilter === 'all', statusFilter, currentLocale);
 
   $('todoList').innerHTML = list.length
     ? orderedTasks.map((t, index) => {
@@ -1763,7 +1782,7 @@ function renderTodos() {
         const done = t.status === 'done';
         const m = taskMetrics(t, S.entries);
         const workEntries = entriesForTask(t, S.entries);
-        const dl = dueLabel(m, done);
+        const dl = dueLabel(m, done, currentLocale);
         let taskDepth = 0;
         let parent = t.parentId ? S.tasks.find((item) => item.id === t.parentId) : null;
         const seenParents = new Set();
@@ -1775,9 +1794,9 @@ function renderTodos() {
 
         // 三個時間排成一行，缺的用 — 佔位
         const dates = [
-          `開單 ${stampLabel(t.openedAt)}`,
+          `開單 ${stampLabel(t.openedAt, currentLocale)}`,
           `截止 ${t.dueDate ? t.dueDate + (t.dueTime ? ` ${t.dueTime}` : '') : '—'}`,
-          `結案 ${stampLabel(t.completedAt)}`,
+          `結案 ${stampLabel(t.completedAt, currentLocale)}`,
         ].join(' · ');
 
         return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>` : ''}
@@ -1788,11 +1807,11 @@ function renderTodos() {
           <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
-              <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority)}</span>
+              <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>
               ${t.scheduleId ? '<span class="badge" title="由排程自動產生">排程</span>' : ''}
               ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
-              ${m.leadMs !== null ? `<span class="badge">歷時 ${leadLabel(m.leadMs)}</span>` : ''}
+              ${m.leadMs !== null ? `<span class="badge">${t('summary.lead', { duration: leadLabel(m.leadMs, currentLocale) })}</span>` : ''}
               ${t.reopenCount ? `<span class="badge">重開 ${t.reopenCount} 次</span>` : ''}
             </div>
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
@@ -1888,8 +1907,8 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdPriority').value = normalizePriority(t.priority);
     $('tdDue').value = t.dueDate || '';
     $('tdDueTime').value = t.dueTime || '';
-    $('tdOpened').value = stampLabel(t.openedAt);
-    $('tdDone').value = stampLabel(t.completedAt);
+    $('tdOpened').value = stampLabel(t.openedAt, currentLocale);
+    $('tdDone').value = stampLabel(t.completedAt, currentLocale);
     const m = taskMetrics(t, S.entries);
     $('tdWorked').value = m.worked ? fmtHM(m.worked) : '—';
     $('tdCancel').hidden = false; $('tdTitle').focus();
@@ -1923,6 +1942,7 @@ function dowLabel(days) {
 }
 
 function renderSchedules() {
+  const noSchedulesLabel = translate(currentLocale, 'schedule.noSchedules');
   const keep = $('scProject').value;
   $('scProject').innerHTML = '<option value="">— 未分類 —</option>' +
     flattenTree(S.projects).map((p) =>
@@ -1946,7 +1966,7 @@ function renderSchedules() {
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(s.title)}
-              <span class="badge priority-${priority}">${priorityLabel(priority)}</span>
+              <span class="badge priority-${priority}">${priorityLabel(priority, currentLocale)}</span>
               ${s.enabled ? '' : '<span class="badge">已停用</span>'}</div>
             <div class="sub num">${bits}</div>
             <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}${
@@ -1959,7 +1979,7 @@ function renderSchedules() {
           </div>
         </div>`;
       }).join('')
-    : '<div class="empty">還沒有排程</div>';
+    : `<div class="empty">${noSchedulesLabel}</div>`;
 }
 
 function resetSchForm() {
@@ -2098,6 +2118,7 @@ function filteredEntries() {
 }
 
 function renderEntries() {
+  const noEntriesLabel = translate(currentLocale, 'entry.noEntries');
   // 專案下拉
   const keep = $('enFilter').value;
   $('enFilter').innerHTML = '<option value="">— 全部專案 —</option>' +
@@ -2155,7 +2176,7 @@ function renderEntries() {
           }).join('')}
         </div>`;
       }).join('')
-    : `<div class="empty">${S.entries.length ? '這個條件下沒有紀錄' : '還沒有紀錄'}</div>`;
+    : `<div class="empty">${S.entries.length ? '這個條件下沒有紀錄' : noEntriesLabel}</div>`;
 
   initializeMarkdownPreviews($('entryList'));
   $('entryMore').innerHTML = rows.length > enUI.limit
@@ -2209,7 +2230,7 @@ $('entryList').addEventListener('click', async (e) => {
 
 /* 一鍵複製 Markdown 總結 */
 async function copySummary(btn, dates) {
-  const md = buildSummary({ dates, entries: S.entries, projects: S.projects, tasks: S.tasks });
+  const md = buildSummary({ dates, entries: S.entries, projects: S.projects, tasks: S.tasks, locale: currentLocale });
   const label = btn.textContent;
   if (!md) btn.textContent = '沒有紀錄';
   else btn.textContent = (await copyToClipboard(md)) ? '已複製 ✓' : '複製失敗';

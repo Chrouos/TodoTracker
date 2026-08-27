@@ -74,7 +74,7 @@ ${formatDisplayTime(b.entry.startedAt, locale)}–${formatDisplayTime(b.entry.en
 }
 
 function trendEmpty(locale = 'zh-TW') {
-  return `<div class="empty">${translate(locale, 'common.noData')}</div>`;
+  return `<div class="empty">${translate(locale, 'chart.empty')}</div>`;
 }
 
 function trendY(seconds, maxSeconds, top, height) {
