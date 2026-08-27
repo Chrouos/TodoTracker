@@ -6,10 +6,11 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <div id="initialLoading" class="initial-loading" data-i18n="app.loading">載入中…</div>
   <header id="top">
     <span class="h">TodoTracker</span>
     <span class="grow"></span>
-    <button id="copyToday" class="btn-ghost btn-sm" title="複製今日總結（Markdown）">[複製今日]</button>
+    <button id="copyToday" class="btn-ghost btn-sm" data-i18n="popup.copySummary" data-i18n-title="popup.copySummary">[複製今日]</button>
     <button id="openOptions" class="btn-ghost btn-sm" title="管理與報表">[管理]</button>
   </header>
 
@@ -17,7 +18,7 @@
   <section id="panel">
     <div id="clock" class="num">00:00:00</div>
     <div id="ctx" class="ctx">未計時</div>
-    <button id="toggle" class="btn-primary" data-state="idle">[&gt;] 開始計時</button>
+    <button id="toggle" class="btn-primary" data-state="idle"><span data-i18n="timer.start">開始計時</span></button>
   </section>
 
   <!-- 停止計時後補寫工作紀錄 -->
@@ -38,8 +39,8 @@
   </div>
 
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="track">計時</button>
-    <button class="tab" data-tab="todo">Todo</button>
+    <button class="tab active" data-tab="track" data-i18n="popup.track">計時</button>
+    <button class="tab" data-tab="todo" data-i18n="popup.todo">Todo</button>
   </nav>
 
   <!-- ── 計時分頁 ── -->

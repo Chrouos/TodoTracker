@@ -6,9 +6,17 @@ import { autoGrow } from '../lib/autogrow.js';
 // popup 空間有限，上限拉到 260px，超過才捲
 const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 260 });
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
-import { fmtHMS, fmtHM, fmtClock, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
+import { fmtHMS, fmtClock, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { filterTasks, normalizePriority, normalizeStatus, priorityLabel } from '../lib/todo-filter.js';
+import {
+  applyTranslations,
+  formatDisplayTime,
+  formatDuration,
+  getBrowserLocale,
+  resolveLocale,
+  translate,
+} from '../lib/i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,6 +25,7 @@ let state = {
   entries: [], draft: { projectId: null, taskId: null, description: '', tagIds: [] },
 };
 let ticker = null;
+let currentLocale = 'zh-TW';
 /** 剛停止、還沒補工作紀錄的那筆 entry id */
 let pendingLogId = null;
 let todoAdvancedOpen = false;
@@ -36,7 +45,10 @@ async function load() {
     getDraft(),
   ]);
   state = { projects, tags, tasks, timer, settings, entries, draft };
+  currentLocale = resolveLocale(settings.language, getBrowserLocale());
+  applyTranslations(document, currentLocale);
   render();
+  $('initialLoading').hidden = true;
 }
 
 /* ---------------- 目前正在編輯的那組欄位 ---------------- */
@@ -70,13 +82,13 @@ function renderPanel() {
 
   if (state.timer) {
     btn.dataset.state = 'running';
-    btn.textContent = '[x] 停止';
-    $('ctx').textContent = [p ? p.name : '未分類', c.description || '（無描述）'].join(' · ');
+    btn.textContent = `[x] ${translate(currentLocale, 'timer.stop')}`;
+    $('ctx').textContent = [p ? p.name : translate(currentLocale, 'project.uncategorized'), c.description || '（無描述）'].join(' · ');
     startTicking();
   } else {
     btn.dataset.state = 'idle';
-    btn.textContent = '[>] 開始計時';
-    $('ctx').textContent = '未計時';
+    btn.textContent = `[>] ${translate(currentLocale, 'timer.start')}`;
+    $('ctx').textContent = translate(currentLocale, 'common.none');
     stopTicking();
     $('clock').textContent = '00:00:00';
   }
@@ -101,7 +113,7 @@ function renderLog() {
   box.hidden = false;
   const p = state.projects.find((x) => x.id === e.projectId);
   $('logMeta').textContent =
-    `${p ? p.name : '未分類'} · ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)} · ${fmtHM(db.durationSec(e))}`;
+    `${p ? p.name : translate(currentLocale, 'project.uncategorized')} · ${formatDisplayTime(e.startedAt, currentLocale)}–${formatDisplayTime(e.endedAt, currentLocale)} · ${fmtHM(db.durationSec(e))}`;
   if ($('logText') !== document.activeElement) {
     $('logText').value = e.notes || '';
     growLog();
@@ -115,7 +127,7 @@ function renderIdle() {
   const sec = (Date.now() - new Date(t.idleSince).getTime()) / 1000;
   if (sec < 60) { bar.hidden = true; return; }
   bar.hidden = false;
-  $('idleText').textContent = `偵測到閒置 ${fmtHM(sec)}`;
+  $('idleText').textContent = `${translate(currentLocale, 'timer.idle')} · ${fmtHM(sec)}`;
 }
 
 function renderFields() {
@@ -151,7 +163,7 @@ function renderFields() {
     ? state.tags.map((t) =>
         `<button class="tagchip ${tagIds.includes(t.id) ? 'on' : ''}" data-tag="${t.id}">${esc(t.name)}</button>`
       ).join('')
-    : '<span class="cap">還沒有標籤，可在 [管理] 新增</span>';
+    : `<span class="cap">${translate(currentLocale, 'popup.emptyTags')}</span>`;
 }
 
 function renderStats() {
@@ -183,7 +195,7 @@ function renderRecent() {
           <button class="btn-ghost btn-sm act" data-resume="${e.id}" title="用同樣設定再開始">[&gt;]</button>
         </div>`;
       }).join('')
-    : '<div class="empty">本週還沒有紀錄</div>';
+    : `<div class="empty">${translate(currentLocale, 'popup.noRecentEntries')}</div>`;
 }
 
 function renderTodo() {
@@ -222,7 +234,9 @@ function renderTodo() {
 
   $('todoAdvanced').hidden = !todoAdvancedOpen;
   $('todoMore').setAttribute('aria-expanded', String(todoAdvancedOpen));
-  $('todoMore').textContent = todoAdvancedOpen ? '[-] 收合設定' : '[+] 詳細設定';
+  $('todoMore').textContent = todoAdvancedOpen
+    ? `[-] ${translate(currentLocale, 'common.close')}`
+    : `[+] ${translate(currentLocale, 'popup.advanced')}`;
 
   const filter = filterSelect.value;
   const priority = priorityFilter.value;
@@ -241,19 +255,20 @@ function renderTodo() {
         return `<div class="item ${done ? 'done' : ''}">
           <button class="check" data-check="${t.id}">${done ? '[x]' : '[ ]'}</button>
           <div class="main">
-            <div class="t1">${esc(t.title)} <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority)}</span></div>
-            <div class="t2">${p ? esc(p.name) : '未分類'}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
+            <div class="t1">${esc(t.title)} <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span></div>
+            <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
           <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="新增子任務">[＋子]</button>
           ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="對這個 todo 計時">[&gt;]</button>`}
           <button class="btn-ghost btn-sm act" data-del-task="${t.id}" title="刪除">[-]</button>
         </div>`;
       }).join('')
-    : '<div class="empty">沒有 todo</div>';
+    : `<div class="empty">${translate(currentLocale, 'todo.noTodos')}</div>`;
 }
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
 
 /* ---------------- 事件 ---------------- */
 
@@ -433,11 +448,13 @@ $('copyToday').addEventListener('click', async (ev) => {
   // state.entries 只有本週，總結需要完整資料
   const all = await db.listEntries();
   const md = buildSummary({
-    dates: [today], entries: all, projects: state.projects, tasks: state.tasks,
+    dates: [today], entries: all, projects: state.projects, tasks: state.tasks, locale: currentLocale,
   });
-  if (!md) { btn.textContent = '[今天沒紀錄]'; }
-  else { btn.textContent = (await copyToClipboard(md)) ? '[已複製]' : '[複製失敗]'; }
-  setTimeout(() => { btn.textContent = '[複製今日]'; }, 1500);
+  if (!md) { btn.textContent = `[${translate(currentLocale, 'popup.noRecentEntries')}]`; }
+  else { btn.textContent = (await copyToClipboard(md))
+    ? `[${translate(currentLocale, 'popup.summaryCopied')}]`
+    : `[${translate(currentLocale, 'common.copy')}]`; }
+  setTimeout(() => { btn.textContent = `[${translate(currentLocale, 'popup.copySummary')}]`; }, 1500);
 });
 
 /* 空白鍵快捷（不在輸入框、也不在收合標題上時）→ 開始/停止 */
