@@ -13,6 +13,8 @@ export const TODO_STATUSES = Object.freeze([
   Object.freeze({ value: 'all', label: '全部' }),
 ]);
 
+import { translate } from './i18n.js';
+
 const PRIORITY_VALUES = new Set(TODO_PRIORITIES.map(({ value }) => value));
 const STATUS_VALUES = new Set(TODO_STATUSES.map(({ value }) => value));
 
@@ -20,16 +22,16 @@ export function normalizePriority(priority) {
   return PRIORITY_VALUES.has(priority) ? priority : 'normal';
 }
 
-export function priorityLabel(priority) {
-  return TODO_PRIORITIES.find(({ value }) => value === normalizePriority(priority)).label;
+export function priorityLabel(priority, locale = 'zh-TW') {
+  return translate(locale, `todo.priority.${normalizePriority(priority)}`);
 }
 
 export function normalizeStatus(status) {
   return STATUS_VALUES.has(status) ? status : 'active';
 }
 
-export function statusLabel(status) {
-  return TODO_STATUSES.find(({ value }) => value === normalizeStatus(status)).label;
+export function statusLabel(status, locale = 'zh-TW') {
+  return translate(locale, `todo.status.${normalizeStatus(status)}`);
 }
 
 export function filterTasks(
@@ -47,10 +49,12 @@ export function filterTasks(
   );
 }
 
-export function taskCountLabel(tasks, showDone, status = '') {
-  if (status === 'doing') return `共 ${tasks.length} 個進行中`;
-  if (status === 'todo') return `共 ${tasks.length} 個待辦`;
-  if (status === 'done') return `共 ${tasks.length} 個已完成`;
+export function taskCountLabel(tasks, showDone, status = '', locale = 'zh-TW') {
+  if (status === 'doing') return translate(locale, 'todo.count.doing', { count: tasks.length });
+  if (status === 'todo') return translate(locale, 'todo.count.todo', { count: tasks.length });
+  if (status === 'done') return translate(locale, 'todo.count.done', { count: tasks.length });
   const open = tasks.filter((task) => task.status !== 'done').length;
-  return showDone ? `${open} 個未完成／共 ${tasks.length} 個` : `共 ${open} 個未完成`;
+  return showDone
+    ? translate(locale, 'todo.count.openAndTotal', { open, total: tasks.length })
+    : translate(locale, 'todo.count.open', { count: open });
 }

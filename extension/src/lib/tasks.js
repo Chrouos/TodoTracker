@@ -9,6 +9,7 @@
  */
 
 import { daysBetween, durationOfEntry, fmtDate, fmtClock } from './time.js';
+import { formatDisplayDate, formatDisplayTime, translate } from './i18n.js';
 
 export function entriesForTask(task, entries) {
   return entries
@@ -71,26 +72,37 @@ export function taskMetrics(task, entries) {
 }
 
 /** 歷時講成人話：不到一天顯示小時，超過就顯示天 */
-export function leadLabel(leadMs) {
+export function leadLabel(leadMs, locale = 'zh-TW') {
   if (leadMs === null || leadMs === undefined) return '';
   const h = leadMs / 3600e3;
-  if (h < 1) return `${Math.max(1, Math.round(leadMs / 60e3))} 分鐘`;
-  if (h < 24) return `${Math.round(h)} 小時`;
+  if (h < 1) return translate(locale, 'todo.lead.minute', {
+    minutes: Math.max(1, Math.round(leadMs / 60e3)),
+  });
+  if (h < 24) return translate(locale, 'todo.lead.hour', { hours: Math.round(h) });
   const d = Math.floor(h / 24);
   const rem = Math.round(h % 24);
-  return rem ? `${d} 天 ${rem} 小時` : `${d} 天`;
+  return rem
+    ? translate(locale, 'todo.lead.dayHours', { days: d, hours: rem })
+    : translate(locale, 'todo.lead.day', { days: d });
 }
 
 /** 把截止差距講成人話 */
-export function dueLabel(m, done) {
+export function dueLabel(m, done, locale = 'zh-TW') {
   if (m.dueDelta === null) return '';
-  if (m.dueDelta === 0) return done ? '當天結案' : '今天到期';
-  if (m.dueDelta > 0) return done ? `提前 ${m.dueDelta} 天` : `還有 ${m.dueDelta} 天`;
-  return `逾期 ${-m.dueDelta} 天`;
+  if (m.dueDelta === 0) return done
+    ? translate(locale, 'todo.due.doneToday')
+    : translate(locale, 'todo.due.today');
+  if (m.dueDelta > 0) return done
+    ? translate(locale, 'todo.due.early', { days: m.dueDelta })
+    : translate(locale, 'todo.due.remaining', { days: m.dueDelta });
+  return translate(locale, 'todo.due.overdue', { days: -m.dueDelta });
 }
 
 /** 時間戳顯示成 2026-07-30 09:12；沒值回 — */
-export function stampLabel(iso) {
+export function stampLabel(iso, locale = 'zh-TW') {
   if (!iso) return '—';
-  return `${fmtDate(iso)} ${fmtClock(iso)}`;
+  return translate(locale, 'todo.stamp', {
+    date: formatDisplayDate(iso, locale),
+    time: formatDisplayTime(iso, locale),
+  });
 }

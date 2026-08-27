@@ -3,7 +3,7 @@
  * 沒有任何相依套件。視覺遵守 DESIGN.md：零陰影、hairline 格線、圓角 0。
  */
 
-import { fmtHM, fmtClock } from './time.js';
+import { formatDisplayTime, formatDuration, translate } from './i18n.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -13,7 +13,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
  * @param {ReturnType<import('./time.js').timelineData>} tl
  * @param {(entry)=>{color:string,label:string}} meta
  */
-export function timelineSVG(tl, meta) {
+export function timelineSVG(tl, meta, locale = 'zh-TW') {
   const { days, minMin, maxMin } = tl;
 
   // 上下各留半小時，並對齊到整點
@@ -61,7 +61,7 @@ export function timelineSVG(tl, meta) {
           style="font-size:10px;fill:var(--text-ink)"
           clip-path="inset(0 0 0 0)">${esc(m.label).slice(0, Math.floor(laneW / 6))}</text>` : ''}
         <title>${esc(m.label)}
-${fmtClock(b.entry.startedAt)}–${fmtClock(b.entry.endedAt)}</title>
+${formatDisplayTime(b.entry.startedAt, locale)}–${formatDisplayTime(b.entry.endedAt, locale)}</title>
       </g>`;
     }
   });
@@ -73,8 +73,8 @@ ${fmtClock(b.entry.startedAt)}–${fmtClock(b.entry.endedAt)}</title>
   </svg>`;
 }
 
-function trendEmpty() {
-  return '<div class="empty">沒有可顯示的資料</div>';
+function trendEmpty(locale = 'zh-TW') {
+  return `<div class="empty">${translate(locale, 'common.noData')}</div>`;
 }
 
 function trendY(seconds, maxSeconds, top, height) {
@@ -85,8 +85,8 @@ function trendColor(level) {
   return ['#fafafa', '#dfeef5', '#9ccde5', '#5fb5dc', '#2d8fbe'][level];
 }
 
-export function stackedAreaSVG(data) {
-  if (!data?.dates?.length || !data.series?.length) return trendEmpty();
+export function stackedAreaSVG(data, locale = 'zh-TW') {
+  if (!data?.dates?.length || !data.series?.length) return trendEmpty(locale);
 
   const W = 760, H = 260, PL = 48, PR = 18, PT = 20, PB = 34;
   const iw = W - PL - PR, ih = H - PT - PB;
@@ -127,17 +127,17 @@ export function stackedAreaSVG(data) {
       ? zoneWidth
       : index === 0 || index === data.dates.length - 1 ? zoneWidth / 2 : zoneWidth;
     const details = data.detailsByDate[index] || [];
-    const detailText = details.map((item) => `${item.name} ${fmtHM(item.seconds)}`).join(' · ');
-    return `<rect class="trend-hover-zone" data-trend-date="${esc(date)}" x="${left}" y="${PT}" width="${width}" height="${ih}" fill="transparent" tabindex="0"><title>${esc(date)} · ${fmtHM(data.dailyTotals[index])}${detailText ? ` · ${esc(detailText)}` : ''}</title></rect>`;
+    const detailText = details.map((item) => `${item.name} ${formatDuration(item.seconds, locale)}`).join(' · ');
+    return `<rect class="trend-hover-zone" data-trend-date="${esc(date)}" x="${left}" y="${PT}" width="${width}" height="${ih}" fill="transparent" tabindex="0"><title>${esc(date)} · ${formatDuration(data.dailyTotals[index], locale)}${detailText ? ` · ${esc(detailText)}` : ''}</title></rect>`;
   }).join('');
 
-  return `<svg class="project-trend-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="每日專案工時堆疊趨勢圖">
+  return `<svg class="project-trend-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="${esc(translate(locale, 'chart.trend'))}">
     ${grid}${areas}${zones}${labels}
   </svg>`;
 }
 
-export function heatmapSVG(data) {
-  if (!data?.dates?.length || !data.series?.length) return trendEmpty();
+export function heatmapSVG(data, locale = 'zh-TW') {
+  if (!data?.dates?.length || !data.series?.length) return trendEmpty(locale);
 
   const labelW = 150, colW = Math.max(72, Math.min(132, 610 / data.dates.length));
   const W = labelW + colW * data.dates.length + 16;
@@ -154,8 +154,8 @@ export function heatmapSVG(data) {
       const pct = total ? Math.round((value / total) * 100) : 0;
       return `<g class="heatmap-cell" data-project-id="${esc(series.id)}" data-trend-date="${esc(date)}" tabindex="0">
         <rect x="${x(index) + 2}" y="${y + 2}" width="${colW - 4}" height="${rowH - 4}" rx="2" fill="${trendColor(level)}"></rect>
-        <text x="${x(index) + colW / 2}" y="${y + 21}" text-anchor="middle" class="heatmap-cell-text">${value ? esc(fmtHM(value)) : '—'}</text>
-        <title>${esc(date)} · ${esc(series.name)} · ${esc(fmtHM(value))} · ${pct}%</title>
+        <text x="${x(index) + colW / 2}" y="${y + 21}" text-anchor="middle" class="heatmap-cell-text">${value ? esc(formatDuration(value, locale)) : '—'}</text>
+        <title>${esc(date)} · ${esc(series.name)} · ${esc(formatDuration(value, locale))} · ${pct}%</title>
       </g>`;
     }).join('');
     return label + columns;
@@ -163,7 +163,7 @@ export function heatmapSVG(data) {
   const headers = data.dates.map((date, index) =>
     `<text x="${x(index) + colW / 2}" y="16" text-anchor="middle" class="axis-label">${esc(date.slice(5))}</text>`).join('');
 
-  return `<svg class="project-heatmap-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${W}px" role="img" aria-label="專案每日工時 Heatmap">
+  return `<svg class="project-heatmap-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${W}px" role="img" aria-label="${esc(translate(locale, 'chart.heatmap'))}">
     ${headers}${cells}
   </svg>`;
 }

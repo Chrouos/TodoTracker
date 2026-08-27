@@ -3,9 +3,10 @@
  * 給「一鍵複製今日總結」用，貼到日報、Obsidian、Slack 都行。
  */
 
-import { fmtHM, fmtClock, fmtDate, durationOfEntry } from './time.js';
+import { fmtDate, durationOfEntry } from './time.js';
 import { pathOf } from './tree.js';
 import { taskMetrics, leadLabel } from './tasks.js';
+import { formatDisplayTime, formatDuration, translate } from './i18n.js';
 
 /**
  * @param {object} o
@@ -15,7 +16,7 @@ import { taskMetrics, leadLabel } from './tasks.js';
  * @param {Array} o.tasks
  * @param {boolean} [o.includeTodos] 是否附上當天完成的 todo
  */
-export function buildSummary({ dates, entries, projects, tasks = [], includeTodos = true }) {
+export function buildSummary({ dates, entries, projects, tasks = [], includeTodos = true, locale = 'zh-TW' }) {
   const done = entries.filter((e) => e.endedAt && !e.deletedAt);
   const out = [];
 
@@ -31,9 +32,11 @@ export function buildSummary({ dates, entries, projects, tasks = [], includeTodo
     if (!rows.length && !finishedTodos.length) continue;
 
     const total = rows.reduce((s, e) => s + durationOfEntry(e), 0);
-    out.push(`## ${date} 工作總結`);
+    out.push(`## ${translate(locale, 'summary.workSummary', { date })}`);
     out.push('');
-    out.push(`總時數 **${fmtHM(total)}** · ${rows.length} 筆`);
+    out.push(translate(locale, 'summary.totalTime', {
+      duration: formatDuration(total, locale), count: rows.length,
+    }));
     out.push('');
 
     // 依專案分組，時數多的在前
@@ -48,17 +51,19 @@ export function buildSummary({ dates, entries, projects, tasks = [], includeTodo
         key,
         list,
         seconds: list.reduce((s, e) => s + durationOfEntry(e), 0),
-        name: key === '__none__' ? '未分類' : pathOf(projects, key).join(' / ') || '未分類',
+        name: key === '__none__'
+          ? translate(locale, 'project.uncategorized')
+          : pathOf(projects, key).join(' / ') || translate(locale, 'project.uncategorized'),
       }))
       .sort((a, b) => b.seconds - a.seconds);
 
     for (const g of ordered) {
-      out.push(`### ${g.name} — ${fmtHM(g.seconds)}`);
+      out.push(`### ${g.name} — ${formatDuration(g.seconds, locale)}`);
       out.push('');
       for (const e of g.list) {
         const task = tasks.find((t) => t.id === e.taskId);
         const title = e.description || task?.title || '（無描述）';
-        out.push(`- **${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}** ${title} · ${fmtHM(durationOfEntry(e))}`);
+        out.push(`- **${formatDisplayTime(e.startedAt, locale)}–${formatDisplayTime(e.endedAt, locale)}** ${title} · ${formatDuration(durationOfEntry(e), locale)}`);
         // 工作紀錄逐行變成子項目，保留原本的時間戳排列
         for (const line of String(e.notes || '').split('\n')) {
           const t = line.trim();
@@ -69,16 +74,16 @@ export function buildSummary({ dates, entries, projects, tasks = [], includeTodo
     }
 
     if (finishedTodos.length) {
-      out.push('### 完成的 Todo');
+      out.push(`### ${translate(locale, 'summary.completedTodos')}`);
       out.push('');
       for (const t of finishedTodos) {
         const p = t.projectId ? pathOf(projects, t.projectId).join(' / ') : null;
         const m = taskMetrics(t, entries);
         const bits = [];
-        if (t.openedAt) bits.push(`開單 ${fmtDate(t.openedAt)}`);
-        if (t.dueDate) bits.push(`截止 ${t.dueDate}`);
-        if (m.leadMs !== null) bits.push(`歷時 ${leadLabel(m.leadMs)}`);
-        if (m.worked) bits.push(`工時 ${fmtHM(m.worked)}`);
+        if (t.openedAt) bits.push(translate(locale, 'summary.opened', { date: fmtDate(t.openedAt) }));
+        if (t.dueDate) bits.push(translate(locale, 'summary.due', { date: t.dueDate }));
+        if (m.leadMs !== null) bits.push(translate(locale, 'summary.lead', { duration: leadLabel(m.leadMs, locale) }));
+        if (m.worked) bits.push(translate(locale, 'summary.worked', { duration: formatDuration(m.worked, locale) }));
         out.push(`- [x] ${t.title}${p ? ` _(${p})_` : ''}${bits.length ? ` — ${bits.join(' · ')}` : ''}`);
       }
       out.push('');

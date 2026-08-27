@@ -10,6 +10,8 @@ import {
   statusLabel,
   taskCountLabel,
 } from '../src/lib/todo-filter.js';
+import { dueLabel, leadLabel, stampLabel } from '../src/lib/tasks.js';
+import { buildSummary } from '../src/lib/summary.js';
 
 assert.deepEqual(
   TODO_PRIORITIES,
@@ -26,10 +28,12 @@ assert.equal(normalizePriority('urgent'), 'urgent');
 assert.equal(normalizePriority('not-a-priority'), 'normal');
 assert.equal(priorityLabel('high'), '高');
 assert.equal(priorityLabel('not-a-priority'), '一般');
+assert.equal(priorityLabel('high', 'en'), 'High');
 assert.deepEqual(TODO_STATUSES.map(({ value }) => value), ['active', 'doing', 'todo', 'done', 'all']);
 assert.equal(normalizeStatus('doing'), 'doing');
 assert.equal(normalizeStatus('not-a-status'), 'active');
 assert.equal(statusLabel('doing'), '進行中');
+assert.equal(statusLabel('done', 'ja'), '完了');
 
 const tasks = [
   { id: 'urgent-a', projectId: 'project-a', status: 'todo', priority: 'urgent' },
@@ -77,6 +81,16 @@ assert.equal(
   ], true),
   '2 個未完成／共 3 個',
 );
+assert.match(taskCountLabel([{ status: 'done' }], true, 'done', 'en'), /completed/);
+assert.match(leadLabel(60 * 60 * 1000, 'en'), /1h/);
+assert.match(dueLabel({ dueDelta: 0 }, false, 'ja'), /期限/);
+assert.match(stampLabel('2026-08-01T09:00:00.000Z', 'en'), /2026/);
+assert.match(buildSummary({
+  dates: ['2026-08-01'],
+  entries: [{ startedAt: '2026-08-01T09:00:00.000Z', endedAt: '2026-08-01T10:00:00.000Z', description: 'Plan' }],
+  projects: [],
+  locale: 'en',
+}), /Work summary/);
 
 const popupHtml = await readFile(new URL('../src/popup/popup.html', import.meta.url), 'utf8');
 const popup = await readFile(new URL('../src/popup/popup.js', import.meta.url), 'utf8');
