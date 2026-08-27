@@ -5,9 +5,6 @@ import {
   formatDisplayTime,
   formatDuration,
   getBrowserLocale,
-  formatDisplayDate,
-  formatDisplayTime,
-  formatDuration,
   normalizeLanguagePreference,
   resolveLocale,
   translate,
@@ -57,10 +54,6 @@ autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const t = (key, variables) => translate(currentLocale, key, variables);
-const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
-const displayDate = (value) => formatDisplayDate(value, currentLocale);
-const displayClock = (value) => formatDisplayTime(value, currentLocale);
 const t = (key, variables) => translate(currentLocale, key, variables);
 const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
 const displayDate = (value) => formatDisplayDate(value, currentLocale);
