@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "TodoTracker 工作時間追蹤器"
+  },
+  "extensionDescription": {
+    "message": "追蹤工作時間、管理 Todo 與檢視工作報表。"
+  }
+}

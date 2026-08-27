@@ -9,21 +9,30 @@
 import * as db from './lib/db.js';
 import { getTimer, patchTimer, getSettings } from './lib/db.js';
 import { fmtBadge } from './lib/time.js';
+import { getBrowserLocale, resolveLocale, translate } from './lib/i18n.js';
 
 const ALARM_TICK = 'tt-tick';
 const ALARM_SCHED = 'tt-sched';   // 每分鐘檢查排程與提醒
 
+async function currentLocale() {
+  const settings = await getSettings();
+  return resolveLocale(settings.language, getBrowserLocale());
+}
+
 async function refreshBadge() {
   const t = await getTimer();
+  const locale = await currentLocale();
   if (!t) {
     await chrome.action.setBadgeText({ text: '' });
-    await chrome.action.setTitle({ title: 'TodoTracker — 未計時' });
+    await chrome.action.setTitle({ title: translate(locale, 'action.idle') });
     return;
   }
   const sec = (Date.now() - new Date(t.startedAt).getTime()) / 1000;
   await chrome.action.setBadgeText({ text: fmtBadge(sec) });
   await chrome.action.setBadgeBackgroundColor({ color: '#201d1d' });
-  await chrome.action.setTitle({ title: `TodoTracker — 計時中 ${fmtBadge(sec)}` });
+  await chrome.action.setTitle({
+    title: translate(locale, 'action.running', { duration: fmtBadge(sec) }),
+  });
 }
 
 async function ensureAlarm() {
@@ -74,15 +83,20 @@ chrome.alarms.onAlarm.addListener((a) => {
  */
 async function tickSchedules() {
   try {
+    const locale = await currentLocale();
     const created = await db.runDueSchedules();
     for (const t of created) {
-      notify(`ts-new-${t.id}`, '新的待辦',
-        t.dueTime ? `${t.title}（今天 ${t.dueTime} 截止）` : t.title);
+      notify(`ts-new-${t.id}`, translate(locale, 'todo.todo'), translate(locale, 'notification.todoCreated', {
+        title: t.title,
+        time: t.dueTime ? ` (${t.dueTime})` : '',
+      }));
     }
 
     const due = await db.pendingReminders();
     for (const t of due) {
-      notify(`ts-due-${t.id}`, '待辦快到期了', `${t.title} · ${t.dueTime}`);
+      notify(`ts-due-${t.id}`, translate(locale, 'notification.todoDueTitle'), translate(locale, 'notification.todoDue', {
+        title: t.title, time: t.dueTime,
+      }));
       await db.markReminded(t.id);
     }
   } catch (e) {

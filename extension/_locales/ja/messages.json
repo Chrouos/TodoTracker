@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "TodoTracker 作業時間トラッカー"
+  },
+  "extensionDescription": {
+    "message": "作業時間を記録し、Todoを管理して、作業レポートを確認できます。"
+  }
+}
