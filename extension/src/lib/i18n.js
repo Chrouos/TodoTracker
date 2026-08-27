@@ -584,10 +584,10 @@ export function resolveLocale(preference = 'auto', browserLocale = '') {
 }
 
 export function getBrowserLocale() {
+  if (typeof navigator !== 'undefined') return navigator.language || 'en';
   if (typeof chrome !== 'undefined' && chrome.i18n?.getUILanguage) {
     return chrome.i18n.getUILanguage();
   }
-  if (typeof navigator !== 'undefined') return navigator.language || 'en';
   return 'en';
 }
 
@@ -618,10 +618,18 @@ export function applyTranslations(root, locale) {
 
 const intlLocale = (locale) => ({ 'zh-TW': 'zh-TW', en: 'en-US', ja: 'ja-JP' }[resolveLocale(locale, locale)] || 'en-US');
 
+function displayDateValue(value) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(value);
+}
+
 export function formatDisplayDate(value, locale) {
   return new Intl.DateTimeFormat(intlLocale(locale), {
     year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short',
-  }).format(new Date(value));
+  }).format(displayDateValue(value));
 }
 
 export function formatDisplayTime(value, locale) {
