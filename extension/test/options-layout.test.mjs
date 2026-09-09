@@ -118,11 +118,18 @@ assert.match(html, /data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should
 assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
 assert.doesNotMatch(html, /id="byDay"/, 'Report should not render a separate daily trend panel');
 assert.match(options, /buildProjectTrendData/, 'Report should build the fused project trend data');
+assert.match(options, /entryOverlapsRange/, 'Report ranges should include entries that cross midnight');
+assert.match(options, /durationInRange/, 'Report totals should clip entries to the selected range');
+assert.match(options, /function filteredEntries\(\)[\s\S]*?entryOverlapsRange/, 'Entry list ranges should include entries that cross midnight');
+assert.match(options, /function renderEntries\(\)[\s\S]*?durationInRange/, 'Entry list totals should clip entries to the selected range');
+assert.match(options, /function entriesRangeBounds\(\)[\s\S]*?reportRangeBounds/, 'Entry list quick ranges should have end boundaries');
 assert.match(options, /data-trend-date/, 'Report should wire date hover interaction');
 assert.match(options, /highlightProjectId/, 'Project selection should highlight without changing the data range');
 assert.match(options, /trendOverview/, 'Report should show a useful summary before hover');
 assert.match(options, /focusReportEntry/, 'Report should navigate directly to work records');
 assert.match(options, /focusReportTodo/, 'Report should navigate directly to Todo items');
+assert.match(options, /buildWorkspaceTodoProgress/, 'Workspace status should derive its Todo completion progress');
+assert.match(options, /report\.todoProgress/, 'Workspace status should show Todo completion progress');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
   'Report navigation should expose one way to clear a stale focused target');
 assert.match(options, /function selectTab\(name, preserveFocus = false\)/,
@@ -156,9 +163,9 @@ assert.match(options, /buildReportActionItems/, 'Report should render actionable
 assert.match(options, /reportActionTarget/, 'Report action items should expose navigation targets');
 assert.match(options, /data-report-entry-id/, 'Report should expose a direct target for work records');
 assert.match(options, /data-report-task-id/, 'Report should expose a direct target for Todo items');
-assert.match(options, /需要注意/, 'Report should show actionable attention items');
-assert.match(options, /專案狀況/, 'Report should show a scannable project status list');
-assert.match(options, /查看完整專案報表/, 'Report should keep detailed project metrics behind an expandable section');
+assert.match(options, /translateText\('report\.attention'\)/, 'Report should show actionable attention items');
+assert.match(options, /translateText\('report\.projectStatus'\)/, 'Report should show a scannable project status list');
+assert.match(options, /translateText\('report\.viewFull'\)/, 'Report should keep detailed project metrics behind an expandable section');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /createReportChartSection/, 'Report charts should be wrapped in independent collapse sections');
 assert.match(options, /dataset\.reportChart = id/, 'Report chart sections should expose a collapse identity');
@@ -168,6 +175,10 @@ assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap',
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
 assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
+assert.match(css, /\.report-project-work\s*\{[^}]*white-space:\s*nowrap/s,
+  'Project status work durations should stay on one line');
+assert.match(css, /\.kpi \.num\s*\{[^}]*white-space:\s*nowrap/s,
+  'Report KPI durations should stay on one line');
 assert.match(css, /\.report-details-collapse\s*>\s*summary/, 'Detailed project metrics should be expandable');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/s,
   'Report action cards should remain compact on narrow screens');
@@ -194,8 +205,29 @@ assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*240px[^}]
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
 assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar should scroll horizontally');
+assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/s,
+  'Calendar should allow vertical scrolling while keeping horizontal scrolling');
+assert.match(css, /\.review-calendar\s*\{[^}]*max-height:\s*min\(72vh,\s*640px\)/s,
+  'Calendar should cap its viewport height');
+assert.match(css, /\.review-calendar-tooltip\[hidden\]\s*\{[^}]*display:\s*none/s,
+  'Hidden calendar tooltips should not expand the scroll range');
+assert.match(options, /reviewCalendarHoverTooltip/, 'Calendar should use one shared hover tooltip');
+assert.match(html, /id="reviewCalendarHoverTooltip"[^>]*role="tooltip"/, 'Calendar tooltip should live outside the scrollable grid');
+assert.match(options, /showReviewCalendarTooltip/, 'Calendar hover should position the shared tooltip');
+assert.match(options, /repositionReviewCalendarTooltip/, 'Calendar tooltip should reposition while the viewport moves');
+assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*position:\s*fixed/s,
+  'Calendar tooltip should escape the scrollable calendar');
+assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*pointer-events:\s*none/s,
+  'Calendar tooltip should not capture the pointer');
+assert.doesNotMatch(options, /<div class="review-calendar-tooltip" role="tooltip">/,
+  'Calendar entries should not own tooltips inside the scrollable grid');
 assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');
 assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
+assert.match(options,
+  /const workspaceSections = \$\('projectWorkspace'\)\.querySelectorAll\('\.workspace-section'\);[\s\S]*?workspaceSections\.forEach\(\(section, index\) => \{\s*if \(index > 0\) section\.classList\.add\('is-collapsed'\);/,
+  'Project workspace should keep the summary open and collapse later sections by default');
+assert.doesNotMatch(options, /notesBox\.classList\.add\('is-collapsed'\)/,
+  'Project notes should remain open by default');
 assert.match(css, /\.markdown-editor-toolbar\s*\{/, 'Markdown fields should render an editor toolbar');
 assert.match(editor, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
 assert.match(options, /mountMarkdownEditor/, 'Options should mount the native Markdown block editor');

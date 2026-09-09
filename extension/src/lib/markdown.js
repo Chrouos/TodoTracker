@@ -247,7 +247,7 @@ function splitTableRow(line) {
   return cells;
 }
 function isEscapedPipe(value, index) { let backslashes = 0; for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\'; cursor -= 1) backslashes += 1; return backslashes % 2 === 1; }
-function isTableStart(lines, index) { return Boolean(lines[index]?.includes('|') && lines[index + 1]?.includes('|') && splitTableRow(lines[index + 1]).every((cell) => /^:?-{3,}:?$/.test(cell))); }
+function isTableStart(lines, index) { return Boolean(lines[index]?.includes('|') && lines[index + 1]?.includes('|') && splitTableRow(lines[index + 1]).every((cell) => /^:?-{2,}:?$/.test(cell))); }
 function parseTable(lines, start) { const header = splitTableRow(lines[start]).map(parseInlines); const alignments = splitTableRow(lines[start + 1]).map((cell) => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'left'); const rows = []; let index = start + 2; while (index < lines.length && lines[index].includes('|') && lines[index].trim()) { const row = splitTableRow(lines[index++]).slice(0, header.length); while (row.length < header.length) row.push(''); rows.push(row.map(parseInlines)); } return { block: { type: 'table', header, alignments, rows }, next: index }; }
 function taskAtPath(blocks, path) {
   if (!Array.isArray(path) || path.length < 2) throw new RangeError('Path does not reference a task item');

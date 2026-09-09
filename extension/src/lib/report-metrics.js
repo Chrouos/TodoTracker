@@ -100,6 +100,13 @@ export function buildReportActionItems(quality) {
   return items.length ? items : [{ kind: 'clear', tone: 'success', label: '目前沒有待處理項目', value: 0 }];
 }
 
+export function buildWorkspaceTodoProgress(metrics) {
+  return metrics.reduce((summary, metric) => ({
+    done: summary.done + Math.max(0, Number(metric.done) || 0),
+    total: summary.total + Math.max(0, Number(metric.total) || 0),
+  }), { done: 0, total: 0 });
+}
+
 export function buildProjectHealthRows(metrics, limit = 8) {
   const weekMs = 7 * 86400000;
   return metrics
@@ -163,9 +170,10 @@ export function buildProjectTaskMetrics(tasks, entries, today) {
 
   for (const entry of entries) {
     const valid = validEntry(entry);
-    if (!valid || !entry.taskId) continue;
-    const task = tasks.find((item) => item.id === entry.taskId);
-    if (task) ensure(task.projectId || null).workedSeconds += Math.round((valid.end - valid.start) / 1000);
+    if (!valid) continue;
+    const task = entry.taskId ? tasks.find((item) => item.id === entry.taskId) : null;
+    const projectId = task?.projectId || entry.projectId || null;
+    if (task || entry.projectId) ensure(projectId).workedSeconds += Math.round((valid.end - valid.start) / 1000);
   }
 
   return [...byProject.values()]

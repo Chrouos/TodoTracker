@@ -1,4 +1,4 @@
-import { fmtDate } from './time.js';
+import { fmtDate, splitEntryByDay } from './time.js';
 
 const UNCLASSIFIED = {
   id: null,
@@ -50,13 +50,17 @@ export function buildProjectTrendData({
   const dateIndex = new Map(safeDates.map((date, index) => [date, index]));
 
   for (const entry of entries) {
-    const date = fmtDate(entry.startedAt);
-    const index = dateIndex.get(date);
-    if (index === undefined) continue;
-    const bucketId = bucketIdFor(entry.projectId, projectsById);
-    if (!byId.has(bucketId)) continue;
-    const seconds = Math.max(0, Number(durationSec(entry)) || 0);
-    valuesById.get(bucketId)[index] += seconds;
+    const parts = splitEntryByDay(entry);
+    const segments = parts.length ? parts : [{ ...entry, seconds: durationSec(entry) }];
+    for (const segment of segments) {
+      const date = fmtDate(segment.startedAt);
+      const index = dateIndex.get(date);
+      if (index === undefined) continue;
+      const bucketId = bucketIdFor(segment.projectId, projectsById);
+      if (!byId.has(bucketId)) continue;
+      const seconds = Math.max(0, Number(segment.seconds ?? durationSec(segment)) || 0);
+      valuesById.get(bucketId)[index] += seconds;
+    }
   }
 
   const rawSeries = definitions
@@ -134,10 +138,14 @@ export function buildProjectDetailData({
   const scopedTasks = tasks.filter((task) => task.projectId && projectIds.has(task.projectId));
   const taskIds = new Set(scopedTasks.map((task) => task.id));
   const relevant = entries
+    .flatMap((entry) => {
+      const parts = splitEntryByDay(entry);
+      return parts.length ? parts : [{ ...entry, seconds: durationSec(entry) }];
+    })
     .filter((entry) => !entry.deletedAt && dateSet.has(fmtDate(entry.startedAt)))
     .filter((entry) => (entry.projectId && projectIds.has(entry.projectId))
       || (entry.taskId && taskIds.has(entry.taskId)))
-    .map((entry) => ({ ...entry, seconds: Math.max(0, Number(durationSec(entry)) || 0) }))
+    .map((entry) => ({ ...entry, seconds: Math.max(0, Number(entry.seconds ?? durationSec(entry)) || 0) }))
     .filter((entry) => entry.seconds > 0)
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
   const dailyTotals = safeDates.map((date) => relevant

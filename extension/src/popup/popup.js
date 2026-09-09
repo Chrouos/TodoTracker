@@ -6,7 +6,7 @@ import { autoGrow } from '../lib/autogrow.js';
 // popup 空間有限，上限拉到 260px，超過才捲
 const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 260 });
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
-import { fmtHMS, fmtClock, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
+import { fmtHMS, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { filterTasks, normalizePriority, normalizeStatus, priorityLabel } from '../lib/todo-filter.js';
 import {
@@ -46,6 +46,7 @@ async function load() {
   ]);
   state = { projects, tags, tasks, timer, settings, entries, draft };
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
+  document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
   render();
   $('initialLoading').hidden = true;
@@ -83,7 +84,7 @@ function renderPanel() {
   if (state.timer) {
     btn.dataset.state = 'running';
     btn.textContent = `[x] ${translate(currentLocale, 'timer.stop')}`;
-    $('ctx').textContent = [p ? p.name : translate(currentLocale, 'project.uncategorized'), c.description || '（無描述）'].join(' · ');
+    $('ctx').textContent = [p ? p.name : translate(currentLocale, 'project.uncategorized'), c.description || translate(currentLocale, 'common.unnamedWork')].join(' · ');
     startTicking();
   } else {
     btn.dataset.state = 'idle';
@@ -143,7 +144,7 @@ function renderFields() {
 
   // 專案下拉：樹狀縮排，已封存的整棵子樹不列
   const ps = $('project');
-  ps.innerHTML = '<option value="">— 未分類 —</option>' +
+  ps.innerHTML = `<option value="">${translate(currentLocale, 'common.uncategorizedOption')}</option>` +
     flattenTree(state.projects, { includeArchived: false })
       .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   ps.value = c.projectId || '';
@@ -153,7 +154,7 @@ function renderFields() {
   const avail = state.tasks.filter(
     (t) => t.status !== 'done' && (!c.projectId || t.projectId === c.projectId)
   );
-  ts.innerHTML = '<option value="">— 不綁 todo —</option>' +
+  ts.innerHTML = `<option value="">${translate(currentLocale, 'common.noTodoOption')}</option>` +
     avail.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
   ts.value = c.taskId || '';
 
@@ -187,12 +188,12 @@ function renderRecent() {
         return `<div class="item" data-entry="${e.id}">
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
-            <div class="t1">${esc(e.description || '（無描述）')}</div>
-            <div class="t2">${p ? esc(p.name) : '未分類'} · ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}${e.notes ? ' · 有紀錄' : ''}</div>
+            <div class="t1">${esc(e.description || translate(currentLocale, 'common.unnamedWork'))}</div>
+            <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')} · ${formatDisplayTime(e.startedAt, currentLocale)}–${formatDisplayTime(e.endedAt, currentLocale)}${e.notes ? ` · ${translate(currentLocale, 'popup.hasNotes')}` : ''}</div>
           </div>
           <span class="dur">${fmtHM(db.durationSec(e))}</span>
-          <button class="btn-ghost btn-sm act" data-log="${e.id}" title="${e.notes ? '編輯' : '補寫'}工作紀錄">[${e.notes ? 'x' : ' '}]</button>
-          <button class="btn-ghost btn-sm act" data-resume="${e.id}" title="用同樣設定再開始">[&gt;]</button>
+          <button class="btn-ghost btn-sm act" data-log="${e.id}" title="${e.notes ? translate(currentLocale, 'common.edit') : translate(currentLocale, 'popup.logEntry')}">${e.notes ? '[x]' : '[ ]'}</button>
+          <button class="btn-ghost btn-sm act" data-resume="${e.id}" title="${translate(currentLocale, 'popup.resumeEntry')}">[&gt;]</button>
         </div>`;
       }).join('')
     : `<div class="empty">${translate(currentLocale, 'popup.noRecentEntries')}</div>`;
@@ -211,13 +212,13 @@ function renderTodo() {
   const keepParent = parentSelect.value;
   const projectOptions = flattenTree(state.projects, { includeArchived: false });
 
-  filterSelect.innerHTML = '<option value="">— 全部專案 —</option>' +
+  filterSelect.innerHTML = `<option value="">${translate(currentLocale, 'common.projectOption')}</option>` +
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   filterSelect.value = keepFilter;
   priorityFilter.value = keepPriorityFilter;
   statusFilter.value = keepStatusFilter;
 
-  createProject.innerHTML = '<option value="">— 未指定專案 —</option>' +
+  createProject.innerHTML = `<option value="">${translate(currentLocale, 'common.uncategorizedOption')}</option>` +
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   createProject.value = projectOptions.some((p) => p.id === keepCreateProject) ? keepCreateProject : '';
 
@@ -225,7 +226,7 @@ function renderTodo() {
     .filter((t) => t.status !== 'archived' && t.status !== 'done')
     .filter((t) => !createProject.value || t.projectId === createProject.value)
     .sort((a, b) => a.title.localeCompare(b.title));
-  parentSelect.innerHTML = '<option value="">— 最上層任務 —</option>' +
+  parentSelect.innerHTML = `<option value="">${translate(currentLocale, 'todo.topLevel')}</option>` +
     parentOptions.map((t) => {
       const p = state.projects.find((item) => item.id === t.projectId);
       return `<option value="${t.id}">${esc(t.title)}${p ? ` · ${esc(p.name)}` : ''}</option>`;
@@ -258,9 +259,9 @@ function renderTodo() {
             <div class="t1">${esc(t.title)} <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span></div>
             <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
-          <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="新增子任務">[＋子]</button>
-          ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="對這個 todo 計時">[&gt;]</button>`}
-          <button class="btn-ghost btn-sm act" data-del-task="${t.id}" title="刪除">[-]</button>
+          <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="${translate(currentLocale, 'todo.addSubtask')}">${translate(currentLocale, 'popup.addSubtaskButton')}</button>
+          ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="${translate(currentLocale, 'todo.start')}">[&gt;]</button>`}
+          <button class="btn-ghost btn-sm act" data-del-task="${t.id}" title="${translate(currentLocale, 'common.delete')}">[-]</button>
         </div>`;
       }).join('')
     : `<div class="empty">${translate(currentLocale, 'todo.noTodos')}</div>`;
@@ -346,7 +347,7 @@ $('liveText').addEventListener('input', (e) => {
   clearTimeout(liveSaveTimer);
   liveSaveTimer = setTimeout(async () => {
     state.timer = await db.patchTimer({ notes: value });
-    $('liveSaved').textContent = '已存';
+  $('liveSaved').textContent = translate(currentLocale, 'popup.saved');
     setTimeout(() => { $('liveSaved').textContent = ''; }, 1200);
   }, 500);
 });
@@ -354,7 +355,7 @@ $('liveText').addEventListener('input', (e) => {
 // 插入 HH:MM 時間戳，方便一條一條記事情發生的時間
 $('stampBtn').addEventListener('click', () => {
   const ta = $('liveText');
-  const stamp = `${fmtClock(new Date().toISOString())} `;
+  const stamp = `${formatDisplayTime(new Date().toISOString(), currentLocale)} `;
   const at = ta.selectionStart;
   const before = ta.value.slice(0, at);
   const prefix = before === '' || before.endsWith('\n') ? '' : '\n';

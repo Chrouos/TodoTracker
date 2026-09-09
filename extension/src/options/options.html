@@ -11,7 +11,7 @@
 <div class="wrap">
   <header>
     <h1 data-i18n="app.name">TodoTracker</h1>
-    <p class="cap">本機時間追蹤 · 資料存在這台瀏覽器</p>
+    <p class="cap" data-i18n="app.subtitle">本機時間追蹤 · 資料存在這台瀏覽器</p>
   </header>
 
   <nav class="tabs" id="tabs">
@@ -29,46 +29,46 @@
     <div id="managementTimer" class="card timer-panel" aria-live="polite">
       <div class="timer-panel-head">
         <div>
-          <div class="cap">目前計時</div>
+          <div class="cap" data-i18n="timer.current">目前計時</div>
           <div id="mgTimerClock" class="timer-clock num">00:00:00</div>
-          <div id="mgTimerStatus" class="cap">尚未開始</div>
+          <div id="mgTimerStatus" class="cap" data-i18n="timer.notStarted">尚未開始</div>
         </div>
-        <button id="mgTimerToggle" type="button" class="btn-primary">開始計時</button>
+        <button id="mgTimerToggle" type="button" class="btn-primary" data-i18n="timer.startAndSave">開始計時</button>
       </div>
       <div id="mgTimerIdleNotice" class="timer-idle-notice" role="status">
-        目前沒有正在計時；現在輸入的紀錄會先保留，按「開始計時」後才會開始計算時間。
+        <span data-i18n="timer.idleNotice">目前沒有正在計時；現在輸入的紀錄會先保留，按「開始計時」後才會開始計算時間。</span>
       </div>
 
       <div class="grid4 timer-fields">
-        <label class="field" style="grid-column: span 2"><span>工作描述</span>
-          <input id="mgTimerDescription" placeholder="正在做什麼？" autocomplete="off" /></label>
-        <label class="field"><span>專案</span><select id="mgTimerProject"></select></label>
-        <label class="field"><span>Todo</span><select id="mgTimerTask"></select></label>
+        <label class="field" style="grid-column: span 2"><span data-i18n="timer.workDescription">工作描述</span>
+          <input id="mgTimerDescription" data-i18n-placeholder="timer.description" placeholder="正在做什麼？" autocomplete="off" /></label>
+        <label class="field"><span data-i18n="timer.project">專案</span><select id="mgTimerProject"></select></label>
+        <label class="field"><span data-i18n="timer.todo">Todo</span><select id="mgTimerTask"></select></label>
       </div>
 
       <div class="field timer-tags-field">
-        <span>標籤</span>
+        <span data-i18n="timer.tags">標籤</span>
         <div id="mgTimerTags" class="timer-tags"></div>
       </div>
 
       <div class="field timer-notes-field">
         <div class="timer-notes-head">
-          <span>當下紀錄</span>
+          <span data-i18n="timer.notesCurrent">當下紀錄</span>
           <div class="timer-notes-preview-actions">
-            <div class="timer-notes-mode" role="group" aria-label="工作紀錄模式">
-              <button id="mgTimerNotesEditToggle" type="button" class="btn-sm active" aria-pressed="true">編輯</button>
-              <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" aria-pressed="false">預覽</button>
+            <div class="timer-notes-mode" role="group" data-i18n-aria-label="timer.notesMode" aria-label="工作紀錄模式">
+              <button id="mgTimerNotesEditToggle" type="button" class="btn-sm active" data-i18n="timer.edit" aria-pressed="true">編輯</button>
+              <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" data-i18n="timer.preview" aria-pressed="false">預覽</button>
             </div>
           </div>
         </div>
-        <textarea id="mgTimerNotes" data-markdown-editor-input placeholder="邊做邊記，停止時會一起保存"></textarea>
+        <textarea id="mgTimerNotes" data-markdown-editor-input data-i18n-placeholder="timer.notesPlaceholder" placeholder="邊做邊記，停止時會一起保存"></textarea>
         <div id="mgTimerNotesPreview" class="timer-notes-preview" hidden></div>
       </div>
 
       <div class="timer-panel-foot">
         <label id="mgTimerCompleteRow" class="timer-complete" hidden>
           <input id="mgTimerComplete" type="checkbox" />
-          停止時標記 Todo 為完成
+          <span data-i18n="timer.completeTodo">停止時標記 Todo 為完成</span>
         </label>
         <span id="mgTimerSaved" class="cap"></span>
       </div>
@@ -79,50 +79,51 @@
   <section id="p-report">
     <div class="toolbar">
       <div class="seg" id="range">
-        <button class="seg-btn range-quick active" data-range="today">今日</button>
-        <button class="seg-btn range-quick" data-range="week">本週</button>
-        <button class="seg-btn range-quick" data-range="month">本月</button>
-        <button class="seg-btn range-quick" data-range="all">全部</button>
-        <button class="seg-btn range-custom" data-range="custom">自訂</button>
-        <button class="seg-btn range-back" data-range="back" hidden>返回</button>
+        <button class="seg-btn range-quick active" data-range="today" data-i18n="report.today">今日</button>
+        <button class="seg-btn range-quick" data-range="week" data-i18n="report.week">本週</button>
+        <button class="seg-btn range-quick" data-range="month" data-i18n="report.month">本月</button>
+        <button class="seg-btn range-quick" data-range="all" data-i18n="common.all">全部</button>
+        <button class="seg-btn range-custom" data-range="custom" data-i18n="report.custom">自訂</button>
+        <button class="seg-btn range-back" data-range="back" hidden data-i18n="common.back">返回</button>
       </div>
       <div class="custom-range" id="reportCustomRange" hidden>
-        <label>開始 <input id="reportRangeFrom" type="date" /></label>
+        <label><span data-i18n="entry.start">開始</span> <input id="reportRangeFrom" type="date" /></label>
         <span>～</span>
-        <label>結束 <input id="reportRangeTo" type="date" /></label>
-        <button id="reportApplyRange" class="btn-sm" type="button">套用</button>
+        <label><span data-i18n="entry.end">結束</span> <input id="reportRangeTo" type="date" /></label>
+        <button id="reportApplyRange" class="btn-sm" type="button" data-i18n="report.apply">套用</button>
       </div>
       <div class="grow"></div>
       <button id="exportCsv">↓ CSV</button>
     </div>
 
     <div class="kpis">
-      <div class="kpi"><span class="cap">總時數</span><span id="kTime" class="num">0m</span></div>
-      <div class="kpi"><span class="cap">筆數</span><span id="kCount" class="num">0</span></div>
-      <div class="kpi"><span class="cap">平均每筆</span><span id="kAvg" class="num">—</span></div>
-      <div class="kpi"><span class="cap">有紀錄天數</span><span id="kDays" class="num">0</span></div>
+      <div class="kpi"><span class="cap" data-i18n="report.totalTime">總時數</span><span id="kTime" class="num">0m</span></div>
+      <div class="kpi"><span class="cap" data-i18n="report.count">筆數</span><span id="kCount" class="num">0</span></div>
+      <div class="kpi"><span class="cap" data-i18n="report.averagePerEntry">平均每筆</span><span id="kAvg" class="num">—</span></div>
+      <div class="kpi"><span class="cap" data-i18n="report.activeDays">有紀錄天數</span><span id="kDays" class="num">0</span></div>
     </div>
 
     <h2 class="sec" data-collapse="rep-insights" data-collapse-default="closed">
-      <span class="mark">[+]</span> 工作區狀態
+      <span class="mark">[+]</span> <span data-i18n="report.workspaceStatus">工作區狀態</span>
     </h2>
-    <div id="reportInsights" data-collapse-body="rep-insights" class="report-insights" aria-label="Todo 健康狀態與專案狀況"></div>
+    <div id="reportInsights" data-collapse-body="rep-insights" class="report-insights" data-i18n-aria-label="report.insights" aria-label="Todo 健康狀態與專案狀況"></div>
 
     <h2 class="sec" data-collapse="rep-health" data-collapse-default="closed">
-      <span class="mark">[+]</span> Todo 健康度
+      <span class="mark">[+]</span> <span data-i18n="report.todoHealth">Todo 健康度</span>
     </h2>
     <div id="todoHealth" data-collapse-body="rep-health"></div>
 
     <h2 class="sec" data-collapse="rep-review">
-      <span class="mark">[-]</span> 每日工作回顧 <span id="reviewLabel" class="mute"></span>
+      <span class="mark">[-]</span> <span data-i18n="report.dailyReview">每日工作回顧</span> <span id="reviewLabel" class="mute"></span>
       <span class="review-mode" id="reviewMode">
-        <button class="btn-sm" type="button" data-review-mode="list">清單</button>
-        <button class="btn-sm active" type="button" data-review-mode="calendar">日曆</button>
+        <button class="btn-sm" type="button" data-review-mode="list" data-i18n="report.list">清單</button>
+        <button class="btn-sm active" type="button" data-review-mode="calendar" data-i18n="report.calendar">日曆</button>
       </span>
     </h2>
     <div id="dailyReview" data-collapse-body="rep-review"></div>
+    <div id="reviewCalendarHoverTooltip" class="review-calendar-tooltip" role="tooltip" hidden></div>
 
-    <h2 class="sec" data-collapse="rep-donut" data-collapse-default="closed"><span class="mark">[+]</span> 專案時間與每日趨勢</h2>
+    <h2 class="sec" data-collapse="rep-donut" data-collapse-default="closed"><span class="mark">[+]</span> <span data-i18n="report.projectTimeTrend">專案時間與每日趨勢</span></h2>
     <div id="byProject" data-collapse-body="rep-donut">
       <div id="projectTrend"></div>
       <div id="projectHeatmap"></div>
@@ -142,29 +143,29 @@
     <form id="projForm" class="card">
       <input type="hidden" id="pjId" />
       <div class="grid4">
-        <label class="field"><span>名稱</span><input id="pjName" required placeholder="例：內部工具" /></label>
-        <label class="field"><span>顏色</span><input id="pjColor" type="color" value="#201d1d" /></label>
+        <label class="field"><span data-i18n="project.name">名稱</span><input id="pjName" required placeholder="例：內部工具" data-i18n-placeholder="project.name" /></label>
+        <label class="field"><span data-i18n="project.color">顏色</span><input id="pjColor" type="color" value="#201d1d" /></label>
         <label class="field" style="grid-column: span 2">
-          <span>上層專案</span>
+          <span data-i18n="project.parent">上層專案</span>
           <select id="pjParent"></select>
-          <span class="hint">留空就是最上層。可以一直往下掛，時數會自動累加到上層。</span>
+          <span class="hint" data-i18n="project.formHint">留空就是最上層。可以一直往下掛，時數會自動累加到上層。</span>
         </label>
       </div>
       <div class="actions">
-        <button type="submit" class="btn-primary">儲存專案</button>
-        <button type="button" id="pjCancel" hidden>取消編輯</button>
+        <button type="submit" class="btn-primary" data-i18n="project.save">儲存專案</button>
+        <button type="button" id="pjCancel" hidden data-i18n="project.cancelEdit">取消編輯</button>
       </div>
     </form>
 
     <!-- 編輯某個專案時才出現：目標／筆記時間軸 -->
     <div id="pjNotesBox" class="card" hidden>
       <div class="row" style="margin-bottom:8px">
-        <span class="h" id="pjNotesTitle">目標與筆記</span>
+        <span class="h" id="pjNotesTitle" data-i18n="project.goalsNotes">目標與筆記</span>
       </div>
-      <textarea id="pjNoteDraft" data-markdown-editor-input placeholder="這個專案要達成什麼？有什麼決定或轉折？Ctrl+Enter 送出"></textarea>
+      <textarea id="pjNoteDraft" data-markdown-editor-input data-i18n-placeholder="project.notePlaceholder" placeholder="這個專案要達成什麼？有什麼決定或轉折？Ctrl+Enter 送出"></textarea>
       <div class="actions">
-        <button type="button" id="pjNoteAdd" class="btn-primary">新增一則</button>
-        <span class="cap" style="align-self:center">會記下寫入當下的時間，之後還能修改</span>
+        <button type="button" id="pjNoteAdd" class="btn-primary" data-i18n="project.addNote">新增一則</button>
+        <span class="cap" style="align-self:center" data-i18n="project.noteHint">會記下寫入當下的時間，之後還能修改</span>
       </div>
       <div id="pjNoteList"></div>
     </div>
@@ -178,69 +179,69 @@
     <form id="todoForm" class="card">
       <input type="hidden" id="tdId" />
       <div class="grid4 todo-form-main">
-        <label class="field" style="grid-column: span 2"><span>項目</span>
-          <input id="tdTitle" required placeholder="要做什麼？" /></label>
-        <label class="field"><span>專案</span><select id="tdProject"></select></label>
-        <label class="field"><span>狀態</span>
+        <label class="field" style="grid-column: span 2"><span data-i18n="todo.todo">項目</span>
+          <input id="tdTitle" required placeholder="要做什麼？" data-i18n-placeholder="timer.description" /></label>
+        <label class="field"><span data-i18n="project.project">專案</span><select id="tdProject"></select></label>
+        <label class="field"><span data-i18n="todo.status">狀態</span>
           <select id="tdStatus">
-            <option value="todo">待辦</option>
-            <option value="doing">進行中</option>
-            <option value="done">已完成</option>
+            <option value="todo" data-i18n="todo.status.todo">待辦</option>
+            <option value="doing" data-i18n="todo.status.doing">進行中</option>
+            <option value="done" data-i18n="todo.status.done">已完成</option>
           </select>
         </label>
       </div>
       <div class="grid4 task-parent-row" style="margin-top:12px">
-        <label class="field" style="grid-column: span 2"><span>父任務</span>
-          <select id="tdParent"><option value="">— 最上層任務 —</option></select>
-          <span class="hint">選擇後會成為這個 Todo 的子任務。</span>
+        <label class="field" style="grid-column: span 2"><span data-i18n="todo.parent">父任務</span>
+          <select id="tdParent"><option value="" data-i18n="todo.topLevel">— 最上層任務 —</option></select>
+          <span class="hint" data-i18n="todo.parentHint">選擇後會成為這個 Todo 的子任務。</span>
         </label>
       </div>
       <div class="grid4" style="margin-top:12px">
-        <label class="field"><span>優先級</span>
+        <label class="field"><span data-i18n="todo.priority">優先級</span>
           <select id="tdPriority">
-            <option value="urgent">緊急</option>
-            <option value="high">高</option>
-            <option value="normal" selected>一般</option>
-            <option value="low">低</option>
+            <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
+            <option value="high" data-i18n="todo.priority.high">高</option>
+            <option value="normal" selected data-i18n="todo.priority.normal">一般</option>
+            <option value="low" data-i18n="todo.priority.low">低</option>
           </select>
         </label>
-        <label class="field"><span>截止日</span>
+        <label class="field"><span data-i18n="todo.dueDate">截止日</span>
           <input id="tdDue" type="date" />
-          <span class="hint">唯一可以改的日期。</span>
+          <span class="hint" data-i18n="todo.dueDateHint">唯一可以改的日期。</span>
         </label>
-        <label class="field"><span>提醒時間</span>
+        <label class="field"><span data-i18n="schedule.dueTime">提醒時間</span>
           <input id="tdDueTime" type="time" />
-          <span class="hint">到時間會發 Chrome 通知</span>
+          <span class="hint" data-i18n="todo.dueTimeHint">到時間會發 Chrome 通知</span>
         </label>
-        <label class="field"><span>開單時間</span>
+        <label class="field"><span data-i18n="todo.openedAt">開單時間</span>
           <input id="tdOpened" disabled />
-          <span class="hint">建立當下自動記錄，不可修改。</span>
+          <span class="hint" data-i18n="todo.openedAtHint">建立當下自動記錄，不可修改。</span>
         </label>
-        <label class="field"><span>結案時間</span>
+        <label class="field"><span data-i18n="todo.completedAt">結案時間</span>
           <input id="tdDone" disabled />
-          <span class="hint">按下完成的當下自動記錄；重新打開就清掉。</span>
+          <span class="hint" data-i18n="todo.completedAtHint">按下完成的當下自動記錄；重新打開就清掉。</span>
         </label>
-        <label class="field"><span>累積工時</span>
+        <label class="field"><span data-i18n="entry.duration">累積工時</span>
           <input id="tdWorked" disabled />
-          <span class="hint">由綁在這個 todo 上的計時紀錄累加。</span>
+          <span class="hint" data-i18n="todo.workedHint">由綁在這個 todo 上的計時紀錄累加。</span>
         </label>
       </div>
-      <label class="field" style="margin-top:12px"><span>備註</span>
-        <textarea id="tdNotes" data-markdown-editor-input placeholder="細節、連結、驗收條件…"></textarea></label>
+      <label class="field" style="margin-top:12px"><span data-i18n="entry.notes">備註</span>
+        <textarea id="tdNotes" data-markdown-editor-input data-i18n-placeholder="todo.notesPlaceholder" placeholder="細節、連結、驗收條件…"></textarea></label>
       <div class="actions">
-        <button type="submit" class="btn-primary">儲存 Todo</button>
-        <button type="button" id="tdCancel" hidden>取消編輯</button>
+        <button type="submit" class="btn-primary" data-i18n="todo.save">儲存 Todo</button>
+        <button type="button" id="tdCancel" hidden data-i18n="todo.cancelEdit">取消編輯</button>
       </div>
     </form>
 
     <div class="toolbar">
       <select id="tdFilter" style="width:260px"></select>
       <select id="tdStatusFilter" style="width:150px">
-        <option value="active">未完成</option>
-        <option value="doing">進行中</option>
-        <option value="todo">待辦</option>
-        <option value="done">已完成</option>
-        <option value="all">全部</option>
+        <option value="active" data-i18n="todo.status.active">未完成</option>
+        <option value="doing" data-i18n="todo.status.doing">進行中</option>
+        <option value="todo" data-i18n="todo.status.todo">待辦</option>
+        <option value="done" data-i18n="todo.status.done">已完成</option>
+        <option value="all" data-i18n="todo.status.all">全部</option>
       </select>
       <select id="tdPriorityFilter" style="width:150px"></select>
       <div class="grow"></div>
@@ -252,69 +253,69 @@
   <!-- ── 排程 ── -->
   <section id="p-schedules" hidden>
     <p class="cap">
-      設定固定週期的工作，到指定時間會自動開一張 Todo，並在快到截止時間時通知你。
-      例：每個平日 09:00 開一張「填寫工作日誌」，當天 17:30 截止，提前 10 分鐘提醒。
+      <span data-i18n="schedule.description">設定固定週期的工作，到指定時間會自動開一張 Todo，並在快到截止時間時通知你。</span>
+      <span data-i18n="schedule.example">例：每個平日 09:00 開一張「填寫工作日誌」，當天 17:30 截止，提前 10 分鐘提醒。</span>
     </p>
 
     <form id="schForm" class="card">
       <input type="hidden" id="scId" />
       <div class="grid4">
-        <label class="field" style="grid-column: span 2"><span>要做什麼</span>
-          <input id="scTitle" required placeholder="例：填寫工作日誌" /></label>
-        <label class="field"><span>專案</span><select id="scProject"></select></label>
-        <label class="field"><span>啟用</span>
+        <label class="field" style="grid-column: span 2"><span data-i18n="timer.description">要做什麼</span>
+          <input id="scTitle" required placeholder="例：填寫工作日誌" data-i18n-placeholder="schedule.exampleTitle" /></label>
+        <label class="field"><span data-i18n="project.project">專案</span><select id="scProject"></select></label>
+        <label class="field"><span data-i18n="common.enabled">啟用</span>
           <select id="scEnabled">
-            <option value="1">開啟</option>
-            <option value="0">關閉</option>
+            <option value="1" data-i18n="schedule.open">開啟</option>
+            <option value="0" data-i18n="schedule.closed">關閉</option>
           </select>
         </label>
       </div>
 
-      <label class="field" style="margin-top:12px"><span>重複於</span>
+      <label class="field" style="margin-top:12px"><span data-i18n="schedule.repeat">重複於</span>
         <div class="dow" id="scDow">
-          <button type="button" data-dow="1">一</button>
-          <button type="button" data-dow="2">二</button>
-          <button type="button" data-dow="3">三</button>
-          <button type="button" data-dow="4">四</button>
-          <button type="button" data-dow="5">五</button>
-          <button type="button" data-dow="6">六</button>
-          <button type="button" data-dow="0">日</button>
+          <button type="button" data-dow="1" data-i18n="schedule.days.mon">一</button>
+          <button type="button" data-dow="2" data-i18n="schedule.days.tue">二</button>
+          <button type="button" data-dow="3" data-i18n="schedule.days.wed">三</button>
+          <button type="button" data-dow="4" data-i18n="schedule.days.thu">四</button>
+          <button type="button" data-dow="5" data-i18n="schedule.days.fri">五</button>
+          <button type="button" data-dow="6" data-i18n="schedule.days.sat">六</button>
+          <button type="button" data-dow="0" data-i18n="schedule.days.sun">日</button>
           <span class="grow"></span>
-          <button type="button" id="scWeekdays" class="btn-sm">平日</button>
-          <button type="button" id="scEveryday" class="btn-sm">每天</button>
+          <button type="button" id="scWeekdays" class="btn-sm" data-i18n="schedule.weekdays">平日</button>
+          <button type="button" id="scEveryday" class="btn-sm" data-i18n="schedule.everyday">每天</button>
         </div>
       </label>
 
       <div class="grid4" style="margin-top:12px">
-        <label class="field"><span>優先度</span>
+        <label class="field"><span data-i18n="todo.priority">優先度</span>
           <select id="scPriority">
-            <option value="urgent">緊急</option>
-            <option value="high">高</option>
-            <option value="normal" selected>一般</option>
-            <option value="low">低</option>
+            <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
+            <option value="high" data-i18n="todo.priority.high">高</option>
+            <option value="normal" selected data-i18n="todo.priority.normal">一般</option>
+            <option value="low" data-i18n="todo.priority.low">低</option>
           </select>
         </label>
-        <label class="field"><span>幾點開單</span>
+        <label class="field"><span data-i18n="schedule.createTime">幾點開單</span>
           <input id="scCreate" type="time" value="09:00" />
-          <span class="hint">到這個時間自動新增到 Todo。</span>
+          <span class="hint" data-i18n="schedule.createTimeHint">到這個時間自動新增到 Todo。</span>
         </label>
-        <label class="field"><span>當天截止時間</span>
+        <label class="field"><span data-i18n="schedule.dueTime">當天截止時間</span>
           <input id="scDue" type="time" />
-          <span class="hint">留空就不設截止。</span>
+          <span class="hint" data-i18n="schedule.dueTimeHint">留空就不設截止。</span>
         </label>
-        <label class="field"><span>提前幾分鐘提醒</span>
-          <input id="scRemind" type="number" min="0" step="5" placeholder="留空不提醒" />
-          <span class="hint">用 Chrome 通知，需要允許通知權限。</span>
+        <label class="field"><span data-i18n="schedule.remindMinutes">提前幾分鐘提醒</span>
+          <input id="scRemind" type="number" min="0" step="5" placeholder="留空不提醒" data-i18n-placeholder="schedule.reminderPlaceholder" />
+          <span class="hint" data-i18n="schedule.reminderHint">用 Chrome 通知，需要允許通知權限。</span>
         </label>
       </div>
 
-      <label class="field" style="margin-top:12px"><span>備註</span>
-        <textarea id="scNotes" data-markdown-editor-input placeholder="會一併寫進產生的 Todo"></textarea></label>
+      <label class="field" style="margin-top:12px"><span data-i18n="entry.notes">備註</span>
+        <textarea id="scNotes" data-markdown-editor-input data-i18n-placeholder="schedule.notesPlaceholder" placeholder="會一併寫進產生的 Todo"></textarea></label>
 
       <div class="actions">
-        <button type="submit" class="btn-primary">儲存排程</button>
-        <button type="button" id="scCancel" hidden>取消編輯</button>
-        <button type="button" id="scRunNow">立刻檢查一次</button>
+        <button type="submit" class="btn-primary" data-i18n="schedule.save">儲存排程</button>
+        <button type="button" id="scCancel" hidden data-i18n="schedule.cancelEdit">取消編輯</button>
+        <button type="button" id="scRunNow" data-i18n="schedule.runNow">立刻檢查一次</button>
       </div>
     </form>
 
@@ -325,10 +326,10 @@
   <section id="p-tags" hidden>
     <form id="tagForm" class="card">
       <div class="grid4">
-        <label class="field"><span>標籤名稱</span><input id="tgName" required placeholder="例：會議" /></label>
-        <label class="field"><span>顏色</span><input id="tgColor" type="color" value="#646262" /></label>
+        <label class="field"><span data-i18n="tag.name">標籤名稱</span><input id="tgName" required placeholder="例：會議" data-i18n-placeholder="tag.example" /></label>
+        <label class="field"><span data-i18n="project.color">顏色</span><input id="tgColor" type="color" value="#646262" /></label>
       </div>
-      <div class="actions"><button type="submit" class="btn-primary">新增標籤</button></div>
+      <div class="actions"><button type="submit" class="btn-primary" data-i18n="tag.new">新增標籤</button></div>
     </form>
     <div id="tagList"></div>
   </section>
@@ -336,29 +337,29 @@
   <!-- ── 紀錄 ── -->
   <section id="p-entries" hidden>
     <div class="toolbar">
-      <input id="enSearch" placeholder="搜尋描述與工作紀錄…" style="width:260px" />
+      <input id="enSearch" placeholder="搜尋描述與工作紀錄…" data-i18n-placeholder="entry.searchPlaceholder" style="width:260px" />
       <select id="enFilter" style="width:240px"></select>
       <div class="seg" id="enRange">
-        <button class="seg-btn range-quick active" data-erange="all">全部</button>
-        <button class="seg-btn range-quick" data-erange="month">本月</button>
-        <button class="seg-btn range-quick" data-erange="week">本週</button>
-        <button class="seg-btn range-quick" data-erange="today">今日</button>
-        <button class="seg-btn range-custom" data-erange="custom">自訂</button>
-        <button class="seg-btn range-back" data-erange="back" hidden>返回</button>
+        <button class="seg-btn range-quick active" data-erange="all" data-i18n="common.all">全部</button>
+        <button class="seg-btn range-quick" data-erange="month" data-i18n="report.month">本月</button>
+        <button class="seg-btn range-quick" data-erange="week" data-i18n="report.week">本週</button>
+        <button class="seg-btn range-quick" data-erange="today" data-i18n="report.today">今日</button>
+        <button class="seg-btn range-custom" data-erange="custom" data-i18n="report.custom">自訂</button>
+        <button class="seg-btn range-back" data-erange="back" hidden data-i18n="common.back">返回</button>
       </div>
       <div class="custom-range" id="entriesCustomRange" hidden>
-        <label>開始 <input id="entriesRangeFrom" type="date" /></label>
+        <label><span data-i18n="entry.start">開始</span> <input id="entriesRangeFrom" type="date" /></label>
         <span>～</span>
-        <label>結束 <input id="entriesRangeTo" type="date" /></label>
-        <button id="entriesApplyRange" class="btn-sm" type="button">套用</button>
+        <label><span data-i18n="entry.end">結束</span> <input id="entriesRangeTo" type="date" /></label>
+        <button id="entriesApplyRange" class="btn-sm" type="button" data-i18n="entry.apply">套用</button>
       </div>
-      <button id="enExpandAll" title="展開／收合所有工作紀錄">[+] 全部展開</button>
+      <button id="enExpandAll" data-i18n-title="entry.expandAll" title="展開／收合所有工作紀錄" data-i18n="entry.expandAll">[+] 全部展開</button>
     </div>
 
     <div class="toolbar">
-      <button id="addEntry">手動補登</button>
-      <button id="copyToday">複製今日總結</button>
-      <button id="copyRange">複製區間總結</button>
+      <button id="addEntry" data-i18n="entry.manual">手動補登</button>
+      <button id="copyToday" data-i18n="entry.copyToday">複製今日總結</button>
+      <button id="copyRange" data-i18n="entry.copyRange">複製區間總結</button>
       <button id="exportFiltered">↓ CSV</button>
       <div class="grow"></div>
       <span class="cap" id="entryCount"></span>
@@ -382,38 +383,38 @@
           </select>
         </label>
         <label class="field">
-          <span>閒置提醒（分）</span>
+          <span data-i18n="settings.idleLabel">閒置提醒（分）</span>
           <input id="stIdle" type="number" min="1" step="1" />
-          <span class="hint">計時中這麼久沒碰鍵盤滑鼠（或鎖螢幕），回來時會問你這段要不要扣掉。防止忘記按停止導致時數灌水。</span>
+          <span class="hint" data-i18n="settings.idleHint">計時中這麼久沒碰鍵盤滑鼠（或鎖螢幕），回來時會問你這段要不要扣掉。防止忘記按停止導致時數灌水。</span>
         </label>
         <label class="field">
-          <span>每筆進位（分）</span>
+          <span data-i18n="settings.roundLabel">每筆進位（分）</span>
           <select id="stRound">
-            <option value="0">不進位</option><option value="5">5</option>
+            <option value="0" data-i18n="settings.roundNone">不進位</option><option value="5">5</option>
             <option value="6">6</option><option value="15">15</option><option value="30">30</option>
           </select>
-          <span class="hint">每筆紀錄長度往上湊到這個倍數。設 15 的話，8 分鐘會記成 15 分鐘。想要精確時數就留「不進位」。</span>
+          <span class="hint" data-i18n="settings.roundHint">每筆紀錄長度往上湊到這個倍數。設 15 的話，8 分鐘會記成 15 分鐘。想要精確時數就留「不進位」。</span>
         </label>
         <label class="field">
-          <span>筆記編輯方式</span>
+          <span data-i18n="settings.editorLabel">筆記編輯方式</span>
           <select id="stNotesEditor">
-            <option value="toolbar">工具列編輯器</option>
-            <option value="source">Markdown 原始碼</option>
+            <option value="toolbar" data-i18n="settings.editorToolbar">工具列編輯器</option>
+            <option value="source" data-i18n="settings.editorSource">Markdown 原始碼</option>
           </select>
-          <span class="hint">工具列會幫你插入粗體、斜體、標題、清單等 Markdown；資料仍以 Markdown 儲存。</span>
+          <span class="hint" data-i18n="settings.editorHint">工具列會幫你插入粗體、斜體、標題、清單等 Markdown；資料仍以 Markdown 儲存。</span>
         </label>
       </div>
       <div class="actions"><button id="saveSettings" class="btn-primary" data-i18n="common.save">儲存設定</button></div>
     </div>
 
-    <h2 class="sec" data-collapse="set-data"><span class="mark">[-]</span> 資料</h2>
+    <h2 class="sec" data-collapse="set-data"><span class="mark">[-]</span> <span data-i18n="settings.data">資料</span></h2>
     <div class="card" data-collapse-body="set-data">
-      <p class="cap">資料只存在這台瀏覽器。換機器或重裝前記得備份。</p>
+      <p class="cap" data-i18n="settings.dataHint">資料只存在這台瀏覽器。換機器或重裝前記得備份。</p>
       <div class="actions">
-        <button id="backup">↓ 匯出備份 JSON</button>
-        <button id="restoreBtn">↑ 匯入備份</button>
+        <button id="backup" data-i18n="settings.backup">↓ 匯出備份 JSON</button>
+        <button id="restoreBtn" data-i18n="settings.restore">↑ 匯入備份</button>
         <input id="restoreFile" type="file" accept="application/json" hidden />
-        <button id="wipe" class="btn-danger">[x] 清空所有資料</button>
+        <button id="wipe" class="btn-danger" data-i18n="settings.wipe">[x] 清空所有資料</button>
       </div>
     </div>
   </section>
@@ -422,22 +423,22 @@
 <!-- 紀錄編輯 dialog -->
 <dialog id="entryDlg">
   <form method="dialog" id="entryForm">
-    <h2 class="h" id="dlgTitle">編輯紀錄</h2>
+    <h2 class="h" id="dlgTitle" data-i18n="dialog.edit">編輯紀錄</h2>
     <input type="hidden" id="enId" />
-    <label class="field"><span>描述</span><input id="enDesc" /></label>
+    <label class="field"><span data-i18n="dialog.description">描述</span><input id="enDesc" /></label>
     <div class="grid2">
-      <label class="field"><span>專案</span><select id="enProject"></select></label>
-      <label class="field"><span>Todo</span><select id="enTask"></select></label>
+      <label class="field"><span data-i18n="project.project">專案</span><select id="enProject"></select></label>
+      <label class="field"><span data-i18n="timer.todo">Todo</span><select id="enTask"></select></label>
     </div>
     <div class="grid2">
-      <label class="field"><span>開始</span><input id="enStart" type="datetime-local" /></label>
-      <label class="field"><span>結束</span><input id="enEnd" type="datetime-local" /></label>
+      <label class="field"><span data-i18n="dialog.startedAt">開始</span><input id="enStart" type="datetime-local" /></label>
+      <label class="field"><span data-i18n="dialog.endedAt">結束</span><input id="enEnd" type="datetime-local" /></label>
     </div>
-    <label class="field"><span>工作紀錄</span>
-      <textarea id="enNotes" data-markdown-editor-input placeholder="這段時間做了什麼？"></textarea></label>
+    <label class="field"><span data-i18n="dialog.workNotes">工作紀錄</span>
+      <textarea id="enNotes" data-markdown-editor-input data-i18n-placeholder="entry.notesPlaceholder" placeholder="這段時間做了什麼？"></textarea></label>
     <div class="actions">
-      <button value="cancel">取消</button>
-      <button value="save" class="btn-primary">儲存</button>
+      <button value="cancel" data-i18n="dialog.cancel">取消</button>
+      <button value="save" class="btn-primary" data-i18n="dialog.save">儲存</button>
     </div>
   </form>
 </dialog>

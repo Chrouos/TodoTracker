@@ -1,9 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dailySeries, durationOfEntry, fmtDate } from '../src/lib/time.js';
-import { trendDateBounds } from '../src/lib/report-range.js';
+import { reportRangeBounds, trendDateBounds } from '../src/lib/report-range.js';
 
 const formatBounds = ({ from, to }) => ({ from: fmtDate(from), to: fmtDate(to) });
+
+test('report quick ranges have exclusive end boundaries', () => {
+  const now = new Date(2026, 7, 17, 15, 30);
+  assert.deepEqual(formatBounds(reportRangeBounds('today', now, 1)), {
+    from: '2026-08-17', to: '2026-08-18',
+  });
+  assert.deepEqual(formatBounds(reportRangeBounds('week', now, 1)), {
+    from: '2026-08-17', to: '2026-08-24',
+  });
+  assert.deepEqual(formatBounds(reportRangeBounds('month', now, 1)), {
+    from: '2026-08-01', to: '2026-09-01',
+  });
+});
 
 test('today trend bounds include today and the five preceding dates', () => {
   const now = new Date(2026, 7, 17);

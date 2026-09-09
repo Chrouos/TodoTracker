@@ -84,6 +84,13 @@ test('renders markdown tables with aligned cells and inline markdown', () => {
   );
 });
 
+test('renders tables whose alignment marker has only two dashes', () => {
+  assert.match(
+    markdownToHTML('| Tag | 判定 |\n| --- | --: |\n| `packaged` | ✅ 是 |'),
+    /^<table>[\s\S]*<th style="text-align:right">判定<\/th>[\s\S]*<\/table>$/,
+  );
+});
+
 test('escapes table cells and pads short rows', () => {
   assert.equal(
     markdownToHTML('| A | B |\n| --- | --- |\n| <x> |'),

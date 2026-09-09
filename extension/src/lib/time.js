@@ -70,6 +70,82 @@ export function localDateRange(fromDate, toDate) {
   return { from, to };
 }
 
+function entryBounds(entry) {
+  if (!entry?.endedAt) return null;
+  const start = new Date(entry.startedAt);
+  const end = new Date(entry.endedAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
+  return { start, end };
+}
+
+/** 判斷工作紀錄是否與 [from, to) 的本機時間區間重疊。 */
+export function entryOverlapsRange(entry, from, to = null) {
+  const bounds = entryBounds(entry);
+  if (!bounds) return false;
+  const rangeStart = new Date(from);
+  const rangeEnd = to ? new Date(to) : null;
+  if (Number.isNaN(rangeStart.getTime()) || (rangeEnd && Number.isNaN(rangeEnd.getTime()))) return false;
+  return bounds.end > rangeStart && (!rangeEnd || bounds.start < rangeEnd);
+}
+
+/** 取得工作紀錄在 [from, to) 本機時間區間內實際重疊的秒數。 */
+export function durationInRange(entry, from, to = null) {
+  const bounds = entryBounds(entry);
+  if (!bounds) return 0;
+  const rangeStart = new Date(from);
+  const rangeEnd = to ? new Date(to) : null;
+  if (Number.isNaN(rangeStart.getTime()) || (rangeEnd && Number.isNaN(rangeEnd.getTime()))) return 0;
+  const clippedStart = Math.max(bounds.start.getTime(), rangeStart.getTime());
+  const clippedEnd = rangeEnd
+    ? Math.min(bounds.end.getTime(), rangeEnd.getTime())
+    : bounds.end.getTime();
+  return clippedEnd > clippedStart ? Math.round((clippedEnd - clippedStart) / 1000) : 0;
+}
+
+/** 產生只涵蓋指定區間的工作紀錄副本，供報表顯示與統計使用。 */
+export function clipEntryToRange(entry, from, to = null) {
+  const bounds = entryBounds(entry);
+  if (!bounds || !entryOverlapsRange(entry, from, to)) return null;
+  const rangeStart = new Date(from);
+  const rangeEnd = to ? new Date(to) : null;
+  const clippedStart = new Date(Math.max(bounds.start.getTime(), rangeStart.getTime()));
+  const clippedEnd = new Date(rangeEnd
+    ? Math.min(bounds.end.getTime(), rangeEnd.getTime())
+    : bounds.end.getTime());
+  return {
+    ...entry,
+    startedAt: clippedStart.toISOString(),
+    endedAt: clippedEnd.toISOString(),
+    seconds: Math.round((clippedEnd - clippedStart) / 1000),
+  };
+}
+
+/** 把工作紀錄切成各本機日的片段，讓跨午夜紀錄能同時出現在兩天。 */
+export function splitEntryByDay(entry) {
+  const bounds = entryBounds(entry);
+  if (!bounds) return [];
+  const parts = [];
+  let cursor = new Date(bounds.start);
+  let guard = 0;
+  while (cursor < bounds.end && guard++ < 400) {
+    const dayStart = startOfDay(cursor);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const clippedStart = new Date(Math.max(bounds.start.getTime(), dayStart.getTime()));
+    const clippedEnd = new Date(Math.min(bounds.end.getTime(), dayEnd.getTime()));
+    if (clippedEnd > clippedStart) {
+      parts.push({
+        ...entry,
+        startedAt: clippedStart.toISOString(),
+        endedAt: clippedEnd.toISOString(),
+        seconds: Math.round((clippedEnd - clippedStart) / 1000),
+      });
+    }
+    cursor = dayEnd;
+  }
+  return parts;
+}
+
 export function activeRange(range, customOpen) {
   return customOpen ? 'custom' : range;
 }
@@ -92,27 +168,9 @@ export function dailySeries(entries, from, to, durationOf) {
     bucket.set(fmtDate(d), 0);
   }
   for (const e of entries) {
-    if (!e.endedAt) continue;
-    const start = new Date(e.startedAt);
-    const end = new Date(e.endedAt);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) continue;
-    let cursor = start;
-    let guard = 0;
-    while (cursor < end && guard++ < 400) {
-      const dayStart = startOfDay(cursor);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-      const clippedStart = new Date(Math.max(start.getTime(), dayStart.getTime()));
-      const clippedEnd = new Date(Math.min(end.getTime(), dayEnd.getTime()));
-      const key = fmtDate(dayStart);
-      if (bucket.has(key) && clippedEnd > clippedStart) {
-        bucket.set(key, bucket.get(key) + durationOf({
-          ...e,
-          startedAt: clippedStart.toISOString(),
-          endedAt: clippedEnd.toISOString(),
-        }));
-      }
-      cursor = dayEnd;
+    for (const part of splitEntryByDay(e)) {
+      const key = fmtDate(part.startedAt);
+      if (bucket.has(key)) bucket.set(key, bucket.get(key) + durationOf(part));
     }
   }
   return [...bucket.entries()].map(([date, seconds]) => ({ date, seconds }));
@@ -121,9 +179,11 @@ export function dailySeries(entries, from, to, durationOf) {
 export function dailyReviewData(entries, dates) {
   const byDate = new Map(dates.map((date) => [date, []]));
   for (const entry of entries) {
-    if (!entry.endedAt || entry.deletedAt) continue;
-    const date = fmtDate(entry.startedAt);
-    if (byDate.has(date)) byDate.get(date).push(entry);
+    if (entry.deletedAt) continue;
+    for (const part of splitEntryByDay(entry)) {
+      const date = fmtDate(part.startedAt);
+      if (byDate.has(date)) byDate.get(date).push(part);
+    }
   }
   return [...byDate.entries()].map(([date, items]) => ({
     date,
@@ -134,14 +194,18 @@ export function dailyReviewData(entries, dates) {
 export function calendarReviewData(entries, dates, defaultFrom = 8 * 60, defaultTo = 18 * 60) {
   const byDate = new Map(dates.map((date) => [date, []]));
   for (const entry of entries) {
-    if (!entry.endedAt || entry.deletedAt) continue;
-    const date = fmtDate(entry.startedAt);
-    if (!byDate.has(date)) continue;
-    const started = new Date(entry.startedAt);
-    const ended = new Date(entry.endedAt);
-    const start = started.getHours() * 60 + started.getMinutes();
-    const end = Math.max(start + 1, ended.getHours() * 60 + ended.getMinutes());
-    byDate.get(date).push({ entry, id: entry.id, start, end });
+    if (entry.deletedAt) continue;
+    for (const part of splitEntryByDay(entry)) {
+      const date = fmtDate(part.startedAt);
+      if (!byDate.has(date)) continue;
+      const started = new Date(part.startedAt);
+      const ended = new Date(part.endedAt);
+      const start = started.getHours() * 60 + started.getMinutes();
+      const end = fmtDate(part.endedAt) !== date
+        ? 1440
+        : Math.max(start + 1, ended.getHours() * 60 + ended.getMinutes());
+      byDate.get(date).push({ entry: part, id: part.id, start, end });
+    }
   }
 
   let axisFrom = defaultFrom;
@@ -221,7 +285,17 @@ export function timelineData(entries, dates) {
         const raw = segEnd.getTime() === midnight.getTime()
           ? 1440
           : segEnd.getHours() * 60 + segEnd.getMinutes();
-        byDay.get(dayKey).push({ s, e: Math.max(raw, s + 1), entry: e });
+        const clippedEnd = Math.max(raw, s + 1);
+        byDay.get(dayKey).push({
+          s,
+          e: clippedEnd,
+          entry: {
+            ...e,
+            startedAt: cursor.toISOString(),
+            endedAt: segEnd.toISOString(),
+            seconds: Math.round((segEnd.getTime() - cursor.getTime()) / 1000),
+          },
+        });
       }
       cursor = midnight;
     }

@@ -13,7 +13,7 @@ assert.match(options, /const trackerEntries = S\.entries\.filter/, 'Todo tracker
 assert.match(options, /renderProjectTrend\(trendEntries, trendDates, trackerEntries\)/, 'Project trend and Todo tracker should use separate entry ranges');
 assert.match(options, /renderTodoTracker\(trackerEntries\)/, 'Todo tracker should derive its own full-history range');
 assert.match(options, /completedTodayCount/, 'Todo tracker should expose today completion count');
-assert.match(options, /今日結案/, 'Todo tracker toolbar should label today completions');
+assert.match(options, /translateText\('report\.todayCompleted'/, 'Todo tracker toolbar should label today completions');
 assert.match(options, /let todoTrackerFilter = ['"]active['"]/, 'Todo tracker should hide completed items by default');
 assert.match(options, /data-todo-tracker-filter/, 'Todo tracker should expose a status filter');
 assert.match(options, /item\.status !== ['"]done['"]|item\.status === ['"]done['"]/, 'Todo tracker should filter completed items by status');
@@ -30,7 +30,7 @@ assert.match(options, /let todoTrackerFilter = ['"]active['"]/, 'Todo tracker sh
 assert.match(options, /data-todo-tracker-filter/, 'Todo tracker should expose a status filter');
 assert.match(options, /item\.status !== ['"]done['"]|item\.status === ['"]done['"]/, 'Todo tracker should filter completed items by status');
 assert.match(options, /completedTodayCount/, 'Todo tracker should expose today completion count');
-assert.match(options, /今日結案/, 'Todo tracker toolbar should label today completions');
+assert.match(options, /translateText\('report\.todayCompleted'/, 'Todo tracker toolbar should label today completions');
 assert.match(options, /todoTrackerVisibleDays|visibleDays/, 'Todo tracker should calculate visible dates from the viewport');
 assert.match(options, /data-todo-tracker-shift="-1"|data-todo-tracker-shift='-1'/, 'Todo tracker should navigate one day backward');
 assert.match(options, /data-todo-tracker-shift="-7"|data-todo-tracker-shift='-7'/, 'Todo tracker should navigate one week backward');
@@ -39,7 +39,8 @@ assert.match(options, /data-todo-tracker-range/, 'Todo tracker should expose the
 assert.match(options, /data-todo-tracker-close/, 'Todo tracker should expose a detail close action');
 assert.match(options, /todoTrackerDateRange\(item\)/, 'Todo tracker rows should expose their lifecycle date range');
 assert.match(options, /class="todo-tracker-label-meta"/, 'Todo tracker labels should expose lifecycle metadata');
-assert.match(options, /\$\{item\.workedDays\} 天 \/ 共 \$\{item\.lifecycleDays\} 天/, 'Todo tracker labels should show worked days against lifecycle days');
+assert.match(options, /translateText\('report\.workedDays'/, 'Todo tracker labels should show worked days');
+assert.match(options, /translateText\('report\.totalDays'/, 'Todo tracker labels should show lifecycle days');
 assert.match(options, /todoTrackerCollapsedIds/, 'Todo tracker should preserve per-row collapsed state');
 assert.match(options, /data-todo-tracker-collapse/, 'Todo tracker rows should expose a collapse control');
 assert.match(options, /<details class="todo-tracker-label-details"/, 'Todo tracker labels should use a native disclosure control');

@@ -6,6 +6,7 @@ import {
   buildProjectTaskMetrics,
   buildProjectMetricChartData,
   buildReportActionItems,
+  buildWorkspaceTodoProgress,
   buildProjectHealthRows,
   compareSeconds,
 } from '../src/lib/report-metrics.js';
@@ -66,6 +67,7 @@ test('buildProjectTaskMetrics reports completion, work, and overdue state by pro
   const entries = [
     entry({ id: 'work-1', projectId: 'p1', taskId: 't1', startedAt: '2026-08-20T10:00:00+08:00', endedAt: '2026-08-20T12:00:00+08:00' }),
     entry({ id: 'work-2', projectId: 'p1', taskId: 't2', startedAt: '2026-08-21T10:00:00+08:00', endedAt: '2026-08-21T11:00:00+08:00' }),
+    entry({ id: 'work-direct', projectId: 'p1', startedAt: '2026-08-21T11:00:00+08:00', endedAt: '2026-08-21T12:00:00+08:00' }),
   ];
 
   assert.deepEqual(buildProjectTaskMetrics(tasks, entries, '2026-08-21'), [{
@@ -74,7 +76,7 @@ test('buildProjectTaskMetrics reports completion, work, and overdue state by pro
     done: 1,
     completionRate: 0.5,
     overdue: 1,
-    workedSeconds: 10800,
+    workedSeconds: 14400,
     averageLeadMs: 172800000,
   }]);
 });
@@ -149,6 +151,17 @@ test('buildReportActionItems returns a clear state when there is nothing to fix'
   }), [
     { kind: 'clear', tone: 'success', label: '目前沒有待處理項目', value: 0 },
   ]);
+});
+
+test('buildWorkspaceTodoProgress reflects Todo completion changes', () => {
+  assert.deepEqual(buildWorkspaceTodoProgress([
+    { total: 10, done: 9 },
+    { total: 4, done: 2 },
+  ]), { done: 11, total: 14 });
+  assert.deepEqual(buildWorkspaceTodoProgress([
+    { total: 10, done: 10 },
+    { total: 4, done: 2 },
+  ]), { done: 12, total: 14 });
 });
 
 test('buildProjectHealthRows sorts projects by attention before workload', () => {

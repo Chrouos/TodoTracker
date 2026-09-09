@@ -7,10 +7,41 @@ const popup = await readFile(new URL('../src/popup/popup.js', import.meta.url), 
 for (const key of ['popup.track', 'popup.todo', 'popup.copySummary', 'timer.start']) {
   assert.match(html, new RegExp(`data-i18n="${key}"`), `Popup markup should mark ${key}`);
 }
+for (const key of [
+  'popup.manage', 'popup.logEntry', 'popup.saveLog', 'timer.keepTime', 'timer.discardTime',
+  'popup.descriptionPlaceholder', 'timer.notes', 'popup.recentEntries', 'popup.newTodoPlaceholder',
+  'project.project', 'todo.parent', 'todo.priority', 'todo.dueDate', 'todo.dueTime',
+  'common.filter', 'todo.status',
+]) {
+  assert.match(html, new RegExp(`data-i18n(?:-[a-z-]+)?="${key}"`), `Popup markup should mark ${key}`);
+}
+for (const key of ['popup.todoPlaceholder', 'popup.notesPlaceholder']) {
+  assert.match(html, new RegExp(`data-i18n-placeholder="${key}"`), `Popup markup should translate ${key}`);
+}
+assert.match(html, /id="ctx"[^>]*data-i18n="timer\.notStarted"/);
 for (const name of ['resolveLocale', 'getBrowserLocale', 'applyTranslations', 'translate']) {
   assert.match(popup, new RegExp(`\\b${name}\\b`), `Popup should use ${name}`);
 }
 assert.match(popup, /formatDuration/, 'Popup should use the shared duration formatter');
 assert.match(popup, /locale:\s*currentLocale/, 'Popup summary should use the selected locale');
+for (const key of [
+  'popup.manage', 'popup.logEntry', 'popup.saveLog', 'timer.keepTime', 'timer.discardTime',
+  'popup.descriptionPlaceholder', 'timer.notes', 'popup.recentEntries', 'popup.newTodoPlaceholder',
+  'project.project', 'todo.parent', 'todo.priority', 'todo.dueDate', 'todo.dueTime',
+  'common.filter', 'todo.status',
+]) {
+  assert.match(html, new RegExp(`data-i18n(?:-[a-z-]+)?="${key}"`), `Popup markup should mark ${key}`);
+}
+for (const key of ['popup.todoPlaceholder', 'popup.notesPlaceholder']) {
+  assert.match(html, new RegExp(`data-i18n-placeholder="${key}"`), `Popup markup should translate ${key}`);
+}
+assert.match(popup, /formatDisplayTime/, 'Popup should use the locale-aware time formatter');
+assert.match(popup, /document\.documentElement\.lang/);
+for (const key of [
+  'common.unnamedWork', 'popup.resumeEntry', 'popup.addSubtaskButton', 'popup.saved', 'todo.addSubtask',
+  'todo.start', 'common.delete', 'common.uncategorizedOption', 'common.noTodoOption',
+]) {
+  assert.match(popup, new RegExp(`translate\\(currentLocale, ['"]${key}['"]`), `Popup should translate ${key}`);
+}
 
 console.log('popup layout contract passed');

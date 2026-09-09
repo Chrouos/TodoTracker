@@ -11,31 +11,31 @@
     <span class="h">TodoTracker</span>
     <span class="grow"></span>
     <button id="copyToday" class="btn-ghost btn-sm" data-i18n="popup.copySummary" data-i18n-title="popup.copySummary">[複製今日]</button>
-    <button id="openOptions" class="btn-ghost btn-sm" title="管理與報表">[管理]</button>
+    <button id="openOptions" class="btn-ghost btn-sm" data-i18n="popup.manage" data-i18n-title="popup.manage">[管理]</button>
   </header>
 
   <!-- 全系統唯一的深色面板 -->
   <section id="panel">
     <div id="clock" class="num">00:00:00</div>
-    <div id="ctx" class="ctx">未計時</div>
+    <div id="ctx" class="ctx" data-i18n="timer.notStarted">未計時</div>
     <button id="toggle" class="btn-primary" data-state="idle"><span data-i18n="timer.start">開始計時</span></button>
   </section>
 
   <!-- 停止計時後補寫工作紀錄 -->
   <div id="logBox" hidden>
-    <div class="logtitle">工作紀錄 · <span id="logMeta"></span></div>
-    <textarea id="logText" placeholder="這段時間做了什麼？留給之後的自己看"></textarea>
+    <div class="logtitle"><span data-i18n="popup.logEntry">工作紀錄</span> · <span id="logMeta"></span></div>
+    <textarea id="logText" data-i18n-placeholder="popup.notesPlaceholder" placeholder="這段時間做了什麼？留給之後的自己看"></textarea>
     <div class="logacts">
-      <button id="logSkip" class="btn-sm">略過</button>
-      <button id="logSave" class="btn-sm btn-primary">儲存紀錄</button>
+      <button id="logSkip" class="btn-sm" data-i18n="common.cancel">略過</button>
+      <button id="logSave" class="btn-sm btn-primary" data-i18n="popup.saveLog">儲存紀錄</button>
     </div>
   </div>
 
   <div id="idleBar" hidden>
     <span class="mark">[!]</span>
     <span class="grow" id="idleText"></span>
-    <button id="idleKeep" class="btn-sm">保留</button>
-    <button id="idleDrop" class="btn-sm btn-danger">扣掉</button>
+    <button id="idleKeep" class="btn-sm" data-i18n="timer.keepTime">保留</button>
+    <button id="idleDrop" class="btn-sm btn-danger" data-i18n="timer.discardTime">扣掉</button>
   </div>
 
   <nav class="tabs" id="tabs">
@@ -46,95 +46,95 @@
   <!-- ── 計時分頁 ── -->
   <main id="tab-track">
     <div class="fields">
-      <input id="desc" placeholder="在做什麼？" autocomplete="off" />
+      <input id="desc" data-i18n-placeholder="popup.descriptionPlaceholder" placeholder="在做什麼？" autocomplete="off" />
       <div class="two">
-        <select id="project"></select>
-        <select id="task"></select>
+        <select id="project" data-i18n-placeholder="popup.projectPlaceholder"></select>
+        <select id="task" data-i18n-placeholder="popup.todoPlaceholder"></select>
       </div>
       <div id="tagRow" class="tagrow"></div>
 
       <!-- 計時中隨手記；停止時會跟著存進那筆紀錄 -->
       <div id="liveLog" hidden>
         <div class="logtitle">
-          <span class="sec-btn" data-collapse="pop-live"><span class="mark">[-]</span> 工作紀錄</span>
-          <button id="stampBtn" class="btn-sm" title="插入現在時間">[時間]</button>
+          <span class="sec-btn" data-collapse="pop-live"><span class="mark">[-]</span> <span data-i18n="timer.notes">工作紀錄</span></span>
+          <button id="stampBtn" class="btn-sm" data-i18n="popup.insertTime" data-i18n-title="popup.insertTime">[時間]</button>
           <span id="liveSaved" class="cap"></span>
         </div>
         <textarea id="liveText" data-collapse-body="pop-live"
-          placeholder="隨時寫，停止計時時一起存進這筆"></textarea>
+          data-i18n-placeholder="popup.notesPlaceholder" placeholder="隨時寫，停止計時時一起存進這筆"></textarea>
       </div>
     </div>
 
     <div class="hr"></div>
 
     <div id="stats" class="stats">
-      <div><span class="cap">今日</span><span id="stToday" class="num">0m</span></div>
-      <div><span class="cap">本週</span><span id="stWeek" class="num">0m</span></div>
-      <div><span class="cap">今日筆數</span><span id="stCount" class="num">0</span></div>
+      <div><span class="cap" data-i18n="report.today">今日</span><span id="stToday" class="num">0m</span></div>
+      <div><span class="cap" data-i18n="report.week">本週</span><span id="stWeek" class="num">0m</span></div>
+      <div><span class="cap" data-i18n="popup.todayEntries">今日筆數</span><span id="stCount" class="num">0</span></div>
     </div>
 
     <div class="hr"></div>
 
-    <div class="sec-title sec-btn" data-collapse="pop-recent"><span class="mark">[-]</span> 最近</div>
+    <div class="sec-title sec-btn" data-collapse="pop-recent"><span class="mark">[-]</span> <span data-i18n="popup.recentEntries">最近</span></div>
     <div id="recent" data-collapse-body="pop-recent"></div>
   </main>
 
   <!-- ── Todo 分頁 ── -->
   <main id="tab-todo" hidden>
     <div class="quick-todo">
-      <input id="newTodo" placeholder="新增 todo，Enter 送出" autocomplete="off" />
-      <button id="todoMore" type="button" class="btn-ghost btn-sm" aria-expanded="false">[+] 詳細設定</button>
+      <input id="newTodo" data-i18n-placeholder="popup.newTodoPlaceholder" placeholder="新增 todo，Enter 送出" autocomplete="off" />
+      <button id="todoMore" type="button" class="btn-ghost btn-sm" data-i18n="popup.advanced" aria-expanded="false">[+] 詳細設定</button>
     </div>
     <div id="todoAdvanced" class="todo-advanced" hidden>
       <label class="quick-field">
-        <span>新增到專案</span>
+        <span data-i18n="project.project">新增到專案</span>
         <select id="todoCreateProject"></select>
       </label>
       <label class="quick-field">
-        <span>父任務（建立子任務）</span>
+        <span data-i18n="todo.parent">父任務（建立子任務）</span>
         <select id="todoParent"></select>
       </label>
       <div class="two">
         <label class="quick-field">
-          <span>優先級</span>
+          <span data-i18n="todo.priority">優先級</span>
           <select id="todoPriority">
-            <option value="normal">一般</option>
-            <option value="urgent">緊急</option>
-            <option value="high">高</option>
-            <option value="low">低</option>
+            <option value="normal" data-i18n="todo.priority.normal">一般</option>
+            <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
+            <option value="high" data-i18n="todo.priority.high">高</option>
+            <option value="low" data-i18n="todo.priority.low">低</option>
           </select>
         </label>
         <label class="quick-field">
-          <span>截止日期</span>
+          <span data-i18n="todo.dueDate">截止日期</span>
           <input id="todoDue" type="date" />
         </label>
       </div>
       <label class="quick-field">
-        <span>截止時間（可選）</span>
+        <span data-i18n="todo.dueTime">截止時間（可選）</span>
         <input id="todoDueTime" type="time" />
       </label>
       <label class="quick-field">
-        <span>清單篩選</span>
+        <span data-i18n="common.filter">清單篩選</span>
         <select id="todoFilter"></select>
       </label>
       <label class="quick-field">
-        <span>優先級篩選</span>
+        <span data-i18n="todo.priority">優先級篩選</span>
         <select id="todoPriorityFilter">
-          <option value="">— 全部優先級 —</option>
-          <option value="urgent">緊急</option>
-          <option value="high">高</option>
-          <option value="normal">一般</option>
-          <option value="low">低</option>
+          <option value="" data-i18n="todo.allPriorities">— 全部優先級 —</option>
+          <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
+          <option value="high" data-i18n="todo.priority.high">高</option>
+          <option value="normal" data-i18n="todo.priority.normal">一般</option>
+          <option value="low" data-i18n="todo.priority.low">低</option>
         </select>
       </label>
       <label class="quick-field">
-        <span>狀態篩選</span>
+        <span data-i18n="todo.status">狀態篩選</span>
         <select id="todoStatusFilter">
-          <option value="all">全部</option>
-          <option value="active">未完成</option>
-          <option value="doing">進行中</option>
-          <option value="todo">待辦</option>
-          <option value="done">已完成</option>
+          <option value="all" data-i18n="todo.status.all">全部</option>
+          <option value="active" data-i18n="todo.status.active">未完成</option>
+          <option value="doing" data-i18n="todo.status.doing">進行中</option>
+          <option value="todo" data-i18n="todo.status.todo">待辦</option>
+          <option value="done" data-i18n="todo.status.done">已完成</option>
         </select>
       </label>
     </div>

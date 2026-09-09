@@ -1,6 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeRange, calendarEntryTooltip, calendarReviewData, currentWeekDateRange, dailyReviewData, localDateRange, rangeControlState } from './time.js';
+import {
+  activeRange,
+  calendarEntryTooltip,
+  calendarReviewData,
+  clipEntryToRange,
+  currentWeekDateRange,
+  dailyReviewData,
+  durationInRange,
+  entryOverlapsRange,
+  localDateRange,
+  rangeControlState,
+  timelineData,
+} from './time.js';
+
+test('range helpers include and clip overnight work by the selected local window', () => {
+  const overnight = {
+    startedAt: '2026-08-10T23:30:00+08:00',
+    endedAt: '2026-08-11T01:30:00+08:00',
+  };
+  const dayAfter = new Date(2026, 7, 11);
+  const nextDay = new Date(2026, 7, 12);
+
+  assert.equal(entryOverlapsRange(overnight, dayAfter, nextDay), true);
+  assert.equal(durationInRange(overnight, dayAfter, nextDay), 90 * 60);
+  assert.equal(durationInRange(overnight, new Date(2026, 7, 10), dayAfter), 30 * 60);
+  const clipped = clipEntryToRange(overnight, dayAfter, nextDay);
+  assert.equal(clipped.startedAt, dayAfter.toISOString());
+  assert.equal(clipped.endedAt, new Date(2026, 7, 11, 1, 30).toISOString());
+});
 
 test('calendarEntryTooltip includes readable work context', () => {
   const tooltip = calendarEntryTooltip('API 問題', {
@@ -39,6 +67,59 @@ test('dailyReviewData keeps empty dates and sorts work by start time', () => {
   assert.deepEqual(result[0].entries, []);
   assert.deepEqual(result[1].entries.map((entry) => entry.id), ['early', 'late']);
   assert.deepEqual(result[2].entries, []);
+});
+
+test('dailyReviewData splits overnight work into each local calendar day', () => {
+  const start = new Date(2026, 7, 10, 23, 30);
+  const midnight = new Date(2026, 7, 11);
+  const end = new Date(2026, 7, 11, 1, 30);
+  const result = dailyReviewData([{
+    id: 'overnight',
+    startedAt: start.toISOString(),
+    endedAt: end.toISOString(),
+  }], ['2026-08-10', '2026-08-11']);
+
+  assert.deepEqual(result.map((group) => group.entries.map((entry) => ({
+    id: entry.id,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+  }))), [
+    [{ id: 'overnight', startedAt: start.toISOString(), endedAt: midnight.toISOString() }],
+    [{ id: 'overnight', startedAt: midnight.toISOString(), endedAt: end.toISOString() }],
+  ]);
+});
+
+test('calendarReviewData places overnight work on both local calendar days', () => {
+  const result = calendarReviewData([{
+    id: 'overnight',
+    startedAt: new Date(2026, 7, 10, 23, 30).toISOString(),
+    endedAt: new Date(2026, 7, 11, 1, 30).toISOString(),
+  }], ['2026-08-10', '2026-08-11']);
+
+  assert.deepEqual(result.days.map((day) => day.entries.map(({ id, start, end }) => ({ id, start, end }))), [
+    [{ id: 'overnight', start: 23 * 60 + 30, end: 1440 }],
+    [{ id: 'overnight', start: 0, end: 90 }],
+  ]);
+});
+
+test('timelineData keeps each overnight block tooltip range scoped to its day', () => {
+  const start = new Date(2026, 7, 10, 23, 30);
+  const midnight = new Date(2026, 7, 11);
+  const end = new Date(2026, 7, 11, 1, 30);
+  const result = timelineData([{
+    id: 'overnight',
+    startedAt: start.toISOString(),
+    endedAt: end.toISOString(),
+  }], ['2026-08-10', '2026-08-11']);
+
+  assert.deepEqual(result.days.map((day) => day.blocks.map((block) => ({
+    id: block.entry.id,
+    startedAt: block.entry.startedAt,
+    endedAt: block.entry.endedAt,
+  }))), [
+    [{ id: 'overnight', startedAt: start.toISOString(), endedAt: midnight.toISOString() }],
+    [{ id: 'overnight', startedAt: midnight.toISOString(), endedAt: end.toISOString() }],
+  ]);
 });
 
 test('rangeControlState switches between quick ranges and custom controls', () => {

@@ -12,6 +12,7 @@ import {
 import {
   fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
   dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
+  clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
 import { timelineSVG, stackedAreaSVG, heatmapSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
@@ -25,7 +26,7 @@ import {
   priorityLabel, statusLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
-import { trendDateBounds } from '../lib/report-range.js';
+import { reportRangeBounds, trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
 import {
@@ -39,6 +40,7 @@ import {
   buildProjectHealthRows,
   buildReportActionItems,
   buildReportQuality,
+  buildWorkspaceTodoProgress,
 } from '../lib/report-metrics.js';
 import {
   mountMarkdownEditor,
@@ -93,7 +95,7 @@ function isMarkdownEditorFocused(textarea) {
 function setMarkdownPreviewExpanded(preview, expanded) {
   preview.classList.toggle('is-expanded', expanded);
   preview.querySelectorAll('[data-markdown-toggle]').forEach((button) => {
-    button.textContent = expanded ? '[-] 收闔全文' : '[+] 展開全文';
+    button.textContent = expanded ? translateText('entry.collapseAll') : translateText('entry.expandAll');
     button.setAttribute('aria-expanded', String(expanded));
   });
 }
@@ -109,7 +111,7 @@ function measureMarkdownPreview(preview, preserveExpanded = false, alwaysExpande
   preview.classList.toggle('is-collapsible', isLong);
   let button = preview.querySelector('[data-markdown-toggle]');
   if (isLong && !button) {
-    preview.insertAdjacentHTML('afterbegin', '<button type="button" class="btn-sm markdown-toggle markdown-toggle-top" data-markdown-toggle aria-expanded="false">[+] 展開全文</button>');
+    preview.insertAdjacentHTML('afterbegin', `<button type="button" class="btn-sm markdown-toggle markdown-toggle-top" data-markdown-toggle aria-expanded="false">${esc(translateText('entry.expandAll'))}</button>`);
     button = preview.querySelector('[data-markdown-toggle]');
   } else if (!isLong && button) {
     button.remove();
@@ -145,7 +147,7 @@ let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: 
 function renderEntryTasks(selectedTaskId = '') {
   const projectId = $('enProject').value;
   const tasks = sortTasksForManualEntry(tasksForProject(S.tasks, projectId), S.entries);
-  $('enTask').innerHTML = '<option value="">— 無 —</option>' +
+  $('enTask').innerHTML = `<option value="">${esc(translateText('common.noTodoOption'))}</option>` +
     tasks.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
   $('enTask').value = tasks.some((task) => task.id === selectedTaskId) ? selectedTaskId : '';
 }
@@ -177,6 +179,7 @@ let timerNotesSaveTimer = null;
 let timerCompleteChoice = false;
 let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
 let timerNotesPreviewOpen = false;
+let reviewCalendarHoveredTarget = null;
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, timer, settings] = await Promise.all([
@@ -185,28 +188,25 @@ async function load() {
   ]);
   S = { projects, tags, tasks, entries, schedules, timer, settings };
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
+  document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
   renderAll();
   $('initialLoading').hidden = true;
 }
 
 function rangeStart() {
-  if (range === 'today') return startOfDay();
-  if (range === 'week') return startOfWeek(new Date(), S.settings.weekStartsOn);
-  if (range === 'month') return startOfMonth();
   if (range === 'custom') return localDateRange(customRange.from, customRange.to)?.from || new Date(0);
-  return new Date(0);
+  return reportRangeBounds(range, new Date(), S.settings.weekStartsOn).from;
 }
 function rangeEnd() {
   if (range === 'custom') return localDateRange(customRange.from, customRange.to)?.to || null;
-  return null;
+  return reportRangeBounds(range, new Date(), S.settings.weekStartsOn).to;
 }
 const inRange = () => {
   const from = rangeStart();
   const to = rangeEnd();
   return S.entries
-    .filter((e) => e.endedAt && new Date(e.startedAt) >= from)
-    .filter((e) => !to || new Date(e.startedAt) < to);
+    .filter((e) => entryOverlapsRange(e, from, to));
 };
 
 function syncRangeControls() {
@@ -259,7 +259,7 @@ function applyCustomRange(source) {
   const from = $(`${prefix}RangeFrom`).value;
   const to = $(`${prefix}RangeTo`).value;
   if (!localDateRange(from, to)) {
-    alert('請選擇有效的日期區間');
+    alert(translateText('common.invalidDateRange'));
     return;
   }
   customRange.from = from;
@@ -342,14 +342,14 @@ function renderTimer() {
 
   syncTimerNotesMode();
   panel.classList.toggle('is-running', Boolean(timer));
-  $('mgTimerStatus').textContent = timer ? '計時中' : '尚未開始';
-  $('mgTimerToggle').textContent = timer ? '停止並儲存' : '開始計時';
+  $('mgTimerStatus').textContent = timer ? translateText('timer.running') : translateText('timer.notStarted');
+  $('mgTimerToggle').textContent = timer ? translateText('timer.stopAndSave') : translateText('timer.startAndSave');
   $('mgTimerIdleNotice').hidden = Boolean(timer);
   $('mgTimerDescription').value = current.description || '';
   if (!isMarkdownEditorFocused($('mgTimerNotes'))) $('mgTimerNotes').value = current.notes || '';
   syncMarkdownEditor($('mgTimerNotes'));
 
-  project.innerHTML = '<option value="">— 未分類 —</option>' +
+  project.innerHTML = `<option value="">${esc(translateText('common.uncategorizedOption'))}</option>` +
     flattenTree(S.projects, { includeArchived: false })
       .map((p) => `<option value="${p.id}">${esc(p.depth ? `${'› '.repeat(p.depth)}${p.name}` : p.name)}</option>`).join('');
   project.value = projectId;
@@ -359,7 +359,7 @@ function renderTimer() {
     .filter((item) => !projectId || item.projectId === projectId);
   const selectedTask = taskId && S.tasks.find((item) => item.id === taskId);
   if (selectedTask && !tasks.some((item) => item.id === taskId)) tasks.unshift(selectedTask);
-  task.innerHTML = '<option value="">— 不掛 Todo —</option>' +
+  task.innerHTML = `<option value="">${esc(translateText('timer.noTodoOption'))}</option>` +
     tasks.map((item) => `<option value="${item.id}">${esc(item.title)}</option>`).join('');
   task.value = taskId;
 
@@ -367,7 +367,7 @@ function renderTimer() {
   $('mgTimerTags').innerHTML = S.tags.length
     ? S.tags.map((tag) => `<button type="button" class="timer-tag${selectedTags.includes(tag.id) ? ' on' : ''}"
         data-mg-timer-tag="${tag.id}">${esc(tag.name)}</button>`).join('')
-    : '<span class="cap">尚未建立標籤</span>';
+    : `<span class="cap">${esc(translateText('tag.noTags'))}</span>`;
 
   $('mgTimerCompleteRow').hidden = !timer?.taskId;
   $('mgTimerComplete').checked = Boolean(timer && timerCompleteChoice);
@@ -396,7 +396,7 @@ async function flushManagementTimerNotes() {
     return;
   }
   S.timer = await db.patchTimer({ notes });
-  $('mgTimerSaved').textContent = '已保存';
+  $('mgTimerSaved').textContent = translateText('timer.saved');
   setTimeout(() => { $('mgTimerSaved').textContent = ''; }, 1200);
 }
 
@@ -431,7 +431,7 @@ $('mgTimerNotes').addEventListener('input', () => {
     timerDraft.notes = $('mgTimerNotes').value;
     return;
   }
-  $('mgTimerSaved').textContent = '儲存中…';
+  $('mgTimerSaved').textContent = translateText('timer.saving');
   clearTimeout(timerNotesSaveTimer);
   timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(), 500);
 });
@@ -495,7 +495,7 @@ function wrapReportChartContent() {
   const wrap = document.querySelector('#byProject .project-trend-wrap');
   if (!wrap || wrap.querySelector('.report-chart-collapse')) return;
 
-  const trend = createReportChartSection('trend', '全部專案');
+  const trend = createReportChartSection('trend', translateText('report.projectAll'));
   [
     wrap.querySelector('.project-trend-toolbar'),
     wrap.querySelector('#projectTrend'),
@@ -504,12 +504,12 @@ function wrapReportChartContent() {
     wrap.querySelector('#projectTrendDetail'),
   ].filter(Boolean).forEach((node) => trend.body.append(node));
 
-  const heatmap = createReportChartSection('heatmap', '專案 × 日期');
+  const heatmap = createReportChartSection('heatmap', translateText('chart.heatmap'));
   wrap.querySelector('.project-heatmap-title')?.remove();
   const heatmapNode = wrap.querySelector('#projectHeatmap');
   if (heatmapNode) heatmap.body.append(heatmapNode);
 
-  const tracker = createReportChartSection('tracker', 'Todo Tracker');
+  const tracker = createReportChartSection('tracker', translateText('report.todoTracker'));
   [wrap.querySelector('#todoTracker'), wrap.querySelector('#todoTrackerDetail')]
     .filter(Boolean).forEach((node) => tracker.body.append(node));
 
@@ -530,15 +530,21 @@ function bindReportChartCollapses() {
 
 function renderReport() {
   const rows = inRange();
-  const sec = rows.reduce((s, e) => s + db.durationSec(e), 0);
-  const dayKeys = new Set(rows.map((e) => fmtDate(e.startedAt)));
+  const from = rangeStart();
+  const to = rangeEnd();
+  const sec = rows.reduce((s, e) => s + durationInRange(e, from, to), 0);
+  const fromKey = fmtDate(from);
+  const toKey = to ? fmtDate(new Date(to.getTime() - 1)) : null;
+  const dayKeys = new Set(rows.flatMap((e) => splitEntryByDay(e)
+    .map((part) => fmtDate(part.startedAt))
+    .filter((date) => date >= fromKey && (!toKey || date <= toKey))));
 
   $('kTime').textContent = fmtHM(sec);
   $('kCount').textContent = rows.length;
   $('kAvg').textContent = rows.length ? fmtHM(sec / rows.length) : '—';
   $('kDays').textContent = dayKeys.size;
   renderTodoHealth();
-  renderReportInsights(rows);
+  renderReportInsights(rows, from, to);
 
   // 融合專案分配與每日趨勢：區間太短就往前補，才看得出趨勢
   const today = startOfDay();
@@ -554,9 +560,7 @@ function renderReport() {
     ? new Date(customBounds.to.getTime() - 864e5)
     : quickBounds?.to ?? new Date();
   const trendEndExclusive = new Date(lineTo.getTime() + 864e5);
-  const trendEntries = S.entries.filter((e) => e.endedAt && !e.deletedAt
-    && new Date(e.startedAt) >= lineFrom
-    && new Date(e.startedAt) < trendEndExclusive);
+  const trendEntries = S.entries.filter((e) => entryOverlapsRange(e, lineFrom, trendEndExclusive));
   const trackerEntries = S.entries.filter((e) => e.endedAt && !e.deletedAt);
   const series = dailySeries(
     trendEntries,
@@ -584,7 +588,7 @@ function renderReport() {
     const p = S.projects.find((x) => x.id === e.projectId);
     return {
       color: p ? p.color : '#9a9898',
-      label: e.description || (p ? p.name : '未分類'),
+      label: e.description || (p ? p.name : translateText('todo.unclassified')),
     };
   });
   }
@@ -593,6 +597,7 @@ function renderReport() {
 }
 
 function renderDailyReview(groups) {
+  hideReviewCalendarTooltip();
   reviewGroups = groups;
   const canCalendar = groups.length > 0;
   if (!canCalendar && reviewMode === 'calendar') reviewMode = 'list';
@@ -603,8 +608,51 @@ function renderDailyReview(groups) {
   return reviewMode === 'calendar' ? renderReviewCalendar(groups) : renderReviewList(groups);
 }
 
+function hideReviewCalendarTooltip() {
+  reviewCalendarHoveredTarget = null;
+  const tooltip = $('reviewCalendarHoverTooltip');
+  if (!tooltip) return;
+  tooltip.hidden = true;
+  tooltip.classList.remove('is-visible');
+}
+
+function showReviewCalendarTooltip(target) {
+  const tooltip = $('reviewCalendarHoverTooltip');
+  if (!tooltip || !target) return;
+  reviewCalendarHoveredTarget = target;
+  const notePreview = target.dataset.reviewNotes
+    ? renderMarkdownPreview(target.dataset.reviewNotes, 'review-calendar-tooltip-notes')
+    : '';
+  tooltip.innerHTML = `<strong>${esc(target.dataset.reviewTitle || '')}</strong>
+    <span>${esc(target.dataset.reviewStart || '')}–${esc(target.dataset.reviewEnd || '')}</span>
+    <span>${esc(target.dataset.reviewProject || '')}</span>
+    ${notePreview}`;
+  tooltip.hidden = false;
+  tooltip.classList.add('is-visible');
+
+  const rect = target.getBoundingClientRect();
+  const gap = 8;
+  const padding = 8;
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const left = Math.max(padding, Math.min(rect.left, window.innerWidth - tooltipRect.width - padding));
+  const fitsBelow = rect.bottom + gap + tooltipRect.height <= window.innerHeight - padding;
+  const top = fitsBelow
+    ? rect.bottom + gap
+    : Math.max(padding, rect.top - gap - tooltipRect.height);
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function repositionReviewCalendarTooltip() {
+  if (reviewCalendarHoveredTarget?.isConnected) showReviewCalendarTooltip(reviewCalendarHoveredTarget);
+}
+
 function renderReviewCalendar(groups) {
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const weekdays = [
+    translateText('schedule.days.sun'), translateText('schedule.days.mon'), translateText('schedule.days.tue'),
+    translateText('schedule.days.wed'), translateText('schedule.days.thu'), translateText('schedule.days.fri'),
+    translateText('schedule.days.sat'),
+  ];
   const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
   const dates = groups.map((group) => group.date);
   const calendar = calendarReviewData(groups.flatMap((group) => group.entries), dates);
@@ -616,29 +664,20 @@ function renderReviewCalendar(groups) {
   }
   const dayHeaders = calendar.days.map((day) => {
     const date = new Date(`${day.date}T00:00:00`);
-    return `<div class="review-calendar-day-head"><strong>${esc(day.date.slice(5))}</strong><span>週${weekdays[date.getDay()]}</span></div>`;
+    return `<div class="review-calendar-day-head"><strong>${esc(displayDate(day.date))}</strong><span>${esc(weekdays[date.getDay()])}</span></div>`;
   }).join('');
   const dayBodies = calendar.days.map((day) => {
     const entries = day.entries.map((item) => {
       const entry = item.entry;
       const project = S.projects.find((projectItem) => projectItem.id === entry.projectId);
       const task = S.tasks.find((taskItem) => taskItem.id === entry.taskId);
-      const title = entry.description || task?.title || '未命名工作';
-      const projectName = project?.name || '一般工作';
+      const title = entry.description || task?.title || translateText('common.unnamedWork');
+      const projectName = project?.name || translateText('common.generalWork');
       const tooltip = calendarEntryTooltip(title, entry, projectName);
-      const notePreview = entry.notes
-        ? renderMarkdownPreview(entry.notes, 'review-calendar-tooltip-notes')
-        : '';
       const top = ((item.start - calendar.axis.from) / span) * 100;
       const height = Math.max(4, ((item.end - item.start) / span) * 100);
-      return `<div class="review-calendar-entry" tabindex="0" title="${esc(tooltip)}" aria-label="${esc(tooltip)}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
+      return `<div class="review-calendar-entry" tabindex="0" title="${esc(tooltip)}" aria-label="${esc(tooltip)}" aria-describedby="reviewCalendarHoverTooltip" data-review-title="${esc(title)}" data-review-start="${esc(fmtClock(entry.startedAt))}" data-review-end="${esc(fmtClock(entry.endedAt))}" data-review-project="${esc(projectName)}" data-review-notes="${esc(entry.notes || '')}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
         <span class="review-calendar-title">${esc(projectName)}</span>
-        <div class="review-calendar-tooltip" role="tooltip">
-          <strong>${esc(title)}</strong>
-          <span>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
-          <span>${esc(projectName)}</span>
-          ${notePreview}
-        </div>
       </div>`;
     }).join('');
     return `<div class="review-calendar-day-body">${entries}</div>`;
@@ -650,7 +689,11 @@ function renderReviewCalendar(groups) {
 }
 
 function renderReviewCalendarLegacy(groups) {
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const weekdays = [
+    translateText('schedule.days.sun'), translateText('schedule.days.mon'), translateText('schedule.days.tue'),
+    translateText('schedule.days.wed'), translateText('schedule.days.thu'), translateText('schedule.days.fri'),
+    translateText('schedule.days.sat'),
+  ];
   const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
   return `<div class="review-calendar" style="--review-days:${groups.length}">${groups.map((group) => {
     const day = new Date(`${group.date}T00:00:00`);
@@ -659,16 +702,16 @@ function renderReviewCalendarLegacy(groups) {
       ? group.entries.map((entry) => {
         const project = S.projects.find((item) => item.id === entry.projectId);
         const task = S.tasks.find((item) => item.id === entry.taskId);
-        const title = entry.description || task?.title || '未命名工作';
+        const title = entry.description || task?.title || translateText('common.unnamedWork');
         return `<div class="review-calendar-entry" style="--project-color:${safeColor(project?.color)}">
           <div class="review-calendar-time num">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div>
-          <div class="review-calendar-title">${esc(project?.name || '一般工作')}</div>
+          <div class="review-calendar-title">${esc(project?.name || translateText('common.generalWork'))}</div>
           <div class="review-calendar-duration num">${fmtHM(db.durationSec(entry))}</div>
         </div>`;
       }).join('')
       : '<div class="review-calendar-empty">—</div>';
     return `<article class="review-calendar-day">
-      <header><strong>${esc(group.date.slice(5))}</strong><span>週${weekdays[day.getDay()]}</span></header>
+      <header><strong>${esc(displayDate(group.date))}</strong><span>${esc(weekdays[day.getDay()])}</span></header>
       <div class="review-calendar-total num">${fmtHM(total)}</div>
       <div class="review-calendar-list">${items}</div>
     </article>`;
@@ -676,7 +719,11 @@ function renderReviewCalendarLegacy(groups) {
 }
 
 function renderReviewList(groups) {
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const weekdays = [
+    translateText('schedule.days.sun'), translateText('schedule.days.mon'), translateText('schedule.days.tue'),
+    translateText('schedule.days.wed'), translateText('schedule.days.thu'), translateText('schedule.days.fri'),
+    translateText('schedule.days.sat'),
+  ];
   const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
   return groups.map((group) => {
     const day = new Date(`${group.date}T00:00:00`);
@@ -685,8 +732,8 @@ function renderReviewList(groups) {
       ? group.entries.map((entry) => {
         const project = S.projects.find((item) => item.id === entry.projectId);
         const task = S.tasks.find((item) => item.id === entry.taskId);
-        const title = entry.description || task?.title || '未命名工作';
-        const projectName = project?.name || '一般工作';
+        const title = entry.description || task?.title || translateText('common.unnamedWork');
+        const projectName = project?.name || translateText('common.generalWork');
         const color = safeColor(project?.color);
         return `<div class="daily-review-entry">
           <div class="daily-review-time num">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div>
@@ -698,11 +745,11 @@ function renderReviewList(groups) {
           <div class="daily-review-duration num">${fmtHM(db.durationSec(entry))}</div>
         </div>`;
       }).join('')
-      : '<div class="daily-review-empty">這天沒有工作紀錄</div>';
+      : `<div class="daily-review-empty">${translateText('report.noWorkThatDay')}</div>`;
     return `<section class="daily-review-day">
       <div class="daily-review-day-head">
-        <strong>${esc(group.date)}（${weekdays[day.getDay()]}）</strong>
-        <span class="cap">${fmtHM(total)} · ${group.entries.length} 筆</span>
+        <strong>${esc(displayDate(group.date))}</strong>
+        <span class="cap">${fmtHM(total)} · ${translateText('report.entryCount', { count: group.entries.length })}</span>
       </div>
       <div class="daily-review-list">${entries}</div>
     </section>`;
@@ -718,7 +765,7 @@ function renderTodoHealth() {
 
   $('todoHealth').innerHTML = `<div class="todo-health">
     <div class="todo-health-item">
-      <span class="cap">Todo 總數</span>
+      <span class="cap">${translateText('report.todoTotal')}</span>
       <span class="num">${health.total}</span>
     </div>
     <div class="todo-health-item todo-health-complete">
@@ -768,8 +815,8 @@ function trendOverview() {
       return `${esc(series.name)} ${fmtHM(series.total)} (${pct}%)`;
     }).join(' · ');
   return total
-    ? `<strong>區間總計 ${fmtHM(total)}</strong><br><span>${rows}</span>`
-    : '這個區間沒有專案工時';
+    ? `<strong>${esc(translateText('report.rangeTotal', { duration: fmtHM(total) }))}</strong><br><span>${rows}</span>`
+    : translateText('report.noProjectTime');
 }
 
 function trendSummary(date, projectId = null) {
@@ -786,11 +833,11 @@ function trendSummary(date, projectId = null) {
         const pct = total ? Math.round((item.seconds / total) * 100) : 0;
         return `${esc(item.name)} ${fmtHM(item.seconds)} (${pct}%)`;
       }).join(' · ')
-    : '沒有專案工時';
+    : translateText('report.noProjectTime');
   const selectedText = selected
     ? `<strong>${esc(selected.name)} ${fmtHM(selected.seconds)} (${total ? Math.round((selected.seconds / total) * 100) : 0}%)</strong><br>`
     : '';
-  return `${selectedText}<strong>${esc(date)}</strong> · 當日總計 ${fmtHM(total)}<br><span>${rows}</span>`;
+  return `${selectedText}<strong>${esc(date)}</strong> · ${esc(translateText('report.dailyTotal', { duration: fmtHM(total) }))}<br><span>${rows}</span>`;
 }
 
 function setTrendHover(date, projectId = null) {
@@ -851,12 +898,12 @@ function renderTrendDetails(projectId) {
   const taskById = new Map(S.tasks.map((task) => [task.id, task]));
   const dayMarkup = [...grouped.entries()].map(([date, entries]) => `
     <section class="trend-detail-day">
-      <div class="trend-detail-day-head"><strong>${esc(date)}</strong><span class="num">${fmtHM(dailyTotals.get(date) || 0)} · ${entries.length} 筆</span></div>
+      <div class="trend-detail-day-head"><strong>${esc(date)}</strong><span class="num">${fmtHM(dailyTotals.get(date) || 0)} · ${translateText('report.entryCount', { count: entries.length })}</span></div>
       ${entries.map((entry) => {
         const task = taskById.get(entry.taskId);
-        const title = entry.description || task?.title || '未命名工作';
+        const title = entry.description || task?.title || translateText('common.unnamedWork');
         const projectItem = S.projects.find((item) => item.id === entry.projectId);
-        const location = projectItem ? pathOf(S.projects, projectItem.id).join(' / ') : '透過 Todo 記錄';
+        const location = projectItem ? pathOf(S.projects, projectItem.id).join(' / ') : translateText('report.locationViaTodo');
         return `<div class="trend-detail-entry">
           <span class="num mute">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
           <div class="grow"><strong>${esc(title)}</strong>${task && entry.description ? ` <span class="badge">${esc(task.title)}</span>` : ''}<div class="sub">${esc(location)}</div></div>
@@ -868,36 +915,52 @@ function renderTrendDetails(projectId) {
   const truncated = detail.totalEntries - detail.entries.length;
   box.hidden = false;
   box.innerHTML = `<div class="trend-detail-head">
-    <div><strong>${esc(project.name)} 細項</strong><div class="sub">${esc(projectPath)} · 含子專案</div></div>
-    <button type="button" class="btn-sm" data-trend-detail-close>收合</button>
+    <div><strong>${esc(project.name)} ${translateText('report.detail')}</strong><div class="sub">${esc(projectPath)} · ${translateText('project.includesChildren')}</div></div>
+    <button type="button" class="btn-sm" data-trend-detail-close>${translateText('common.collapse')}</button>
   </div>
   <div class="trend-detail-kpis">
-    <span class="badge">${fmtHM(detail.totalSeconds)} 總工時</span>
-    <span class="badge">${detail.tasksDone}/${detail.tasksTotal} Todo 完成</span>
-    <span class="badge">${detail.totalEntries} 筆工作紀錄</span>
+    <span class="badge">${fmtHM(detail.totalSeconds)} ${translateText('report.totalWork')}</span>
+    <span class="badge">${detail.tasksDone}/${detail.tasksTotal} ${translateText('report.todoCompleted')}</span>
+    <span class="badge">${detail.totalEntries} ${translateText('report.workEntries')}</span>
   </div>
-  <div class="trend-detail-list">${dayMarkup || '<div class="empty">這個區間沒有工作紀錄</div>'}</div>
-  ${truncated > 0 ? `<div class="cap trend-detail-more">另有 ${truncated} 筆紀錄未展開</div>` : ''}`;
+  <div class="trend-detail-list">${dayMarkup || `<div class="empty">${translateText('report.noEntriesInRange')}</div>`}</div>
+  ${truncated > 0 ? `<div class="cap trend-detail-more">${translateText('report.moreEntries', { count: truncated })}</div>` : ''}`;
 }
 
 function todoStatusLabel(status) {
-  return status === 'done' ? '已完成' : status === 'doing' ? '進行中' : '待辦';
+  return statusLabel(status, currentLocale);
 }
 
-function renderReportInsights(rows) {
+function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
   const mount = $('reportInsights');
   if (!mount) return;
-  const quality = buildReportQuality(S.entries.filter((entry) => rows.includes(entry)), S.tasks, fmtDate(new Date().toISOString()));
-  const metrics = buildProjectTaskMetrics(S.tasks, rows, fmtDate(new Date().toISOString()));
+  const clippedRows = rows.map((entry) => clipEntryToRange(entry, from, to)).filter(Boolean);
+  const quality = buildReportQuality(clippedRows, S.tasks, fmtDate(new Date().toISOString()));
+  const metrics = buildProjectTaskMetrics(S.tasks, clippedRows, fmtDate(new Date().toISOString()));
   const actionItems = buildReportActionItems(quality);
   const healthRows = buildProjectHealthRows(metrics);
+  const todoProgress = buildWorkspaceTodoProgress(metrics);
+  const actionLabels = {
+    overdue: 'report.action.overdue',
+    unlinked: 'report.action.unlinked',
+    unclassified: 'report.action.unclassified',
+    'missing-notes': 'report.action.missingNotes',
+    clear: 'report.action.clear',
+  };
+  const statusLabels = {
+    '進行中': 'report.projectStatus.inProgress',
+    '逾期': 'report.projectStatus.overdue',
+    '進度偏低': 'report.projectStatus.lowProgress',
+    '週期偏長': 'report.projectStatus.longCycle',
+    '已完成': 'report.projectStatus.done',
+  };
   const projectLabel = (projectId) => {
     const project = projectId && S.projects.find((item) => item.id === projectId);
-    return project ? pathOf(S.projects, project.id).join(' / ') : '未分類';
+    return project ? pathOf(S.projects, project.id).join(' / ') : translateText('todo.unclassified');
   };
   const actionValue = (item) => {
-    if (item.kind === 'overdue') return `${item.value} 個`;
-    if (item.kind === 'missing-notes') return `${item.value} 筆`;
+    if (item.kind === 'overdue') return translateText('report.actionCount.todos', { count: item.value });
+    if (item.kind === 'missing-notes') return translateText('report.actionCount.entries', { count: item.value });
     if (item.kind === 'clear') return '✓';
     return fmtHM(item.value);
   };
@@ -914,29 +977,39 @@ function renderReportInsights(rows) {
     if (!ids?.length) return '';
     const details = target.type === 'entry'
       ? rows.filter((entry) => ids.includes(entry.id)).slice(0, 2).map((entry) =>
-        `<button type="button" class="report-action-detail" data-report-entry-id="${esc(entry.id)}">${esc(entry.description || '未命名工作')} · ${esc(fmtDate(entry.startedAt))} · ${esc(fmtHM(db.durationSec(entry)))}</button>`
+        `<button type="button" class="report-action-detail" data-report-entry-id="${esc(entry.id)}">${esc(entry.description || translateText('common.unnamedWork'))} · ${esc(fmtDate(entry.startedAt))} · ${esc(fmtHM(durationInRange(entry, from, to)))}</button>`
       ).join('')
       : ids.map((id) => S.tasks.find((task) => task.id === id)).filter(Boolean).slice(0, 2).map((task) =>
-        `<button type="button" class="report-action-detail" data-report-task-id="${esc(task.id)}">${esc(task.title)} · 截止 ${esc(task.dueDate || '未設定')}</button>`
+        `<button type="button" class="report-action-detail" data-report-task-id="${esc(task.id)}">${esc(task.title)} · ${translateText('todo.dueDate')} ${esc(task.dueDate || translateText('common.notSet'))}</button>`
       ).join('');
     const matchingCount = target.type === 'entry'
       ? rows.filter((entry) => ids.includes(entry.id)).length
       : ids.filter((id) => S.tasks.some((task) => task.id === id)).length;
     const rest = matchingCount - Math.min(2, matchingCount);
-    return details + (rest > 0 ? `<div>另有 ${rest} 筆</div>` : '');
+    return details + (rest > 0 ? `<div>${translateText('report.moreCount', { count: rest })}</div>` : '');
   };
   const statusItem = actionItems[0];
-  const statusLabel = statusItem.kind === 'clear'
-    ? '狀態良好'
-    : statusItem.tone === 'danger' ? '需要處理' : '有待整理';
+  const allTodosDone = statusItem.kind === 'clear'
+    && todoProgress.total > 0
+    && todoProgress.done === todoProgress.total;
+  const statusLabel = allTodosDone
+    ? translateText('report.projectStatus.done')
+    : statusItem.kind === 'clear'
+      ? translateText('report.statusGood')
+    : statusItem.tone === 'danger' ? translateText('report.needsWork') : translateText('report.needsOrganizing');
   const statusDetail = statusItem.kind === 'clear'
-    ? '目前沒有逾期或未整理的資料'
-    : `最優先：${statusItem.label}`;
+    ? todoProgress.total > 0
+      ? translateText('report.todoProgress', todoProgress)
+      : translateText('report.noIssues')
+    : [
+      todoProgress.total > 0 ? translateText('report.todoProgress', todoProgress) : '',
+      translateText('report.topPriority', { label: translateText(actionLabels[statusItem.kind]) }),
+    ].filter(Boolean).join(' · ');
   const actionMarkup = actionItems.map((item) => `
     <div class="report-action report-action-${item.tone}">
-      <span class="report-action-label">${esc(item.label)}</span>
+      <span class="report-action-label">${esc(translateText(actionLabels[item.kind]))}</span>
       <strong>${esc(actionValue(item))}</strong>
-      <span class="report-action-hint">${item.kind === 'clear' ? '可以繼續工作' : '建議整理'}</span>
+      <span class="report-action-hint">${item.kind === 'clear' ? translateText('report.canContinue') : translateText('report.organize')}</span>
       ${actionDetails(item) ? `<div class="report-action-details">${actionDetails(item)}</div>` : ''}
     </div>`).join('');
   const projectMarkup = healthRows.length
@@ -945,7 +1018,7 @@ function renderReportInsights(rows) {
       const percentage = Math.round(Math.max(0, Math.min(1, row.completionRate)) * 100);
       return `<div class="report-project-row">
         <div class="report-project-name" title="${esc(label)}">${esc(label)}</div>
-        <span class="report-project-status report-project-status-${row.tone}">${esc(row.status)}</span>
+        <span class="report-project-status report-project-status-${row.tone}">${esc(translateText(statusLabels[row.status] || 'report.projectStatus.inProgress'))}</span>
         <div class="report-project-progress">
           <span class="report-project-track"><span style="--bar-width:${percentage}%"></span></span>
           <span class="report-project-count num">${row.done} / ${row.total}</span>
@@ -953,11 +1026,11 @@ function renderReportInsights(rows) {
         <span class="report-project-work num">${fmtHM(row.workedSeconds)}</span>
       </div>`;
     }).join('')
-    : '<div class="report-empty">目前沒有 Todo 績效資料</div>';
+    : `<div class="report-empty">${translateText('report.noTodoPerformance')}</div>`;
   const metricRows = metrics.slice(0, 8).map((metric) => {
     const project = metric.projectId && S.projects.find((item) => item.id === metric.projectId);
     return `<tr>
-      <td>${esc(project ? pathOf(S.projects, project.id).join(' / ') : '未分類')}</td>
+      <td>${esc(project ? pathOf(S.projects, project.id).join(' / ') : translateText('todo.unclassified'))}</td>
       <td>${metric.done} / ${metric.total}</td>
       <td>${Math.round(metric.completionRate * 100)}%</td>
       <td class="${metric.overdue ? 'report-warning-text' : ''}">${metric.overdue}</td>
@@ -967,24 +1040,24 @@ function renderReportInsights(rows) {
   }).join('');
   mount.innerHTML = `<div class="report-status">
     <div>
-      <span class="cap">工作區狀態</span>
+    <span class="cap">${translateText('report.workspaceStatus')}</span>
       <strong class="report-status-label report-status-${statusItem.tone}">${statusLabel}</strong>
     </div>
     <span class="report-status-detail">${statusDetail}</span>
   </div>
-  <section class="report-attention" aria-label="需要注意">
-    <div class="report-section-heading"><strong>需要注意</strong><span class="cap">先處理上面的項目</span></div>
+  <section class="report-attention" aria-label="${esc(translateText('report.attention'))}">
+    <div class="report-section-heading"><strong>${translateText('report.attention')}</strong><span class="cap">${translateText('report.attentionHint')}</span></div>
     <div class="report-action-grid">${actionMarkup}</div>
   </section>
-  <section class="report-projects" aria-label="專案狀況">
-    <div class="report-section-heading"><strong>專案狀況</strong><span class="cap">按需處理程度排序 · 完成 / 總數 · 工時</span></div>
+  <section class="report-projects" aria-label="${esc(translateText('report.projectStatus'))}">
+    <div class="report-section-heading"><strong>${translateText('report.projectStatus')}</strong><span class="cap">${translateText('report.projectStatusHint')}</span></div>
     <div class="report-project-list">${projectMarkup}</div>
   </section>
   <details class="report-details-collapse">
-    <summary><span class="mark">[+]</span><span>查看完整專案報表</span></summary>
+    <summary><span class="mark">[+]</span><span>${translateText('report.viewFull')}</span></summary>
     <div class="report-metrics-table-wrap">
-      <table class="report-metrics-table"><thead><tr><th>專案</th><th>Todo</th><th>完成率</th><th>逾期</th><th>實際工時</th><th>平均完成週期</th></tr></thead>
-      <tbody>${metricRows || '<tr><td colspan="6" class="mute">目前沒有 Todo 績效資料</td></tr>'}</tbody></table>
+      <table class="report-metrics-table"><thead><tr><th>${translateText('project.project')}</th><th>Todo</th><th>${translateText('report.completionRate')}</th><th>${translateText('report.overdue')}</th><th>${translateText('report.actualWork')}</th><th>${translateText('report.averageCycle')}</th></tr></thead>
+      <tbody>${metricRows || `<tr><td colspan="6" class="mute">${translateText('report.noTodoPerformance')}</td></tr>`}</tbody></table>
     </div>
   </details>`;
 }
@@ -994,7 +1067,7 @@ function todoTrackerColor(project) {
 }
 
 function todoTrackerDateTime(value) {
-  return value ? `${fmtDate(value)} ${fmtClock(value)}` : '進行中（更新中）';
+  return value ? `${fmtDate(value)} ${fmtClock(value)}` : translateText('todo.inProgressUpdating');
 }
 
 function todoTrackerDateRange(item) {
@@ -1015,30 +1088,30 @@ function renderTodoTrackerDetail() {
 
   const task = S.tasks.find((candidate) => candidate.id === item.id);
   const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
-  const projectPath = project ? pathOf(S.projects, project.id).join(' / ') : '未分類專案';
+  const projectPath = project ? pathOf(S.projects, project.id).join(' / ') : translateText('project.uncategorized');
   const entries = item.entries.length
     ? item.entries.map((entry) => `<div class="todo-tracker-entry">
         <span class="num mute">${fmtDate(entry.startedAt)}<br>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
-        <div class="grow"><strong>${esc(entry.description || '工作紀錄')}</strong><div class="sub">${fmtDate(entry.startedAt)} → ${fmtDate(entry.endedAt)}</div>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div>
+        <div class="grow"><strong>${esc(entry.description || translateText('entry.entry'))}</strong><div class="sub">${fmtDate(entry.startedAt)} → ${fmtDate(entry.endedAt)}</div>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div>
         <span class="num">${fmtHM(entry.seconds)}</span>
       </div>`).join('')
-    : '<div class="empty">沒有可顯示的實際工作紀錄</div>';
+    : `<div class="empty">${translateText('report.noActualEntries')}</div>`;
 
   box.hidden = false;
   box.innerHTML = `<div class="todo-tracker-detail-head">
     <div><strong>${esc(item.title)}</strong><div class="sub">${esc(projectPath)}</div></div>
-    <button type="button" class="btn-sm" data-todo-tracker-close>關閉</button>
+    <button type="button" class="btn-sm" data-todo-tracker-close>${translateText('common.close')}</button>
   </div>
   <div class="todo-tracker-detail-kpis">
     <span class="badge">${esc(todoStatusLabel(item.status))}</span>
-    <span class="badge">開單 ${esc(todoTrackerDateTime(item.openedAt))}</span>
-    <span class="badge">結單 ${esc(todoTrackerDateTime(item.endedAt))}</span>
-    <span class="badge">跨日 ${item.lifecycleDays} 天</span>
-    <span class="badge">實際工作 ${item.workedDays} 天</span>
-    <span class="badge">累積工時 ${fmtHM(item.trackedSeconds)}</span>
+    <span class="badge">${translateText('report.opened')} ${esc(todoTrackerDateTime(item.openedAt))}</span>
+    <span class="badge">${translateText('report.closed')} ${esc(todoTrackerDateTime(item.endedAt))}</span>
+    <span class="badge">${translateText('report.crossDays', { count: item.lifecycleDays })}</span>
+    <span class="badge">${translateText('report.workedDays', { count: item.workedDays })}</span>
+    <span class="badge">${fmtHM(item.trackedSeconds)} ${translateText('report.totalWork')}</span>
   </div>
   ${task?.notes ? `<div class="todo-tracker-detail-notes">${renderMarkdownPreview(task.notes)}</div>` : ''}
-  <div class="todo-tracker-detail-section"><strong>實際工作紀錄（${item.entries.length} 筆）</strong></div>
+  <div class="todo-tracker-detail-section"><strong>${translateText('report.actualWork')} (${translateText('report.entryCount', { count: item.entries.length })})</strong></div>
   <div class="todo-tracker-entry-list">${entries}</div>`;
   initializeMarkdownPreviews(box);
 }
@@ -1108,7 +1181,7 @@ function showTodoTrackerTooltip(target) {
   }
   todoTrackerHoveredTarget = target;
   target.classList.add('is-hovered');
-  tooltip.innerHTML = `<strong>${esc(target.dataset.todoTrackerTitle || '')}</strong><br>${esc(target.dataset.todoTrackerDate || '')} · 有工作紀錄`;
+  tooltip.innerHTML = `<strong>${esc(target.dataset.todoTrackerTitle || '')}</strong><br>${esc(target.dataset.todoTrackerDate || '')} · ${translateText('report.hasWorkEntries')}`;
   tooltip.hidden = false;
   tooltip.classList.add('is-visible');
 
@@ -1168,14 +1241,14 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   }
 
   if (!data.items.length) {
-    mount.innerHTML = `<div class="todo-tracker-empty"><strong>Todo Tracker</strong><span class="todo-tracker-summary">今日結案 ${data.completedTodayCount} 個</span><div>目前沒有實際工時的 Todo</div></div>`;
+    mount.innerHTML = `<div class="todo-tracker-empty"><strong>${translateText('report.todoTracker')}</strong><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><div>${translateText('report.noActualTodoTime')}</div></div>`;
     renderTodoTrackerDetail();
     if (restartTimer) startTodoTrackerRefresh();
     return;
   }
 
   const dateHeaders = visibleDates.map((date) => `<span>${esc(date.slice(5))}</span>`).join('');
-  const filterControl = `<label class="todo-tracker-filter"><span>顯示</span><select data-todo-tracker-filter aria-label="Todo Tracker 篩選"><option value="active"${todoTrackerFilter === 'active' ? ' selected' : ''}>未完成</option><option value="all"${todoTrackerFilter === 'all' ? ' selected' : ''}>全部</option><option value="done"${todoTrackerFilter === 'done' ? ' selected' : ''}>已完成</option></select></label>`;
+  const filterControl = `<label class="todo-tracker-filter"><span>${translateText('report.show')}</span><select data-todo-tracker-filter aria-label="${esc(translateText('report.filter'))}"><option value="active"${todoTrackerFilter === 'active' ? ' selected' : ''}>${translateText('todo.status.active')}</option><option value="all"${todoTrackerFilter === 'all' ? ' selected' : ''}>${translateText('common.all')}</option><option value="done"${todoTrackerFilter === 'done' ? ' selected' : ''}>${translateText('todo.status.done')}</option></select></label>`;
   const rows = visibleItems.map((item) => {
     const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
     const color = todoTrackerColor(project);
@@ -1187,15 +1260,15 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       dayEnd.setDate(dayEnd.getDate() + 1);
       return lifecycleStart < dayEnd && lifecycleEnd > dayStart ? { date, day } : null;
     }).filter(Boolean);
-    const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day};--todo-color:${color}" title="開單 ${todoTrackerDateTime(item.openedAt)} · 結單 ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
+    const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day};--todo-color:${color}" title="${translateText('report.opened')} ${todoTrackerDateTime(item.openedAt)} · ${translateText('report.closed')} ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
     const dateRange = todoTrackerDateRange(item);
-    const title = `${item.title} · ${todoStatusLabel(item.status)} · ${dateRange} · 實際工作 ${item.workedDays} 天 / 共 ${item.lifecycleDays} 天`;
+    const title = `${item.title} · ${todoStatusLabel(item.status)} · ${dateRange} · ${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })}`;
     const collapsed = todoTrackerCollapsedIds.has(item.id);
     const workDates = item.workedDates
       .map((date) => ({ date, day: visibleDateIndex.get(date) }))
       .filter(({ day }) => day >= 0);
     const workSegments = workDates.map(({ date, day }) => {
-      const dateTitle = `${item.title} · ${date} · 有工作紀錄`;
+      const dateTitle = `${item.title} · ${date} · ${translateText('report.hasWorkEntries')}`;
       return `<button type="button" class="todo-tracker-work${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
         data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-title="${esc(item.title)}" data-todo-tracker-date="${esc(date)}" aria-label="${esc(dateTitle)}"
         style="--todo-day:${day};--todo-color:${color}">
@@ -1206,7 +1279,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
         <details class="todo-tracker-label-details" data-todo-tracker-collapse="${esc(item.id)}"${collapsed ? '' : ' open'}>
           <summary><strong>${esc(item.title)}</strong></summary>
           <span class="todo-tracker-label-meta"><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${esc(dateRange)}</span>
-          <span class="todo-tracker-label-days">${item.workedDays} 天 / 共 ${item.lifecycleDays} 天</span>
+          <span class="todo-tracker-label-days">${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })}</span>
         </details>
       </div>
       <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
@@ -1215,10 +1288,10 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       </div>
     </div>`;
   }).join('');
-  const rowMarkup = rows || '<div class="todo-tracker-filter-empty">這個篩選沒有符合的 Todo</div>';
+  const rowMarkup = rows || `<div class="todo-tracker-filter-empty">${translateText('report.noMatchingTodo')}</div>`;
 
   mount.innerHTML = `<div class="todo-tracker" style="--todo-tracker-days:${visibleDates.length}">
-    <div class="todo-tracker-toolbar"><strong>Todo Tracker</strong><span class="todo-tracker-summary">今日結案 ${data.completedTodayCount} 個</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="前一天" aria-label="前一天">←1天</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="前一週" aria-label="前一週">←1週</button><button type="button" class="btn-sm" data-todo-tracker-today>今天</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="後一週" aria-label="後一週">1週→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="後一天" aria-label="後一天">1天→</button></span></div>
+    <div class="todo-tracker-toolbar"><strong>${translateText('report.todoTracker')}</strong><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="${translateText('report.previousDay')}" aria-label="${translateText('report.previousDay')}">←1d</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="${translateText('report.previousWeek')}" aria-label="${translateText('report.previousWeek')}">←1w</button><button type="button" class="btn-sm" data-todo-tracker-today>${translateText('report.today')}</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="${translateText('report.nextWeek')}" aria-label="${translateText('report.nextWeek')}">1w→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="${translateText('report.nextDay')}" aria-label="${translateText('report.nextDay')}">1d→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rowMarkup}</div>
   </div><div id="todoTrackerHoverTooltip" class="todo-tracker-tooltip" role="tooltip" hidden></div>
@@ -1254,11 +1327,11 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     .join('');
 
   $('byProject').innerHTML = `<div class="project-trend-wrap">
-    <div class="project-trend-toolbar"><span class="mute">全部專案</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
+    <div class="project-trend-toolbar"><span class="mute">${translateText('report.projectAll')}</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
     <div id="projectTrend">${stackedAreaSVG(data, currentLocale)}</div>
     <div id="projectTrendTooltip" class="project-trend-tooltip"></div>
-    <div class="trend-legend">${projectLinks || '<span class="mute">沒有可聚焦的專案</span>'}</div>
-    <div class="project-heatmap-title">專案 × 日期</div>
+    <div class="trend-legend">${projectLinks || `<span class="mute">${translateText('report.noFocusableProject')}</span>`}</div>
+    <div class="project-heatmap-title">${translateText('chart.heatmap')}</div>
     <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
   </div>`;
@@ -1377,6 +1450,42 @@ $('byProject').addEventListener('focusout', (e) => {
 window.addEventListener('resize', repositionTodoTrackerTooltip);
 window.addEventListener('scroll', repositionTodoTrackerTooltip, true);
 
+$('dailyReview').addEventListener('pointerover', (e) => {
+  const target = e.target.closest('[data-review-title]');
+  if (!target || e.relatedTarget && target.contains(e.relatedTarget)) return;
+  showReviewCalendarTooltip(target);
+});
+
+$('dailyReview').addEventListener('pointerout', (e) => {
+  const target = e.target.closest('[data-review-title]');
+  if (!target) return;
+  const next = e.relatedTarget?.closest?.('[data-review-title]');
+  if (next) {
+    showReviewCalendarTooltip(next);
+    return;
+  }
+  hideReviewCalendarTooltip();
+});
+
+$('dailyReview').addEventListener('focusin', (e) => {
+  const target = e.target.closest('[data-review-title]');
+  if (target) showReviewCalendarTooltip(target);
+});
+
+$('dailyReview').addEventListener('focusout', (e) => {
+  const target = e.target.closest('[data-review-title]');
+  if (!target) return;
+  const next = e.relatedTarget?.closest?.('[data-review-title]');
+  if (next) {
+    showReviewCalendarTooltip(next);
+    return;
+  }
+  hideReviewCalendarTooltip();
+});
+
+window.addEventListener('resize', repositionReviewCalendarTooltip);
+window.addEventListener('scroll', repositionReviewCalendarTooltip, true);
+
 /* ---------------- 專案 ---------------- */
 function renderProjects() {
   const own = db.secondsByProject(S.entries.filter((e) => e.endedAt));
@@ -1389,14 +1498,14 @@ function renderProjects() {
     ? new Set([editing, ...descendantSet(editing)])
     : new Set();
   const keepParent = $('pjParent').value;
-  $('pjParent').innerHTML = '<option value="">— 最上層 —</option>' +
+  $('pjParent').innerHTML = `<option value="">${esc(translateText('project.topLevel'))}</option>` +
     tree.filter((p) => !excluded.has(p.id))
       .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   $('pjParent').value = keepParent;
 
   $('projList').innerHTML = tree.length
     ? `<div class="project-list-head" aria-hidden="true">
-        <span>專案</span><span>總工時</span><span>直接工時</span><span>操作</span>
+        <span>${translateText('project.project')}</span><span>${translateText('report.totalWork')}</span><span>${translateText('project.directWork')}</span><span>${translateText('common.actions')}</span>
       </div>
       ${tree.map((p) => {
         const open = S.tasks.filter((x) => x.projectId === p.id && x.status !== 'done' && x.status !== 'archived').length;
@@ -1409,31 +1518,31 @@ function renderProjects() {
             <span class="tree-branch">${p.depth ? '└' : ''}</span>
             <span class="project-color" aria-hidden="true"></span>
             <div class="main">
-              <div>${esc(p.name)} ${p.archivedAt ? '<span class="badge">已封存</span>' : ''}</div>
+              <div>${esc(p.name)} ${p.archivedAt ? `<span class="badge">${translateText('common.archived')}</span>` : ''}</div>
               <div class="sub">
-                ${kids ? `${kids} 個子專案 · ` : ''}${open > 0 ? `${open} 個待辦` : '沒有待辦'}
+                ${kids ? translateText('project.childCount', { count: kids }) + ' · ' : ''}${open > 0 ? translateText('project.openTodoCount', { count: open }) : translateText('project.noOpenTodos')}
               </div>
             </div>
           </div>
           <div class="project-hours">
-            <span class="project-hours-label">總工時</span>
+            <span class="project-hours-label">${translateText('report.totalWork')}</span>
             <span class="num">${fmtHM(r.total)}</span>
           </div>
           <div class="project-hours project-hours-direct">
-            <span class="project-hours-label">直接工時</span>
+            <span class="project-hours-label">${translateText('project.directWork')}</span>
             <span class="num">${fmtHM(r.own)}</span>
           </div>
           <div class="act project-actions">
-            <button class="btn-sm workspace-open" data-open-workspace="${p.id}">查看工作區</button>
+            <button class="btn-sm workspace-open" data-open-workspace="${p.id}">${translateText('project.openWorkspace')}</button>
             <div class="project-secondary-actions">
-              <button class="btn-sm" data-edit-p="${p.id}">[編輯]</button>
-              <button class="btn-sm" data-arch-p="${p.id}">${p.archivedAt ? '[復原]' : '[封存]'}</button>
+              <button class="btn-sm" data-edit-p="${p.id}">${translateText('project.edit')}</button>
+              <button class="btn-sm" data-arch-p="${p.id}">${p.archivedAt ? `[${translateText('common.restored')}]` : `[${translateText('common.archive')}]`}</button>
               <button class="btn-sm btn-danger" data-del-p="${p.id}">[x]</button>
             </div>
           </div>
         </div>`;
       }).join('')}`
-    : '<div class="empty">還沒有專案，用上面的表單新增一個</div>';
+    : `<div class="empty">${translateText('project.noProjectsHint')}</div>`;
 }
 
 /* ---------------- 專案目標／筆記 ---------------- */
@@ -1452,7 +1561,7 @@ function renderProjectNotes() {
 
   box.hidden = false;
   const notes = [...(p.notes || [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  $('pjNotesTitle').textContent = `「${p.name}」的目標與筆記${notes.length ? `（${notes.length}）` : ''}`;
+  $('pjNotesTitle').textContent = `${p.name} · ${translateText('project.goalsNotes')}${notes.length ? ` (${notes.length})` : ''}`;
 
   $('pjNoteList').innerHTML = notes.length
     ? notes.map((n) => {
@@ -1460,13 +1569,13 @@ function renderProjectNotes() {
         return `<div class="note-entry">
           <div class="row cap" style="margin-bottom:4px">
             <span class="num">${fmtDate(n.createdAt)} ${fmtClock(n.createdAt)}</span>
-            ${n.updatedAt ? `<span class="ash" title="最後修改 ${fmtDate(n.updatedAt)} ${fmtClock(n.updatedAt)}">· 已編輯</span>` : ''}
+            ${n.updatedAt ? `<span class="ash" title="${translateText('project.lastEdited', { date: `${fmtDate(n.updatedAt)} ${fmtClock(n.updatedAt)}` })}">${translateText('project.edited')}</span>` : ''}
             <span class="grow"></span>
             ${editing
-              ? `<button class="btn-sm" data-note-cancel="1">取消</button>
-                 <button class="btn-sm btn-primary" style="height:26px" data-note-save="${n.id}">儲存</button>`
+              ? `<button class="btn-sm" data-note-cancel="1">${translateText('common.cancel')}</button>
+                 <button class="btn-sm btn-primary" style="height:26px" data-note-save="${n.id}">${translateText('common.save')}</button>`
               : `<span class="act">
-                   <button class="btn-sm" data-note-edit="${n.id}">[編輯]</button>
+                   <button class="btn-sm" data-note-edit="${n.id}">${translateText('project.edit')}</button>
                    <button class="btn-sm btn-danger" data-note-del="${n.id}">[x]</button>
                  </span>`}
           </div>
@@ -1475,7 +1584,7 @@ function renderProjectNotes() {
             : `<div class="note-body">${renderMarkdownPreview(n.text)}</div>`}
         </div>`;
       }).join('')
-    : '<div class="empty">還沒有目標或筆記</div>';
+    : `<div class="empty">${translateText('project.noNotes')}</div>`;
 
   if (noteEditingId) {
     const ta = $('pjNoteList').querySelector(`[data-note-input="${noteEditingId}"]`);
@@ -1523,7 +1632,7 @@ $('pjNoteList').addEventListener('click', async (e) => {
     await db.updateProjectNote(pid, save, ta.value);
     noteEditingId = null;
   } else if (del) {
-    if (!confirm('刪除這則筆記？')) return;
+    if (!confirm(translateText('project.deleteNoteConfirm'))) return;
     await db.deleteProjectNote(pid, del);
   } else return;
 
@@ -1564,13 +1673,13 @@ function renderProjectWorkspace(id) {
   }
   const dailyRows = [...daily.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   const maxDaily = Math.max(1, ...dailyRows.map(([, value]) => value));
-  const taskGroup = (label, items) => `<div class="workspace-task-group"><div class="workspace-subhead"><span>${label}</span><span class="badge">${items.length}</span></div>${items.length ? items.map((task) => `<div class="workspace-task"><div><strong>${esc(task.title)}</strong>${task.notes ? renderMarkdownPreview(task.notes) : ''}</div><span class="num">${task.dueDate || '無期限'}</span></div>`).join('') : '<div class="empty">目前沒有項目</div>'}</div>`;
+  const taskGroup = (label, items) => `<div class="workspace-task-group"><div class="workspace-subhead"><span>${label}</span><span class="badge">${items.length}</span></div>${items.length ? items.map((task) => `<div class="workspace-task"><div><strong>${esc(task.title)}</strong>${task.notes ? renderMarkdownPreview(task.notes) : ''}</div><span class="num">${task.dueDate || translateText('todo.noDueDate')}</span></div>`).join('') : `<div class="empty">${translateText('project.noItems')}</div>`}</div>`;
   $('projectWorkspace').hidden = false;
-  $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} 工作區</h2><button class="btn-sm" data-close-workspace>關閉</button></div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>專案摘要</h3><span class="cap">只顯示此專案與子專案</span></div><div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} 總工時</span><span class="badge">${done}/${tasks.length} Todo 完成</span><span class="badge">${entries.length} 筆工作日誌</span></div></div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${tasks.length} 個項目</span></div>${taskGroup('進行中', taskGroups.doing)}${taskGroup('待辦', taskGroups.todo)}${taskGroup('已完成', taskGroups.done)}</div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>工作日誌</h3><span class="cap">${entries.length} 筆</span></div>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-log"><div class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div><div class="grow"><strong>${esc(task?.title || entry.description || '未命名工作')}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : '<div class="empty">這個專案沒有工作日誌</div>'}</div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>工時過程</h3><span class="cap">依日期整理</span></div>${dailyRows.length ? dailyRows.map(([date, value]) => `<div class="workspace-day"><span class="num">${date}</span><div class="workspace-day-bar"><i style="width:${Math.round((value / maxDaily) * 100)}%"></i></div><span class="num">${fmtHM(value)}</span></div>`).join('') : '<div class="empty">目前沒有可用的工時資料</div>'}</div>`;
+  $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} ${translateText('project.workspace')}</h2><button class="btn-sm" data-close-workspace>${translateText('common.close')}</button></div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>${translateText('project.summary')}</h3><span class="cap">${translateText('project.summaryHint')}</span></div><div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} ${translateText('report.totalWork')}</span><span class="badge">${done}/${tasks.length} ${translateText('report.todoCompleted')}</span><span class="badge">${entries.length} ${translateText('report.workEntries')}</span></div></div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${translateText('project.todoItems', { count: tasks.length })}</span></div>${taskGroup(translateText('todo.status.doing'), taskGroups.doing)}${taskGroup(translateText('todo.status.todo'), taskGroups.todo)}${taskGroup(translateText('todo.status.done'), taskGroups.done)}</div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>${translateText('project.workLog')}</h3><span class="cap">${translateText('report.entryCount', { count: entries.length })}</span></div>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-log"><div class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div><div class="grow"><strong>${esc(task?.title || entry.description || translateText('common.unnamedWork'))}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : `<div class="empty">${translateText('project.noWorkLog')}</div>`}</div>
+    <div class="workspace-section"><div class="workspace-section-head"><h3>${translateText('project.process')}</h3><span class="cap">${translateText('project.byDate')}</span></div>${dailyRows.length ? dailyRows.map(([date, value]) => `<div class="workspace-day"><span class="num">${date}</span><div class="workspace-day-bar"><i style="width:${Math.round((value / maxDaily) * 100)}%"></i></div><span class="num">${fmtHM(value)}</span></div>`).join('') : `<div class="empty">${translateText('project.noWorkData')}</div>`}</div>`;
   if (notesBox) {
     $('projectWorkspace').appendChild(notesBox);
     notesBox.hidden = false;
@@ -1580,10 +1689,11 @@ function renderProjectWorkspace(id) {
   initializeMarkdownPreviews($('projectWorkspace'));
   const workspaceSections = $('projectWorkspace').querySelectorAll('.workspace-section');
   workspaceSections[0]?.classList.add('workspace-section-first');
-  workspaceSections.forEach((section) => {
+  workspaceSections.forEach((section, index) => {
+    if (index > 0) section.classList.add('is-collapsed');
     const head = section.querySelector('.workspace-section-head');
     if (!head) return;
-    head.insertAdjacentHTML('beforeend', '<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>[−]</button>');
+    head.insertAdjacentHTML('beforeend', `<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>${section.classList.contains('is-collapsed') ? '[+]' : '[−]'}</button>`);
   });
   const noteHead = notesBox?.querySelector('.row');
   if (noteHead && !noteHead.querySelector('[data-workspace-toggle]')) {
@@ -1712,7 +1822,7 @@ function renderTodos() {
     .map((item) => `<option value="${item.value}">${statusLabel(item.value, currentLocale)}</option>`).join('');
 
   const keepP = $('tdProject').value;
-  $('tdProject').innerHTML = opts('— 未分類 —');
+  $('tdProject').innerHTML = opts(translateText('common.uncategorizedOption'));
   $('tdProject').value = keepP;
 
   const keepParent = $('tdParent').value;
@@ -1725,14 +1835,14 @@ function renderTodos() {
     }
   });
   if (editingId) collectDescendants(editingId);
-  $('tdParent').innerHTML = '<option value="">— 最上層任務 —</option>' + S.tasks
+  $('tdParent').innerHTML = `<option value="">${esc(translateText('common.topLevelTask'))}</option>` + S.tasks
     .filter((task) => task.status !== 'archived' && task.id !== editingId && !descendants.has(task.id))
     .sort((a, b) => a.title.localeCompare(b.title))
     .map((task) => `<option value="${task.id}">${esc(task.title)}</option>`).join('');
   $('tdParent').value = keepParent;
 
   const keepF = $('tdFilter').value;
-  $('tdFilter').innerHTML = opts('— 全部專案 —');
+  $('tdFilter').innerHTML = opts(translateText('common.projectOption'));
   $('tdFilter').value = keepF;
 
   const keepPriority = normalizePriority($('tdPriority').value);
@@ -1740,7 +1850,7 @@ function renderTodos() {
   $('tdPriority').value = keepPriority;
 
   const keepPriorityFilter = $('tdPriorityFilter').value;
-  $('tdPriorityFilter').innerHTML = priorityOpts('— 全部優先級 —');
+  $('tdPriorityFilter').innerHTML = priorityOpts(translateText('todo.allPriorities'));
   $('tdPriorityFilter').value = keepPriorityFilter;
   const statusFilter = normalizeStatus($('tdStatusFilter').value);
   $('tdStatusFilter').innerHTML = statusOpts;
@@ -1787,46 +1897,46 @@ function renderTodos() {
 
         // 三個時間排成一行，缺的用 — 佔位
         const dates = [
-          `開單 ${stampLabel(t.openedAt, currentLocale)}`,
-          `截止 ${t.dueDate ? t.dueDate + (t.dueTime ? ` ${t.dueTime}` : '') : '—'}`,
-          `結案 ${stampLabel(t.completedAt, currentLocale)}`,
+          `${translateText('todo.openedAt')} ${stampLabel(t.openedAt, currentLocale)}`,
+          `${translateText('todo.dueDate')} ${t.dueDate ? t.dueDate + (t.dueTime ? ` ${t.dueTime}` : '') : '—'}`,
+          `${translateText('todo.completedAt')} ${stampLabel(t.completedAt, currentLocale)}`,
         ].join(' · ');
 
-        return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>` : ''}
+        return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>` : ''}
         <div class="row-item todo-card task-item activity-row priority-${t.priority || 'normal'}${done ? ' done' : ''}" data-todo-id="${esc(t.id)}" style="--task-depth:${t.depth}">
           ${t.depth ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
           <button class="btn-sm btn-ghost activity-status" data-check="${t.id}"
-            title="${done ? '重新打開' : '標記完成'}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
+            title="${done ? translateText('todo.reopen') : translateText('todo.markDone')}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
           <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
               <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>
-              ${t.scheduleId ? '<span class="badge" title="由排程自動產生">排程</span>' : ''}
-              ${t.status === 'doing' ? '<span class="badge">進行中</span>' : ''}
+              ${t.scheduleId ? `<span class="badge" title="${translateText('todo.generatedBySchedule')}">${translateText('todo.schedule')}</span>` : ''}
+              ${t.status === 'doing' ? `<span class="badge">${translateText('todo.status.doing')}</span>` : ''}
               ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
               ${m.leadMs !== null ? `<span class="badge">${translateText('summary.lead', { duration: leadLabel(m.leadMs, currentLocale) })}</span>` : ''}
-              ${t.reopenCount ? `<span class="badge">重開 ${t.reopenCount} 次</span>` : ''}
+              ${t.reopenCount ? `<span class="badge">${translateText('todo.reopened', { count: t.reopenCount })}</span>` : ''}
             </div>
-            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
+            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>
             <div class="sub num">${dates}</div>
             ${t.notes ? renderMarkdownPreview(t.notes, 'notes') : ''}
-            ${workEntries.length ? `<details class="todo-worklog"><summary>工作紀錄 ${workEntries.length} 筆 · ${fmtHM(m.worked)}</summary>
+            ${workEntries.length ? `<details class="todo-worklog"><summary>${translateText('todo.workLog', { count: workEntries.length, duration: fmtHM(m.worked) })}</summary>
               <div class="todo-worklog-list">${workEntries.map((entry) => `<div class="todo-worklog-row">
                 <span class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
-                <span class="grow">${esc(entry.description || '（無描述）')}${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</span>
+                <span class="grow">${esc(entry.description || translateText('common.noDescription'))}${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</span>
                 <span class="num">${fmtHM(db.durationSec(entry))}</span>
               </div>`).join('')}</div></details>` : ''}
           </div>
-          <span class="num activity-duration" title="累積工時">${m.worked ? fmtHM(m.worked) : '—'}</span>
+          <span class="num activity-duration" title="${translateText('entry.duration')}">${m.worked ? fmtHM(m.worked) : '—'}</span>
           <div class="act">
-            ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="對這個 todo 開始計時">[&gt;]</button>`}
-            <button class="btn-sm" data-add-subtask="${t.id}" title="新增子任務">＋子任務</button>
-            <button class="btn-sm" data-edit-t="${t.id}">[編輯]</button>
+            ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="${translateText('todo.start')}">[&gt;]</button>`}
+            <button class="btn-sm" data-add-subtask="${t.id}" title="${translateText('todo.addSubtask')}">＋${translateText('todo.addSubtask')}</button>
+            <button class="btn-sm" data-edit-t="${t.id}">${translateText('project.edit')}</button>
             <button class="btn-sm btn-danger" data-del-t="${t.id}">[x]</button>
           </div>
         </div>`;
       }).join('')
-    : '<div class="empty">沒有符合的 todo</div>';
+    : `<div class="empty">${translateText('todo.noMatching')}</div>`;
   initializeMarkdownPreviews($('todoList'));
 }
 
@@ -1835,7 +1945,7 @@ function resetTodoForm() {
   syncMarkdownEditor($('tdNotes'));
   $('tdParent').value = '';
   $('tdStatus').value = 'todo'; $('tdPriority').value = 'normal'; $('tdDue').value = ''; $('tdDueTime').value = '';
-  $('tdOpened').value = '建立後自動記錄';
+  $('tdOpened').value = translateText('todo.openedAuto');
   $('tdDone').value = '—';
   $('tdWorked').value = '—';
   $('tdCancel').hidden = true;
@@ -1908,7 +2018,7 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdNotes').dispatchEvent(new Event('input')); // 讓備註重算高度
     return;
   } else if (del) {
-    if (!confirm('刪除這個 todo？綁在它上面的時間紀錄會保留，只是解除關聯。')) return;
+    if (!confirm(translateText('todo.deleteConfirm'))) return;
     await db.deleteTask(del);
   } else return;
 
@@ -1917,7 +2027,10 @@ $('todoList').addEventListener('click', async (e) => {
 
 /* ---------------- 排程 ---------------- */
 
-const DOW_NAME = ['日', '一', '二', '三', '四', '五', '六'];
+const DOW_NAME = [
+  'schedule.days.sun', 'schedule.days.mon', 'schedule.days.tue',
+  'schedule.days.wed', 'schedule.days.thu', 'schedule.days.fri', 'schedule.days.sat',
+];
 let scDays = new Set([1, 2, 3, 4, 5]);   // 預設平日
 
 function paintDow() {
@@ -1928,16 +2041,16 @@ function paintDow() {
 
 function dowLabel(days) {
   const s = [...days].sort();
-  if (s.length === 7) return '每天';
-  if (s.join() === '1,2,3,4,5') return '每個平日';
-  if (s.join() === '0,6') return '每個週末';
-  return s.map((d) => DOW_NAME[d]).join('、');
+  if (s.length === 7) return translateText('schedule.everyday');
+  if (s.join() === '1,2,3,4,5') return translateText('schedule.weekdays');
+  if (s.join() === '0,6') return translateText('schedule.weekends');
+  return s.map((d) => translateText(DOW_NAME[d])).join(' · ');
 }
 
 function renderSchedules() {
   const noSchedulesLabel = translate(currentLocale, 'schedule.noSchedules');
   const keep = $('scProject').value;
-  $('scProject').innerHTML = '<option value="">— 未分類 —</option>' +
+  $('scProject').innerHTML = `<option value="">${esc(translateText('common.uncategorizedOption'))}</option>` +
     flattenTree(S.projects).map((p) =>
       `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   $('scProject').value = keep;
@@ -1949,25 +2062,25 @@ function renderSchedules() {
         const priority = normalizePriority(s.priority);
         const bits = [
           dowLabel(s.weekdays),
-          `${s.createTime} 開單`,
-          s.dueTime ? `${s.dueTime} 截止` : null,
-          s.remindMinutes ? `提前 ${s.remindMinutes} 分提醒` : null,
+          translateText('schedule.createLabel', { time: s.createTime }),
+          s.dueTime ? translateText('schedule.dueLabel', { time: s.dueTime }) : null,
+          s.remindMinutes ? translateText('schedule.reminderLabel', { count: s.remindMinutes }) : null,
         ].filter(Boolean).join(' · ');
         return `<div class="row-item${s.enabled ? '' : ' done'}">
           <button class="btn-sm btn-ghost" data-sc-toggle="${s.id}" style="width:34px"
-            title="${s.enabled ? '停用' : '啟用'}">${s.enabled ? '[x]' : '[ ]'}</button>
+            title="${s.enabled ? translateText('common.disabled') : translateText('common.enabled')}">${s.enabled ? '[x]' : '[ ]'}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(s.title)}
               <span class="badge priority-${priority}">${priorityLabel(priority, currentLocale)}</span>
-              ${s.enabled ? '' : '<span class="badge">已停用</span>'}</div>
+              ${s.enabled ? '' : `<span class="badge">${translateText('schedule.disabled')}</span>`}</div>
             <div class="sub num">${bits}</div>
-            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}${
-              s.lastRunDate ? ` · 上次開單 ${s.lastRunDate}` : ' · 尚未執行過'}</div>
+            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}${
+              s.lastRunDate ? ` · ${translateText('schedule.lastRun', { date: s.lastRunDate })}` : ` · ${translateText('schedule.neverRun')}`}</div>
             ${s.notes ? `<div class="notes">${esc(s.notes)}</div>` : ''}
           </div>
           <div class="act">
-            <button class="btn-sm" data-sc-edit="${s.id}">[編輯]</button>
+            <button class="btn-sm" data-sc-edit="${s.id}">${translateText('project.edit')}</button>
             <button class="btn-sm btn-danger" data-sc-del="${s.id}">[x]</button>
           </div>
         </div>`;
@@ -1999,7 +2112,7 @@ $('scEveryday').addEventListener('click', () => { scDays = new Set([0, 1, 2, 3, 
 $('schForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!$('scTitle').value.trim()) return;
-  if (!scDays.size) { alert('至少要選一天'); return; }
+  if (!scDays.size) { alert(translateText('schedule.atLeastOneDay')); return; }
   const remind = $('scRemind').value;
   await db.upsertSchedule({
     id: $('scId').value || undefined,
@@ -2022,8 +2135,8 @@ $('scCancel').addEventListener('click', resetSchForm);
 $('scRunNow').addEventListener('click', async (e) => {
   const created = await db.runDueSchedules();
   const btn = e.currentTarget;
-  btn.textContent = created.length ? `已新增 ${created.length} 張` : '目前沒有到點的';
-  setTimeout(() => { btn.textContent = '立刻檢查一次'; }, 1800);
+  btn.textContent = created.length ? translateText('schedule.createdCount', { count: created.length }) : translateText('schedule.noneDue');
+  setTimeout(() => { btn.textContent = translateText('schedule.runNow'); }, 1800);
   await load();
 });
 
@@ -2052,7 +2165,7 @@ $('schList').addEventListener('click', async (e) => {
     $('scTitle').focus();
     return;
   } else if (del) {
-    if (!confirm('刪除這條排程？已經產生的 Todo 會保留。')) return;
+    if (!confirm(translateText('schedule.deleteConfirm'))) return;
     await db.deleteSchedule(del);
   } else return;
 
@@ -2067,7 +2180,7 @@ function renderTags() {
         <div class="main">${esc(t.name)}</div>
         <div class="act"><button class="btn-sm btn-danger" data-del-t="${t.id}">[x]</button></div>
       </div>`).join('')
-    : '<div class="empty">還沒有標籤</div>';
+    : `<div class="empty">${translateText('tag.noTags')}</div>`;
 }
 $('tagForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -2084,14 +2197,16 @@ $('tagList').addEventListener('click', async (e) => {
 /* 紀錄分頁的篩選狀態 */
 const enUI = { q: '', projectId: '', range: 'all', limit: 50, expanded: new Set(), allOpen: false, focusId: null };
 
+function entriesRangeBounds() {
+  const customBounds = enUI.range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
+  if (customBounds) return customBounds;
+  if (enUI.range === 'all') return { from: null, to: null };
+  return reportRangeBounds(enUI.range, new Date(), S.settings.weekStartsOn);
+}
+
 /** 套用搜尋 / 專案 / 區間之後的紀錄，新的在前 */
 function filteredEntries() {
-  const customBounds = enUI.range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
-  const from = customBounds?.from || (enUI.range === 'today' ? startOfDay()
-    : enUI.range === 'week' ? startOfWeek(new Date(), S.settings.weekStartsOn)
-      : enUI.range === 'month' ? startOfMonth()
-        : null);
-  const to = customBounds?.to || null;
+  const { from, to } = entriesRangeBounds();
 
   // 選了父專案時，子專案的紀錄也一起算進來
   const scope = enUI.projectId
@@ -2102,8 +2217,7 @@ function filteredEntries() {
 
   return S.entries
     .filter((e) => e.endedAt && !e.deletedAt)
-    .filter((e) => !from || new Date(e.startedAt) >= from)
-    .filter((e) => !to || new Date(e.startedAt) < to)
+    .filter((e) => !from || entryOverlapsRange(e, from, to))
     .filter((e) => !scope || (e.projectId && scope.has(e.projectId)))
     .filter((e) => !kw || `${e.description} ${e.notes || ''}`.toLowerCase().includes(kw))
     .filter((e) => !enUI.focusId || e.id === enUI.focusId)
@@ -2114,16 +2228,19 @@ function renderEntries() {
   const noEntriesLabel = translate(currentLocale, 'entry.noEntries');
   // 專案下拉
   const keep = $('enFilter').value;
-  $('enFilter').innerHTML = '<option value="">— 全部專案 —</option>' +
+  $('enFilter').innerHTML = `<option value="">${esc(translateText('common.projectOption'))}</option>` +
     flattenTree(S.projects).map((p) =>
       `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   $('enFilter').value = keep;
 
   const rows = filteredEntries();
-  const shown = rows.slice(0, enUI.limit);
-  const totalSec = rows.reduce((s, e) => s + db.durationSec(e), 0);
-  $('entryCount').textContent = `${rows.length} 筆 · ${fmtHM(totalSec)}`;
-  $('enExpandAll').textContent = enUI.allOpen ? '[-] 全部收合' : '[+] 全部展開';
+  const { from, to } = entriesRangeBounds();
+  const shown = rows.slice(0, enUI.limit)
+    .map((entry) => (from ? clipEntryToRange(entry, from, to) : entry))
+    .filter(Boolean);
+  const totalSec = rows.reduce((s, e) => s + (from ? durationInRange(e, from, to) : db.durationSec(e)), 0);
+  $('entryCount').textContent = `${translateText('report.entryCount', { count: rows.length })} · ${fmtHM(totalSec)}`;
+  $('enExpandAll').textContent = enUI.allOpen ? translateText('entry.collapseAll') : translateText('entry.expandAll');
 
   // 依日期分組
   const byDay = new Map();
@@ -2140,7 +2257,7 @@ function renderEntries() {
           <div class="day-head">
             <span class="num">${date}</span>
             <span class="grow"></span>
-            <span class="num mute">${fmtHM(daySec)} · ${list.length} 筆</span>
+            <span class="num mute">${fmtHM(daySec)} · ${translateText('report.entryCount', { count: list.length })}</span>
           </div>
           ${list.map((e) => {
             const p = S.projects.find((x) => x.id === e.projectId);
@@ -2154,26 +2271,26 @@ function renderEntries() {
                 ${fmtClock(e.startedAt)}–${fmtClock(e.endedAt)}</span>
               <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
               <div class="main">
-                <div class="ellipsis">${esc(e.description || '（無描述）')}
+                <div class="ellipsis">${esc(e.description || translateText('common.noDescription'))}
                   ${task ? `<span class="badge">${esc(task.title)}</span>` : ''}
                   ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
-                <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : '未分類'}</div>
+                <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>
                 ${notes ? renderMarkdownPreview(notes, 'notes') : ''}
               </div>
               <span class="num activity-duration">${fmtHM(db.durationSec(e))}</span>
               <div class="act">
-                <button class="btn-sm" data-edit-e="${e.id}">[編輯]</button>
+                <button class="btn-sm" data-edit-e="${e.id}">${translateText('entry.edit')}</button>
                 <button class="btn-sm btn-danger" data-del-e="${e.id}">[x]</button>
               </div>
             </div>`;
           }).join('')}
         </div>`;
       }).join('')
-    : `<div class="empty">${S.entries.length ? '這個條件下沒有紀錄' : noEntriesLabel}</div>`;
+    : `<div class="empty">${S.entries.length ? translateText('entry.noEntriesInCondition') : noEntriesLabel}</div>`;
 
   initializeMarkdownPreviews($('entryList'));
   $('entryMore').innerHTML = rows.length > enUI.limit
-    ? `<button id="enMore">載入更多（還有 ${rows.length - enUI.limit} 筆）</button>`
+    ? `<button id="enMore">${translateText('entry.noMore', { count: rows.length - enUI.limit })}</button>`
     : '';
 }
 
@@ -2225,8 +2342,8 @@ $('entryList').addEventListener('click', async (e) => {
 async function copySummary(btn, dates) {
   const md = buildSummary({ dates, entries: S.entries, projects: S.projects, tasks: S.tasks, locale: currentLocale });
   const label = btn.textContent;
-  if (!md) btn.textContent = '沒有紀錄';
-  else btn.textContent = (await copyToClipboard(md)) ? '已複製 ✓' : '複製失敗';
+  if (!md) btn.textContent = translateText('entry.noRecords');
+  else btn.textContent = (await copyToClipboard(md)) ? translateText('common.copied') + ' ✓' : translateText('entry.copyFailed');
   setTimeout(() => { btn.textContent = label; }, 1500);
 }
 
@@ -2249,10 +2366,10 @@ $('addEntry').addEventListener('click', () => {
 });
 
 function openEntryDialog(e) {
-  $('dlgTitle').textContent = e.id ? '編輯紀錄' : '手動補登';
+  $('dlgTitle').textContent = e.id ? translateText('dialog.edit') : translateText('dialog.manual');
   $('enId').value = e.id || '';
   $('enDesc').value = e.description || '';
-  $('enProject').innerHTML = '<option value="">— 未分類 —</option>' +
+  $('enProject').innerHTML = `<option value="">${esc(translateText('dialog.noProject'))}</option>` +
     flattenTree(S.projects).map((p) =>
       `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   $('enProject').value = e.projectId || '';
@@ -2269,7 +2386,7 @@ $('entryForm').addEventListener('submit', async (ev) => {
   if (ev.submitter?.value !== 'save') return;
   const start = fromLocalInput($('enStart').value);
   const end = fromLocalInput($('enEnd').value);
-  if (new Date(end) <= new Date(start)) { alert('結束時間必須晚於開始時間'); return; }
+  if (new Date(end) <= new Date(start)) { alert(translateText('entry.endMustFollowStart')); return; }
   const id = $('enId').value;
   const old = S.entries.find((x) => x.id === id);
   await db.upsertEntry({
@@ -2348,19 +2465,19 @@ $('restoreBtn').addEventListener('click', () => $('restoreFile').click());
 $('restoreFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
-  if (!confirm('匯入會覆蓋目前所有資料，確定？')) return;
+  if (!confirm(translateText('settings.importConfirm'))) return;
   try {
     await db.importAll(JSON.parse(await f.text()));
     await load();
-    alert('已匯入');
+    alert(translateText('settings.imported'));
   } catch (err) {
-    alert('匯入失敗：' + err.message);
+    alert(`${translateText('settings.importFailed')}: ${err.message}`);
   }
   e.target.value = '';
 });
 
 $('wipe').addEventListener('click', async () => {
-  if (!confirm('清空所有專案、標籤、todo 與時間紀錄？此動作無法復原。')) return;
+  if (!confirm(translateText('settings.wipeConfirm'))) return;
   await chrome.storage.local.clear();
   await load();
 });

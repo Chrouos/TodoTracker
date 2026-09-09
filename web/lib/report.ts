@@ -146,9 +146,10 @@ export function buildProjectTaskMetrics(tasks: Task[], entries: Entry[], today: 
 
   for (const entry of entries) {
     const valid = validEntry(entry);
-    if (!valid || !entry.taskId) continue;
-    const task = tasks.find((candidate) => candidate.id === entry.taskId);
-    if (task) ensure(task.projectId ?? null).workedSeconds += Math.round((valid.end.getTime() - valid.start.getTime()) / 1000);
+    if (!valid) continue;
+    const task = entry.taskId ? tasks.find((candidate) => candidate.id === entry.taskId) : null;
+    const projectId = task?.projectId ?? entry.projectId ?? null;
+    if (task || entry.projectId) ensure(projectId).workedSeconds += Math.round((valid.end.getTime() - valid.start.getTime()) / 1000);
   }
 
   return [...byProject.values()]

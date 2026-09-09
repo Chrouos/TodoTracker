@@ -40,7 +40,7 @@ section[hidden] { display: none; }
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--hairline); }
 .kpi { padding: var(--lg); border-right: 1px solid var(--hairline); display: flex; flex-direction: column; gap: var(--xs); }
 .kpi:last-child { border-right: 0; }
-.kpi .num { font-size: 24px; font-weight: 700; }
+.kpi .num { font-size: 24px; font-weight: 700; white-space: nowrap; }
 .kpi .cap { line-height: 1; }
 
 .card { border: 1px solid var(--hairline); padding: var(--lg); margin-bottom: var(--lg); }
@@ -626,7 +626,8 @@ section[hidden] { display: none; }
   grid-template-columns: 58px repeat(var(--review-days), minmax(112px, 1fr));
   grid-template-rows: auto var(--calendar-height);
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: auto;
+  max-height: min(72vh, 640px);
 }
 .review-calendar-corner { border-bottom: 1px solid var(--hairline); }
 .review-calendar-day-head {
@@ -681,8 +682,8 @@ section[hidden] { display: none; }
 .review-calendar-entry:hover,
 .review-calendar-entry:focus-visible { z-index: 10; outline: 1px solid var(--project-color); }
 .review-calendar-tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
+  position: fixed;
+  top: 0;
   left: 0;
   width: min(360px, calc(100vw - 32px));
   max-height: 280px;
@@ -698,10 +699,13 @@ section[hidden] { display: none; }
   font-weight: 400;
   line-height: 1.6;
   white-space: normal;
+  display: block;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  z-index: 1000;
 }
+.review-calendar-tooltip[hidden] { display: none; }
 .review-calendar-tooltip > * { display: block; }
 .review-calendar-tooltip > strong { margin-bottom: 4px; }
 .review-calendar-tooltip .markdown-preview {
@@ -711,10 +715,12 @@ section[hidden] { display: none; }
   line-height: 1.6;
 }
 .review-calendar-tooltip .markdown-preview p { margin: 0 0 6px; }
-.review-calendar-entry:hover .review-calendar-tooltip,
-.review-calendar-entry:focus-visible .review-calendar-tooltip { opacity: 1; visibility: visible; }
+.review-calendar-tooltip.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
 .review-calendar-title { display: block; margin: 0; font-size: 12px; line-height: 1.35; }
-.review-calendar { overflow-x: auto; overflow-y: visible; }
+.review-calendar { overflow-x: auto; overflow-y: auto; }
 .review-calendar-title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1355,7 +1361,7 @@ dialog .field { margin-bottom: var(--md); }
 .report-project-track { flex: 1; height: 7px; overflow: hidden; border-radius: var(--r-full); background: var(--surface-card); }
 .report-project-track span { display: block; width: var(--bar-width); height: 100%; min-width: 2px; border-radius: inherit; background: var(--success); }
 .report-project-count { min-width: 34px; color: var(--text-mute); font-size: 11px; text-align: right; }
-.report-project-work { color: var(--text-body); text-align: right; }
+.report-project-work { color: var(--text-body); text-align: right; white-space: nowrap; }
 .report-empty { padding: 12px 0 2px; color: var(--text-mute); font-size: 12px; }
 .report-details-collapse { border-top: 1px solid var(--hairline); }
 .report-details-collapse > summary {

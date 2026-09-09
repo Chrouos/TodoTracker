@@ -69,4 +69,15 @@ const empty = buildProjectTrendData({
 assert.match(stackedAreaSVG(empty), /沒有可顯示的資料/);
 assert.match(heatmapSVG(empty), /沒有可顯示的資料/);
 
+const overnight = buildProjectTrendData({
+  entries: [{
+    id: 'overnight', projectId: 'project-a',
+    startedAt: '2026-08-10T23:30:00+08:00', endedAt: '2026-08-11T01:30:00+08:00',
+  }],
+  projects,
+  dates: ['2026-08-10', '2026-08-11'],
+  durationSec: (entry) => entry.seconds ?? 0,
+});
+assert.deepEqual(overnight.dailyTotals, [1800, 5400]);
+
 console.log('report trend contract passed');
