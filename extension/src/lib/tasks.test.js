@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entriesForTask, promoteTodoTasksWithEntries, todoHealth } from './tasks.js';
+import {
+  compareTodoTasks, entriesForTask, flattenTodoTree, promoteTodoTasksWithEntries, todoHealth,
+} from './tasks.js';
 
 test('returns completed work records for a todo, newest first', () => {
   const result = entriesForTask(
@@ -14,6 +16,67 @@ test('returns completed work records for a todo, newest first', () => {
   );
 
   assert.deepEqual(result.map((entry) => entry.id), ['new', 'old']);
+});
+
+test('sorts todos by priority, then latest update, then existing fallbacks', () => {
+  const tasks = [
+    { id: 'high-new', priority: 'high', updatedAt: '2026-08-20T10:00:00.000Z', dueDate: '2026-08-30', sortOrder: 4 },
+    { id: 'urgent-old', priority: 'urgent', updatedAt: '2026-08-01T10:00:00.000Z', dueDate: '2026-08-30', sortOrder: 3 },
+    { id: 'high-old', priority: 'high', updatedAt: '2026-08-10T10:00:00.000Z', dueDate: '2026-08-01', sortOrder: 2 },
+    { id: 'normal-due-later', priority: 'normal', updatedAt: null, dueDate: '2026-08-20', sortOrder: 1 },
+    { id: 'normal-due-sooner', priority: 'normal', updatedAt: null, dueDate: '2026-08-15', sortOrder: 5 },
+  ];
+
+  assert.deepEqual(tasks.sort(compareTodoTasks).map((task) => task.id), [
+    'urgent-old',
+    'high-new',
+    'high-old',
+    'normal-due-sooner',
+    'normal-due-later',
+  ]);
+});
+
+test('treats unknown priority as normal and uses sort order as the final fallback', () => {
+  const tasks = [
+    { id: 'legacy-new', priority: 'legacy', updatedAt: '2026-08-20T10:00:00.000Z', dueDate: null, sortOrder: 2 },
+    { id: 'high-old', priority: 'high', updatedAt: '2026-08-01T10:00:00.000Z', dueDate: null, sortOrder: 3 },
+    { id: 'normal-second', priority: 'normal', updatedAt: null, dueDate: null, sortOrder: 5 },
+    { id: 'normal-first', priority: 'normal', updatedAt: null, dueDate: null, sortOrder: 1 },
+  ];
+
+  assert.deepEqual(tasks.sort(compareTodoTasks).map((task) => task.id), [
+    'high-old',
+    'legacy-new',
+    'normal-first',
+    'normal-second',
+  ]);
+});
+
+test('preserves original Todo depth when a filtered parent is hidden', () => {
+  const allRows = flattenTodoTree([
+    { id: 'parent', parentId: null, priority: 'normal', updatedAt: '2026-08-01T10:00:00.000Z' },
+    { id: 'child', parentId: 'parent', priority: 'urgent', updatedAt: '2026-08-02T10:00:00.000Z' },
+    { id: 'root', parentId: null, priority: 'high', updatedAt: '2026-08-03T10:00:00.000Z' },
+  ]);
+
+  assert.deepEqual(
+    allRows.filter((task) => task.id !== 'parent').map((task) => [task.id, task.depth]),
+    [['root', 0], ['child', 1]],
+  );
+});
+
+test('sorts orphan Todos as roots and preserves their child depth', () => {
+  const rows = flattenTodoTree([
+    { id: 'low-orphan', parentId: 'deleted-low-parent', priority: 'low', updatedAt: '2026-08-03T10:00:00.000Z' },
+    { id: 'urgent-orphan', parentId: 'deleted-urgent-parent', priority: 'urgent', updatedAt: '2026-08-01T10:00:00.000Z' },
+    { id: 'orphan-child', parentId: 'urgent-orphan', priority: 'normal', updatedAt: '2026-08-02T10:00:00.000Z' },
+  ]);
+
+  assert.deepEqual(rows.map((task) => [task.id, task.depth]), [
+    ['urgent-orphan', 0],
+    ['orphan-child', 1],
+    ['low-orphan', 0],
+  ]);
 });
 
 test('todoHealth counts active, completed, and overdue todos', () => {

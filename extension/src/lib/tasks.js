@@ -11,6 +11,51 @@
 import { daysBetween, durationOfEntry, fmtDate, fmtClock } from './time.js';
 import { formatDisplayDate, formatDisplayTime, translate } from './i18n.js';
 
+const TODO_PRIORITY_ORDER = { urgent: 0, high: 1, normal: 2, low: 3 };
+
+/** 同一專案／層級的 Todo：優先度、最近更新、截止日、手動順序。 */
+export function compareTodoTasks(a, b) {
+  const aPriority = TODO_PRIORITY_ORDER[a.priority] ?? TODO_PRIORITY_ORDER.normal;
+  const bPriority = TODO_PRIORITY_ORDER[b.priority] ?? TODO_PRIORITY_ORDER.normal;
+  return (aPriority - bPriority)
+    || String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+    || String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999'))
+    || ((a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
+/** 排出 Todo 樹並保留每一列的原始階層深度。 */
+export function flattenTodoTree(tasks) {
+  const children = new Map();
+  const taskIds = new Set(tasks.map((task) => task.id));
+  tasks.forEach((task) => {
+    const parentId = task.parentId || null;
+    if (!children.has(parentId)) children.set(parentId, []);
+    children.get(parentId).push(task);
+  });
+
+  const rows = [];
+  const visited = new Set();
+  const visit = (task, depth) => {
+    if (visited.has(task.id)) return;
+    visited.add(task.id);
+    rows.push({ ...task, depth });
+    for (const child of (children.get(task.id) || []).sort(compareTodoTasks)) {
+      visit(child, depth + 1);
+    }
+  };
+
+  tasks
+    .filter((task) => !task.parentId || !taskIds.has(task.parentId))
+    .sort(compareTodoTasks)
+    .forEach((task) => visit(task, 0));
+
+  // 循環關聯沒有真正的根；仍以穩定順序顯示，避免資料消失。
+  tasks.filter((task) => !visited.has(task.id)).sort(compareTodoTasks)
+    .forEach((task) => visit(task, 0));
+
+  return rows;
+}
+
 export function entriesForTask(task, entries) {
   return entries
     .filter((entry) => entry.taskId === task.id && entry.endedAt && !entry.deletedAt)

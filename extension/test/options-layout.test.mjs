@@ -104,6 +104,15 @@ assert.match(css, /\.markdown-editor-content \.markdown-task-list input\[type="c
   'Editable Markdown task checkboxes should remain compact');
 assert.match(options, /filterTasks/, 'Todo should apply the shared task filter');
 assert.match(options, /taskCountLabel/, 'Todo should use the informative task count');
+assert.match(options, /compareTodoTasks/, 'Todo should use the shared priority and recency ordering');
+assert.match(options, /task\?\.notes\?\.trim\(\)\s*\?\s*`<details class="entry-todo-note">/,
+  'Only linked Todos with non-empty notes should expose the note disclosure');
+assert.doesNotMatch(options, /<details class="entry-todo-note"\s+open/,
+  'Linked Todo notes should remain collapsed by default');
+assert.match(options, /renderMarkdownPreview\(task\.notes, 'notes'\)/,
+  'Linked Todo notes should render with the shared Markdown preview');
+assert.match(css, /\.entry-todo-note\s*>\s*summary\s*\{[^}]*cursor:\s*pointer/s,
+  'Linked Todo notes should remain collapsed behind a subtle interactive summary');
 assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');
 assert.match(html, /id="reportInsights"/, 'Report should expose data quality and Todo performance insights');
 assert.match(html, /data-collapse="rep-insights"/, 'Workspace status should have its own collapsible heading');

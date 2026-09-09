@@ -211,6 +211,9 @@ section[hidden] { display: none; }
   overflow: hidden;
 }
 .notes-toggle { margin-top: var(--xs); height: 22px; font-size: 11px; color: var(--text-mute); }
+.entry-todo-note { margin-top: var(--xs); }
+.entry-todo-note > summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
+.entry-todo-note[open] > summary { margin-bottom: var(--xs); }
 .todo-worklog { margin-top: var(--sm); border-left: 2px solid var(--hairline); padding-left: var(--sm); }
 .todo-worklog summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
 .todo-worklog-list { margin-top: var(--xs); }

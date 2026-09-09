@@ -19,7 +19,7 @@ import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
-import { taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { compareTodoTasks, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, TODO_STATUSES, filterTasks, normalizePriority, normalizeStatus,
@@ -1786,31 +1786,6 @@ $('projList').addEventListener('click', async (e) => {
 
 /* ---------------- Todo ---------------- */
 
-function flattenTodoTree(tasks) {
-  const children = new Map();
-  tasks.forEach((task) => {
-    const parentId = task.parentId || null;
-    if (!children.has(parentId)) children.set(parentId, []);
-    children.get(parentId).push(task);
-  });
-  const compare = (a, b) =>
-    Number(a.status === 'done') - Number(b.status === 'done')
-    || ({ urgent: 0, high: 1, normal: 2, low: 3 }[a.priority || 'normal'] - { urgent: 0, high: 1, normal: 2, low: 3 }[b.priority || 'normal'])
-    || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
-    || (a.sortOrder - b.sortOrder);
-  const out = [];
-  const visit = (parentId, depth, seen = new Set()) => {
-    for (const task of (children.get(parentId) || []).sort(compare)) {
-      if (seen.has(task.id)) continue;
-      out.push({ ...task, depth });
-      visit(task.id, depth + 1, new Set(seen).add(task.id));
-    }
-  };
-  visit(null, 0);
-  return out.concat(tasks.filter((task) => !out.some((item) => item.id === task.id))
-    .map((task) => ({ ...task, depth: 0 })));
-}
-
 function renderTodos() {
   const noTodosLabel = translate(currentLocale, 'todo.noTodos');
   const tree = flattenTree(S.projects);
@@ -1865,15 +1840,14 @@ function renderTodos() {
     status: statusFilter,
   })
     .filter((task) => !todoFocusId || task.id === todoFocusId)
-    .sort((a, b) =>
-      Number(a.status === 'done') - Number(b.status === 'done')
-      || ({ urgent: 0, high: 1, normal: 2, low: 3 }[a.priority || 'normal'] - { urgent: 0, high: 1, normal: 2, low: 3 }[b.priority || 'normal'])
-      || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')
-      || (a.sortOrder - b.sortOrder));
+    .sort(compareTodoTasks);
 
+  const visibleTaskIds = new Set(list.map((task) => task.id));
   const orderedTasks = tree.flatMap((project) =>
-    flattenTodoTree(list.filter((task) => task.projectId === project.id))
-  ).concat(flattenTodoTree(list.filter((task) => !task.projectId)));
+    flattenTodoTree(S.tasks.filter((task) => task.projectId === project.id))
+      .filter((task) => visibleTaskIds.has(task.id))
+  ).concat(flattenTodoTree(S.tasks.filter((task) => !task.projectId))
+    .filter((task) => visibleTaskIds.has(task.id)));
 
   $('tdCount').textContent = taskCountLabel(list, statusFilter === 'all', statusFilter, currentLocale);
 
@@ -2276,6 +2250,10 @@ function renderEntries() {
                   ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
                 <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>
                 ${notes ? renderMarkdownPreview(notes, 'notes') : ''}
+                ${task?.notes?.trim() ? `<details class="entry-todo-note">
+                  <summary>${translateText('entry.todoNotes')}</summary>
+                  ${renderMarkdownPreview(task.notes, 'notes')}
+                </details>` : ''}
               </div>
               <span class="num activity-duration">${fmtHM(db.durationSec(e))}</span>
               <div class="act">
