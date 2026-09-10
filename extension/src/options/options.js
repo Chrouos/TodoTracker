@@ -20,7 +20,7 @@ import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tre
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { createToast } from '../lib/toast.js';
-import { compareTodoTasks, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { compareTodoTasks, dueTodoAlerts, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, TODO_STATUSES, filterTasks, normalizePriority, normalizeStatus,
@@ -550,6 +550,7 @@ function renderReport() {
   $('kCount').textContent = rows.length;
   $('kAvg').textContent = rows.length ? fmtHM(sec / rows.length) : '—';
   $('kDays').textContent = dayKeys.size;
+  renderDueAlerts();
   renderTodoHealth();
   renderReportInsights(rows, from, to);
 
@@ -761,6 +762,46 @@ function renderReviewList(groups) {
       <div class="daily-review-list">${entries}</div>
     </section>`;
   }).join('');
+}
+
+function renderDueAlerts() {
+  const mount = $('reportDueAlerts');
+  if (!mount) return;
+  const today = fmtDate(new Date().toISOString());
+  const all = dueTodoAlerts(S.tasks, today, Number.MAX_SAFE_INTEGER, 3);
+  const visible = all.slice(0, 3);
+  const overdueCount = all.filter((task) => task.alertKind === 'overdue').length;
+  const todayCount = all.filter((task) => task.alertKind === 'today').length;
+  if (!visible.length) {
+    mount.innerHTML = `<section class="report-due-alerts report-due-alerts-clear">
+      <div class="report-due-alerts-head"><strong>${translateText('report.dueAlerts')}</strong>
+        <span class="cap">${translateText('report.dueAlertsClear')}</span></div>
+    </section>`;
+    return;
+  }
+  const counts = [
+    overdueCount ? translateText('report.dueAlertsOverdue', { count: overdueCount }) : '',
+    todayCount ? translateText('report.dueAlertsToday', { count: todayCount }) : '',
+  ].filter(Boolean).join(' · ');
+  const rows = visible.map((task) => {
+    const project = task.projectId && S.projects.find((item) => item.id === task.projectId);
+    const projectLabel = project ? pathOf(S.projects, project.id).join(' / ') : '';
+    const title = task.title?.trim() || translateText('report.dueAlertsNoTitle');
+    const due = `${task.dueDate}${task.dueTime ? ` ${task.dueTime}` : ''}`;
+    return `<button type="button" class="report-due-alert report-due-alert-${task.alertKind}" data-report-task-id="${esc(task.id)}">
+      <span class="report-due-alert-main"><strong>${esc(title)}</strong>${projectLabel ? `<span class="sub">${esc(projectLabel)}</span>` : ''}</span>
+      <span class="report-due-alert-meta"><span>${esc(due)}</span><span class="badge">${esc(dueLabel(task, false, currentLocale))}</span></span>
+    </button>`;
+  }).join('');
+  const more = all.length > visible.length
+    ? `<span class="cap">${translateText('report.dueAlertsMore', { count: all.length - visible.length })}</span>`
+    : '';
+  mount.innerHTML = `<section class="report-due-alerts">
+    <div class="report-due-alerts-head"><div><strong>${translateText('report.dueAlerts')}</strong><span class="cap">${translateText('report.dueAlertsHint')}</span></div>
+      <span class="cap">${counts}</span></div>
+    <div class="report-due-alert-list">${rows}</div>
+    ${more}
+  </section>`;
 }
 
 function renderTodoHealth() {
@@ -2539,6 +2580,10 @@ $('tabs').addEventListener('click', (e) => selectTab(e.target.dataset.tab));
 $('reportInsights').addEventListener('click', (e) => {
   const entryId = e.target.closest('[data-report-entry-id]')?.dataset.reportEntryId;
   if (entryId) { focusReportEntry(entryId); return; }
+  const taskId = e.target.closest('[data-report-task-id]')?.dataset.reportTaskId;
+  if (taskId) focusReportTodo(taskId);
+});
+$('reportDueAlerts').addEventListener('click', (e) => {
   const taskId = e.target.closest('[data-report-task-id]')?.dataset.reportTaskId;
   if (taskId) focusReportTodo(taskId);
 });

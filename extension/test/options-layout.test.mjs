@@ -15,6 +15,7 @@ assert.match(html, /id="tdPriorityFilter"/, 'Todo should have a priority filter'
 assert.match(html, /id="scPriority"/, 'Schedule should have a priority field');
 assert.match(html, /data-tab="timer"/, 'Management timer should have its own tab');
 assert.match(html, /id="p-timer"/, 'Management timer should be inside its own panel');
+assert.match(html, /id="reportDueAlerts"/, 'Report should reserve a first-glance area for due Todo alerts');
 assert.match(html,
   /data-tab="report"[\s\S]*data-tab="timer"[\s\S]*data-tab="projects"[\s\S]*data-tab="todos"[\s\S]*data-tab="entries"[\s\S]*data-tab="schedules"[\s\S]*data-tab="tags"[\s\S]*data-tab="settings"/,
   'Management tabs should follow the requested order');
@@ -145,6 +146,8 @@ assert.match(options, /highlightProjectId/, 'Project selection should highlight 
 assert.match(options, /trendOverview/, 'Report should show a useful summary before hover');
 assert.match(options, /focusReportEntry/, 'Report should navigate directly to work records');
 assert.match(options, /focusReportTodo/, 'Report should navigate directly to Todo items');
+assert.match(options, /dueTodoAlerts/, 'Report should derive a compact list of upcoming Todo deadlines');
+assert.match(options, /data-report-task-id/, 'Due Todo alerts should link directly to Todo items');
 assert.match(options, /buildWorkspaceTodoProgress/, 'Workspace status should derive its Todo completion progress');
 assert.match(options, /report\.todoProgress/, 'Workspace status should show Todo completion progress');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
@@ -191,6 +194,7 @@ assert.match(options, /reportChartCollapsed/, 'Report chart collapse state shoul
 assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap', 'tracker'\]\)/, 'Report chart sections should default to collapsed');
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
+assert.match(css, /\.report-due-alerts\s*\{/, 'Report due alerts should have a dedicated compact style');
 assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
 assert.match(css, /\.report-project-work\s*\{[^}]*white-space:\s*nowrap/s,
   'Project status work durations should stay on one line');

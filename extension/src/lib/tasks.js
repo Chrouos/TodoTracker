@@ -91,6 +91,40 @@ export function todoHealth(tasks, today = fmtDate(new Date().toISOString())) {
   };
 }
 
+/** 報表上方的截止提醒：逾期、今天及未來幾天內到期的未完成 Todo。 */
+export function dueTodoAlerts(tasks, today = fmtDate(new Date().toISOString()), limit = 3, horizonDays = 3) {
+  const max = Number.isFinite(Number(limit)) ? Math.max(0, Math.floor(Number(limit))) : 3;
+  const horizon = Number.isFinite(Number(horizonDays)) ? Math.max(0, Number(horizonDays)) : 3;
+  const priority = (task) => TODO_PRIORITY_ORDER[task.priority] ?? TODO_PRIORITY_ORDER.normal;
+  const dueSortTime = (task) => task.dueTime || '99:99';
+  const alerts = tasks
+    .filter((task) => task.status !== 'done' && task.status !== 'archived'
+      && /^\d{4}-\d{2}-\d{2}$/.test(String(task.dueDate || '')))
+    .map((task) => {
+      const dueDelta = daysBetween(today, task.dueDate);
+      return {
+        ...task,
+        dueDelta,
+        alertKind: dueDelta < 0 ? 'overdue' : dueDelta === 0 ? 'today' : 'upcoming',
+      };
+    })
+    .filter((task) => task.dueDelta <= horizon)
+    .sort((a, b) => {
+      const aRank = a.dueDelta < 0 ? 0 : a.dueDelta === 0 ? 1 : 2;
+      const bRank = b.dueDelta < 0 ? 0 : b.dueDelta === 0 ? 1 : 2;
+      if (aRank !== bRank) return aRank - bRank;
+      const dueOrder = aRank === 0
+        ? String(b.dueDate).localeCompare(String(a.dueDate))
+        : String(a.dueDate).localeCompare(String(b.dueDate));
+      return dueOrder
+        || dueSortTime(a).localeCompare(dueSortTime(b))
+        || priority(a) - priority(b)
+        || String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+        || ((a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    });
+  return alerts.slice(0, max);
+}
+
 export function taskMetrics(task, entries) {
   const worked = entries
     .filter((e) => e.taskId === task.id && e.endedAt && !e.deletedAt)

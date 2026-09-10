@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  compareTodoTasks, entriesForTask, flattenTodoTree, promoteTodoTasksWithEntries, todoHealth,
+  compareTodoTasks, dueTodoAlerts, entriesForTask, flattenTodoTree, promoteTodoTasksWithEntries, todoHealth,
 } from './tasks.js';
 
 test('returns completed work records for a todo, newest first', () => {
@@ -129,4 +129,32 @@ test('todoHealth handles empty todos without division by zero', () => {
     active: 0,
     overdue: 0,
   });
+});
+
+test('dueTodoAlerts keeps unfinished due todos visible even without notes or work records', () => {
+  const alerts = dueTodoAlerts([
+    { id: 'empty', title: '', notes: '', status: 'todo', dueDate: '2026-09-10' },
+    { id: 'done', title: 'Done', status: 'done', dueDate: '2026-09-10' },
+    { id: 'archived', title: 'Archived', status: 'archived', dueDate: '2026-09-10' },
+    { id: 'none', title: 'No due date', status: 'todo', dueDate: null },
+  ], '2026-09-10');
+
+  assert.deepEqual(alerts.map((item) => [item.id, item.dueDelta, item.alertKind]), [
+    ['empty', 0, 'today'],
+  ]);
+});
+
+test('dueTodoAlerts prioritizes overdue and nearest upcoming deadlines, then due time and priority', () => {
+  const alerts = dueTodoAlerts([
+    { id: 'old-overdue', status: 'todo', dueDate: '2026-09-01', dueTime: '09:00', priority: 'urgent' },
+    { id: 'near-overdue', status: 'doing', dueDate: '2026-09-09', dueTime: '18:00', priority: 'low' },
+    { id: 'today-late', status: 'todo', dueDate: '2026-09-10', dueTime: '18:00', priority: 'normal' },
+    { id: 'today-soon', status: 'todo', dueDate: '2026-09-10', dueTime: '09:00', priority: 'low' },
+    { id: 'tomorrow', status: 'todo', dueDate: '2026-09-11', dueTime: '09:00', priority: 'normal' },
+    { id: 'later', status: 'todo', dueDate: '2026-09-20', dueTime: '09:00', priority: 'urgent' },
+  ], '2026-09-10', 99);
+
+  assert.deepEqual(alerts.map((item) => item.id), ['near-overdue', 'old-overdue', 'today-soon', 'today-late', 'tomorrow']);
+  assert.deepEqual(alerts.map((item) => item.alertKind), ['overdue', 'overdue', 'today', 'today', 'upcoming']);
+  assert.equal(alerts.some((item) => item.id === 'later'), false);
 });
