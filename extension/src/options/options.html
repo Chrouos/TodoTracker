@@ -437,12 +437,13 @@
     <label class="field"><span data-i18n="dialog.workNotes">工作紀錄</span>
       <textarea id="enNotes" data-markdown-editor-input data-i18n-placeholder="entry.notesPlaceholder" placeholder="這段時間做了什麼？"></textarea></label>
     <div class="actions">
-      <button value="cancel" data-i18n="dialog.cancel">取消</button>
-      <button value="save" class="btn-primary" data-i18n="dialog.save">儲存</button>
+      <button type="button" id="entryCancel" value="cancel" data-i18n="dialog.cancel">取消</button>
+      <button type="submit" id="entrySave" value="save" class="btn-primary" data-i18n="dialog.save">儲存</button>
     </div>
   </form>
 </dialog>
 
+<div id="appToast" class="app-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script type="module" src="options.js"></script>
 </body>
 </html>

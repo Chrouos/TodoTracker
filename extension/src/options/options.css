@@ -211,6 +211,16 @@ section[hidden] { display: none; }
   overflow: hidden;
 }
 .notes-toggle { margin-top: var(--xs); height: 22px; font-size: 11px; color: var(--text-mute); }
+.app-toast {
+  position: fixed; right: 20px; bottom: 20px; z-index: 100;
+  max-width: min(320px, calc(100vw - 40px)); padding: 8px 12px;
+  border: 1px solid var(--hairline-strong); border-radius: 4px;
+  background: var(--ink); color: var(--canvas); font-size: 12px;
+  box-shadow: 0 4px 16px rgba(32, 29, 29, .14);
+  opacity: 0; pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.app-toast.is-visible { opacity: 1; }
 .entry-todo-note { margin-top: var(--xs); }
 .entry-todo-note > summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
 .entry-todo-note[open] > summary { margin-bottom: var(--xs); }

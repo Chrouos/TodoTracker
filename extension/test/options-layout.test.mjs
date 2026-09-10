@@ -25,6 +25,14 @@ for (const id of [
   assert.match(html, new RegExp(`id="${id}"`), `Management timer should have ${id}`);
 }
 assert.match(html, /id="stNotesEditor"/, 'Settings should expose the Markdown editor mode');
+assert.match(html, /id="appToast"[^>]*role="status"[^>]*aria-live="polite"/,
+  'Options should expose one unobtrusive live toast region');
+assert.doesNotMatch(html, /id="appToast"[^>]*hidden/,
+  'Options toast live region should remain available to assistive technology');
+assert.match(html, /<button type="button"[^>]*value="cancel"[^>]*data-i18n="dialog\.cancel"/,
+  'Entry dialog cancel must not be the implicit submit action');
+assert.match(html, /<button type="submit"[^>]*id="entrySave"[^>]*value="save"[^>]*data-i18n="dialog\.save"/,
+  'Entry dialog save should be the explicit submit action');
 for (const id of ['mgTimerNotes', 'tdNotes', 'enNotes', 'pjNoteDraft', 'scNotes']) {
   assert.match(html, new RegExp(`id="${id}"[^>]*data-markdown-editor-input`), `${id} should use the shared Markdown editor`);
 }
@@ -240,6 +248,14 @@ assert.doesNotMatch(options, /notesBox\.classList\.add\('is-collapsed'\)/,
 assert.match(css, /\.markdown-editor-toolbar\s*\{/, 'Markdown fields should render an editor toolbar');
 assert.match(editor, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
 assert.match(options, /mountMarkdownEditor/, 'Options should mount the native Markdown block editor');
+assert.match(options, /onEmptyParagraphEnter:[\s\S]{0,160}requestSubmit\(\$\('entrySave'\)\)/,
+  'A second Enter on an empty entry-note paragraph should submit the entry');
+for (const key of ['todoCreated', 'todoUpdated', 'todoCompleted', 'todoReopened', 'todoDeleted']) {
+  assert.match(options, new RegExp(`['"]toast\\.${key}['"]`), `Options should expose ${key} feedback`);
+}
+assert.match(options, /showToast\(translateText\(/, 'Options Todo actions should display translated toast feedback');
+assert.match(css, /\.app-toast\s*\{[^}]*position:\s*fixed[^}]*right:/s,
+  'Options toast should stay compact in the lower-right viewport');
 assert.match(editor, /dataset\.markdownEditorRoot\s*=\s*'true'/,
   'Options Markdown editors should mount one delegated editable root');
 assert.doesNotMatch(editor, /data-editor-surface|editorSurface|activeSurface/,

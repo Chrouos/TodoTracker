@@ -2,6 +2,7 @@ import * as db from '../lib/db.js';
 import { initCollapse } from '../lib/collapse.js';
 import { flattenTree, indentLabel } from '../lib/tree.js';
 import { autoGrow } from '../lib/autogrow.js';
+import { createToast } from '../lib/toast.js';
 
 // popup 空間有限，上限拉到 260px，超過才捲
 const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 260 });
@@ -19,6 +20,7 @@ import {
 } from '../lib/i18n.js';
 
 const $ = (id) => document.getElementById(id);
+const showToast = createToast($('appToast'));
 
 let state = {
   projects: [], tags: [], tasks: [], timer: null, settings: db.DEFAULT_SETTINGS,
@@ -381,7 +383,7 @@ $('logText').addEventListener('keydown', (ev) => {
 /* Todo 分頁 */
 $('newTodo').addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter' || !e.target.value.trim()) return;
-  await db.upsertTask({
+  const savedTask = await db.upsertTask({
     title: e.target.value,
     projectId: $('todoCreateProject').value || null,
     parentId: $('todoParent').value || null,
@@ -389,6 +391,7 @@ $('newTodo').addEventListener('keydown', async (e) => {
     dueDate: $('todoDue').value || null,
     dueTime: $('todoDueTime').value || null,
   });
+  showToast(translate(currentLocale, 'toast.todoCreated', { title: savedTask.title }));
   e.target.value = '';
   await load();
 });
@@ -410,6 +413,7 @@ $('todoList').addEventListener('click', async (e) => {
   if (check) {
     const t = state.tasks.find((x) => x.id === check);
     await db.upsertTask({ ...t, status: t.status === 'done' ? 'todo' : 'done' });
+    showToast(translate(currentLocale, t.status === 'done' ? 'toast.todoReopened' : 'toast.todoCompleted', { title: t.title }));
   } else if (addSubtaskId) {
     const parent = state.tasks.find((x) => x.id === addSubtaskId);
     if (!parent) return;
@@ -424,7 +428,9 @@ $('todoList').addEventListener('click', async (e) => {
     await db.startTimer({ projectId: t.projectId, taskId: t.id, description: t.title });
     switchTab('track');
   } else if (delId) {
+    const t = state.tasks.find((x) => x.id === delId);
     await db.deleteTask(delId);
+    showToast(translate(currentLocale, 'toast.todoDeleted', { title: t?.title || '' }));
   } else return;
 
   await load();

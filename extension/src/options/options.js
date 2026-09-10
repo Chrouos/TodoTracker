@@ -19,6 +19,7 @@ import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
+import { createToast } from '../lib/toast.js';
 import { compareTodoTasks, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
@@ -54,6 +55,7 @@ autoGrow(document.getElementById('pjNoteDraft'), { min: 72, max: 320 });
 autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
 
 const $ = (id) => document.getElementById(id);
+const showToast = createToast($('appToast'));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const translateText = (key, variables) => translate(currentLocale, key, variables);
@@ -80,7 +82,12 @@ function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
   });
   document.querySelectorAll('[data-markdown-editor-input]').forEach((textarea) => {
     markdownEditors.get(textarea)?.destroy();
-    markdownEditors.set(textarea, mountMarkdownEditor(textarea, { mode: editorMode }));
+    markdownEditors.set(textarea, mountMarkdownEditor(textarea, {
+      mode: editorMode,
+      onEmptyParagraphEnter: textarea.id === 'enNotes'
+        ? () => $('entryForm').requestSubmit($('entrySave'))
+        : undefined,
+    }));
   });
 }
 
@@ -1929,7 +1936,7 @@ $('todoForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!$('tdTitle').value.trim()) return;
   const old = S.tasks.find((t) => t.id === $('tdId').value);
-  await db.upsertTask({
+  const savedTask = await db.upsertTask({
     ...(old || {}),
     id: $('tdId').value || undefined,
     title: $('tdTitle').value,
@@ -1941,6 +1948,7 @@ $('todoForm').addEventListener('submit', async (e) => {
     dueTime: $('tdDueTime').value || null,
     notes: $('tdNotes').value,
   });
+  showToast(translateText(old ? 'toast.todoUpdated' : 'toast.todoCreated', { title: savedTask.title }));
   resetTodoForm();
   await load();
 });
@@ -1961,6 +1969,7 @@ $('todoList').addEventListener('click', async (e) => {
   if (check) {
     const t = S.tasks.find((x) => x.id === check);
     await db.upsertTask({ ...t, status: t.status === 'done' ? 'todo' : 'done' });
+    showToast(translateText(t.status === 'done' ? 'toast.todoReopened' : 'toast.todoCompleted', { title: t.title }));
   } else if (run) {
     const t = S.tasks.find((x) => x.id === run);
     await db.startTimer({ projectId: t.projectId, taskId: t.id, description: t.title });
@@ -1992,8 +2001,10 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdNotes').dispatchEvent(new Event('input')); // 讓備註重算高度
     return;
   } else if (del) {
+    const t = S.tasks.find((x) => x.id === del);
     if (!confirm(translateText('todo.deleteConfirm'))) return;
     await db.deleteTask(del);
+    showToast(translateText('toast.todoDeleted', { title: t?.title || '' }));
   } else return;
 
   await load();
@@ -2359,6 +2370,8 @@ function openEntryDialog(e) {
   $('entryDlg').showModal();
   growNotes();   // dialog 開啟後才量得到高度
 }
+
+$('entryCancel').addEventListener('click', () => $('entryDlg').close('cancel'));
 
 $('entryForm').addEventListener('submit', async (ev) => {
   if (ev.submitter?.value !== 'save') return;

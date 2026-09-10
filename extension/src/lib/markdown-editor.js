@@ -224,7 +224,51 @@ export function restoreTextareaFromEditor(marker, wrapper, textarea) {
   marker.remove();
 }
 
-function mountSimpleMarkdownEditor(textarea, onChange) {
+function bindDoubleEnterSubmit(textarea, onEmptyParagraphEnter) {
+  if (!onEmptyParagraphEnter) return () => {};
+  let expectedCaretOffset = null;
+  const disarm = () => { expectedCaretOffset = null; };
+  const onKeyDown = (event) => {
+    const plainEnter = event.key === 'Enter'
+      && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey
+      && !event.repeat && !event.isComposing && event.keyCode !== 229;
+    const collapsed = textarea.selectionStart === textarea.selectionEnd;
+    if (!plainEnter || !collapsed) { disarm(); return; }
+    const caret = textarea.selectionStart;
+    const atEmptyLine = caret > 0
+      && textarea.value[caret - 1] === '\n'
+      && (caret === textarea.value.length || textarea.value[caret] === '\n');
+    if (expectedCaretOffset === caret && atEmptyLine) {
+      event.preventDefault();
+      disarm();
+      onEmptyParagraphEnter();
+      return;
+    }
+    expectedCaretOffset = caret + 1;
+  };
+  const onInput = (event) => {
+    const insertedEnter = ['insertLineBreak', 'insertParagraph'].includes(event.inputType)
+      && textarea.selectionStart === expectedCaretOffset
+      && textarea.selectionStart === textarea.selectionEnd;
+    if (!insertedEnter) disarm();
+  };
+  textarea.addEventListener('keydown', onKeyDown);
+  textarea.addEventListener('input', onInput);
+  textarea.addEventListener('select', disarm);
+  textarea.addEventListener('pointerdown', disarm);
+  textarea.addEventListener('mousedown', disarm);
+  textarea.addEventListener('compositionstart', disarm);
+  return () => {
+    textarea.removeEventListener('keydown', onKeyDown);
+    textarea.removeEventListener('input', onInput);
+    textarea.removeEventListener('select', disarm);
+    textarea.removeEventListener('pointerdown', disarm);
+    textarea.removeEventListener('mousedown', disarm);
+    textarea.removeEventListener('compositionstart', disarm);
+  };
+}
+
+function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter) {
   const parent = textarea.parentNode;
   const marker = document.createComment('markdown-editor');
   const wrapper = document.createElement('div');
@@ -298,11 +342,13 @@ function mountSimpleMarkdownEditor(textarea, onChange) {
   };
   toolbar.addEventListener('mousedown', onMouseDown);
   toolbar.addEventListener('click', onClick);
+  const removeDoubleEnterSubmit = bindDoubleEnterSubmit(textarea, onEmptyParagraphEnter);
 
   return {
     destroy() {
       toolbar.removeEventListener('mousedown', onMouseDown);
       toolbar.removeEventListener('click', onClick);
+      removeDoubleEnterSubmit();
       restoreTextareaFromEditor(marker, wrapper, textarea);
     },
     focus() { textarea.focus(); },
@@ -789,9 +835,9 @@ function deleteAtSelection(blocks, selection, direction) {
  * Mount the native block editor while preserving the textarea as the public
  * compatibility source for forms, auto-grow listeners, and external callers.
  */
-export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
+export function mountMarkdownEditor(textarea, { mode, onChange, onEmptyParagraphEnter } = {}) {
   if (!textarea?.parentNode) throw new TypeError('mountMarkdownEditor requires a connected textarea');
-  if (mode === 'simple') return mountSimpleMarkdownEditor(textarea, onChange);
+  if (mode === 'simple') return mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter);
   const editorMode = normalizeMarkdownEditorMode(mode);
   const parent = textarea.parentNode;
   const marker = document.createComment('markdown-editor');
@@ -807,6 +853,11 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   let composing = false;
   let emitting = false;
   let rememberedSelection = null;
+  let submitOnNextEmptyEnterPath = null;
+  const clearPendingEmptyEnter = () => { submitOnNextEmptyEnterPath = null; };
+  const removeDoubleEnterSubmit = editorMode === 'source'
+    ? bindDoubleEnterSubmit(textarea, onEmptyParagraphEnter)
+    : () => {};
 
   const emit = () => {
     textarea.value = serializeMarkdown(blocks);
@@ -921,6 +972,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   };
   const onInput = (event) => {
     if (!content || !content.contains(event.target) || composing || event.target.closest?.('[data-markdown-editor-task="true"]')) return;
+    clearPendingEmptyEnter();
     blocks = readEditableBlocks(content, [{ type: 'paragraph', inlines: [] }]);
     const selection = logicalSelection(content, blocks);
     const path = selection?.focus.path;
@@ -947,6 +999,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
   };
   const onPaste = (event) => {
     if (!content || !content.contains(event.target) || composing || event.isComposing) return;
+    clearPendingEmptyEnter();
     const markdown = event.clipboardData?.getData('text/plain')?.replace(/\r\n?/g, '\n');
     if (!markdown) return;
     const selection = logicalSelection(content, blocks);
@@ -955,6 +1008,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     event.preventDefault();
   };
   const onComposition = (event) => {
+    clearPendingEmptyEnter();
     composing = event.type === 'compositionstart';
     if (event.type === 'compositionend' && content) {
       composing = false;
@@ -962,7 +1016,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
       emit();
     }
   };
-  const handleEnter = () => {
+  const handleEnter = ({ allowSubmit = false, armSubmit = false } = {}) => {
     if (!content) return false;
     const element = selectedElement(content);
     const selection = logicalSelection(content, blocks);
@@ -990,8 +1044,18 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     if (!selection || !collapsedSelection(selection)) return false;
     const location = blockLocationAtPath(blocks, selection.focus.path);
     if (!location || !['paragraph', 'heading'].includes(location.block.type)) return false;
+    if (allowSubmit && location.block.type === 'paragraph' && !inlineText(location.block.inlines).trim()
+      && submitOnNextEmptyEnterPath && samePath(selection.focus.path, submitOnNextEmptyEnterPath)
+      && onEmptyParagraphEnter) {
+      clearPendingEmptyEnter();
+      onEmptyParagraphEnter();
+      return true;
+    }
+    const createsEmptyTrailingParagraph = armSubmit
+      && selection.focus.offset === inlineText(location.block.inlines).length;
     const split = splitTextBlockAtOffset(blocks, selection.focus.path, selection.focus.offset);
     commitBlocks(split.blocks, { selection: selectionAt(split.nextPath, 0) });
+    submitOnNextEmptyEnterPath = createsEmptyTrailingParagraph ? split.nextPath : null;
     return true;
   };
   const handleDelete = (direction) => {
@@ -1020,7 +1084,11 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     if (event.inputType === 'insertText' && event.data && replaceSelection(event.data)) event.preventDefault();
   };
   const onKeyDown = (event) => {
-    if (!content || !content.contains(event.target) || composing || event.isComposing || event.keyCode === 229) return;
+    if (!content || !content.contains(event.target)) return;
+    if (composing || event.isComposing || event.keyCode === 229) { clearPendingEmptyEnter(); return; }
+    const plainEnter = event.key === 'Enter'
+      && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat;
+    if (!plainEnter) clearPendingEmptyEnter();
     if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'k'].includes(event.key.toLowerCase())) {
       event.preventDefault();
       applyInlineCommand(event.key.toLowerCase() === 'b' ? 'strong' : event.key.toLowerCase() === 'i' ? 'emphasis' : 'link');
@@ -1035,7 +1103,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
       commitBlocks(indentListItem(blocks, path, direction), { selection: selectionAt(nextPath, 0) });
       return;
     }
-    if (event.key === 'Enter' && handleEnter()) {
+    if (event.key === 'Enter' && handleEnter({ allowSubmit: plainEnter, armSubmit: plainEnter })) {
       event.preventDefault();
       return;
     }
@@ -1046,6 +1114,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
     if (event.key === 'Delete' && handleDelete('forward')) event.preventDefault();
   };
   const onMouseDown = (event) => {
+    clearPendingEmptyEnter();
     if (!event.target.closest?.('[data-markdown-command]')) return;
     rememberSelection();
     event.preventDefault();
@@ -1089,6 +1158,7 @@ export function mountMarkdownEditor(textarea, { mode, onChange } = {}) {
       wrapper.removeEventListener('compositionstart', onComposition); wrapper.removeEventListener('compositionend', onComposition); wrapper.removeEventListener('keydown', onKeyDown);
       wrapper.removeEventListener('paste', onPaste);
       textarea.removeEventListener('input', onTextareaInput);
+      removeDoubleEnterSubmit();
       restoreTextareaFromEditor(marker, wrapper, textarea);
     },
     focus() { if (editorMode === 'source') textarea.focus(); else content?.focus(); },

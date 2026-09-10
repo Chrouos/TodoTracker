@@ -3,6 +3,18 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../src/popup/popup.html', import.meta.url), 'utf8');
 const popup = await readFile(new URL('../src/popup/popup.js', import.meta.url), 'utf8');
+const css = await readFile(new URL('../src/popup/popup.css', import.meta.url), 'utf8');
+
+assert.match(html, /id="appToast"[^>]*role="status"[^>]*aria-live="polite"/,
+  'Popup should expose one unobtrusive live toast region');
+assert.doesNotMatch(html, /id="appToast"[^>]*hidden/,
+  'Popup toast live region should remain available to assistive technology');
+for (const key of ['todoCreated', 'todoCompleted', 'todoReopened', 'todoDeleted']) {
+  assert.match(popup, new RegExp(`['"]toast\\.${key}['"]`), `Popup should expose ${key} feedback`);
+}
+assert.match(popup, /showToast\(translate\(currentLocale,/, 'Popup Todo actions should display translated toast feedback');
+assert.match(css, /\.app-toast\s*\{[^}]*position:\s*fixed/s,
+  'Popup toast should float without changing the compact layout');
 
 for (const key of ['popup.track', 'popup.todo', 'popup.copySummary', 'timer.start']) {
   assert.match(html, new RegExp(`data-i18n="${key}"`), `Popup markup should mark ${key}`);

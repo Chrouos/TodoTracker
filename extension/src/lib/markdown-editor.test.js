@@ -668,6 +668,147 @@ test('continues after a table and removes it from the following empty paragraph'
   }
 });
 
+test('submits after Enter creates an empty trailing paragraph and Enter is pressed again', () => {
+  const fixture = editorFixture('Finished work');
+  let submits = 0;
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, {
+      mode: 'toolbar',
+      onEmptyParagraphEnter: () => { submits += 1; },
+    });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    const paragraph = root.querySelector('p');
+    setEditorFixtureSelection(fixture.document, paragraph.firstChild, paragraph.textContent.length);
+
+    const firstEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    root.dispatchEvent(firstEnter);
+    assert.equal(submits, 0);
+
+    const emptyParagraph = root.querySelectorAll('p')[1];
+    setEditorFixtureSelection(fixture.document, emptyParagraph, 0);
+    const secondEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    root.dispatchEvent(secondEnter);
+
+    assert.equal(secondEnter.defaultPrevented, true);
+    assert.equal(submits, 1);
+    assert.equal(fixture.textarea.value, 'Finished work\n\n');
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('submits on the second consecutive Enter in textarea editor modes', () => {
+  for (const mode of ['simple', 'source']) {
+    const fixture = editorFixture('Finished work');
+    let submits = 0;
+    try {
+      const editor = mountMarkdownEditor(fixture.textarea, {
+        mode,
+        onEmptyParagraphEnter: () => { submits += 1; },
+      });
+      fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+      fixture.textarea.dispatchEvent(new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' }));
+      fixture.textarea.value += '\n';
+      fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+      fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true, inputType: 'insertLineBreak' }));
+      const secondEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+      fixture.textarea.dispatchEvent(secondEnter);
+
+      assert.equal(secondEnter.defaultPrevented, true, `${mode} should prevent a second newline`);
+      assert.equal(submits, 1, `${mode} should submit once`);
+      editor.destroy();
+    } finally {
+      fixture.restore();
+    }
+  }
+});
+
+test('does not submit textarea modes after cursor movement, IME, or a newline inside text', () => {
+  for (const mode of ['simple', 'source']) {
+    const fixture = editorFixture('LeftRight');
+    let submits = 0;
+    try {
+      const editor = mountMarkdownEditor(fixture.textarea, {
+        mode,
+        onEmptyParagraphEnter: () => { submits += 1; },
+      });
+      fixture.textarea.setSelectionRange(4, 4);
+      fixture.textarea.dispatchEvent(new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' }));
+      fixture.textarea.value = 'Left\nRight';
+      fixture.textarea.setSelectionRange(5, 5);
+      fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true, inputType: 'insertLineBreak' }));
+      const middleEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+      fixture.textarea.dispatchEvent(middleEnter);
+      assert.equal(middleEnter.defaultPrevented, undefined, `${mode} should keep a non-empty line editable`);
+
+      fixture.textarea.dispatchEvent(new EditorFixtureEvent('compositionstart', { bubbles: true }));
+      const imeEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter', isComposing: true, keyCode: 229 });
+      fixture.textarea.dispatchEvent(imeEnter);
+      assert.equal(imeEnter.defaultPrevented, undefined, `${mode} should not submit during IME composition`);
+
+      fixture.textarea.dispatchEvent(new EditorFixtureEvent('select', { bubbles: true }));
+      fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+      const movedEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+      fixture.textarea.dispatchEvent(movedEnter);
+      assert.equal(movedEnter.defaultPrevented, undefined, `${mode} should re-arm after selection changes`);
+      assert.equal(submits, 0);
+      editor.destroy();
+    } finally {
+      fixture.restore();
+    }
+  }
+});
+
+test('does not submit toolbar mode after pointer movement or modified Enter', () => {
+  const fixture = editorFixture('Finished work');
+  let submits = 0;
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, {
+      mode: 'toolbar',
+      onEmptyParagraphEnter: () => { submits += 1; },
+    });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    const first = root.querySelector('p');
+    setEditorFixtureSelection(fixture.document, first.firstChild, first.textContent.length);
+    root.dispatchEvent(new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' }));
+    const empty = root.querySelectorAll('p')[1];
+
+    empty.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    setEditorFixtureSelection(fixture.document, empty, 0);
+    const afterPointer = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    root.dispatchEvent(afterPointer);
+    assert.equal(submits, 0);
+
+    const latestEmpty = root.querySelectorAll('p')[2];
+    setEditorFixtureSelection(fixture.document, latestEmpty, 0);
+    const shiftedEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter', shiftKey: true });
+    root.dispatchEvent(shiftedEnter);
+    assert.equal(submits, 0);
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('does not intercept consecutive Enter when no submit callback is configured', () => {
+  const fixture = editorFixture('Regular note');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'simple' });
+    fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' }));
+    fixture.textarea.value += '\n';
+    fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+    const secondEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    fixture.textarea.dispatchEvent(secondEnter);
+
+    assert.equal(secondEnter.defaultPrevented, undefined);
+    editor.destroy();
+  } finally {
+    fixture.restore();
+  }
+});
+
 test('delegates task checkbox changes while keeping checkbox and text in one list row', () => {
   const fixture = editorFixture('- [ ] Task');
   try {
