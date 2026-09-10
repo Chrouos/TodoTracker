@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  compareTodoTasks, dueTodoAlerts, entriesForTask, flattenTodoTree, promoteTodoTasksWithEntries, todoHealth,
+  compareTodoTasks, completedTodosOnDate, dueTodoAlerts, entriesForTask, flattenTodoTree, promoteTodoTasksWithEntries, todoHealth,
 } from './tasks.js';
 
 test('returns completed work records for a todo, newest first', () => {
@@ -157,4 +157,17 @@ test('dueTodoAlerts prioritizes overdue and nearest upcoming deadlines, then due
   assert.deepEqual(alerts.map((item) => item.id), ['near-overdue', 'old-overdue', 'today-soon', 'today-late', 'tomorrow']);
   assert.deepEqual(alerts.map((item) => item.alertKind), ['overdue', 'overdue', 'today', 'today', 'upcoming']);
   assert.equal(alerts.some((item) => item.id === 'later'), false);
+});
+
+test('completedTodosOnDate returns done todos completed on the local date, newest first', () => {
+  const result = completedTodosOnDate([
+    { id: 'old', status: 'done', completedAt: '2026-09-10T09:00:00.000Z' },
+    { id: 'new', status: 'done', completedAt: '2026-09-10T15:00:00.000Z' },
+    { id: 'open', status: 'doing', completedAt: '2026-09-10T16:00:00.000Z' },
+    { id: 'archived', status: 'archived', completedAt: '2026-09-10T17:00:00.000Z' },
+    { id: 'other-day', status: 'done', completedAt: '2026-09-11T09:00:00.000Z' },
+    { id: 'missing-date', status: 'done' },
+  ], '2026-09-10');
+
+  assert.deepEqual(result.map((task) => task.id), ['new', 'old']);
 });

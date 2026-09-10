@@ -20,7 +20,7 @@ import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tre
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { createToast } from '../lib/toast.js';
-import { compareTodoTasks, dueTodoAlerts, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { compareTodoTasks, completedTodosOnDate, dueTodoAlerts, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, TODO_STATUSES, filterTasks, normalizePriority, normalizeStatus,
@@ -29,6 +29,7 @@ import {
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { reportRangeBounds, trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
+import { sortProjectsByRecentActivity } from '../lib/workspace.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
 import {
   clearReportFocus,
@@ -187,6 +188,7 @@ let timerCompleteChoice = false;
 let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
 let timerNotesPreviewOpen = false;
 let reviewCalendarHoveredTarget = null;
+let workProjectId = null;
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, timer, settings] = await Promise.all([
@@ -281,7 +283,7 @@ function applyCustomRange(source) {
 }
 
 function renderAll() {
-  renderTimer(); renderReport(); renderProjects(); renderTodos(); renderSchedules();
+  renderTimer(); renderReport(); renderWorkPage(); renderProjects(); renderTodos(); renderSchedules();
   renderTags(); renderEntries(); renderSettings();
 }
 
@@ -600,7 +602,11 @@ function renderReport() {
     };
   });
   }
-  $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, reviewDates));
+  const reviewData = dailyReviewData(rows, reviewDates).map((group) => ({
+    ...group,
+    completedTodos: completedTodosOnDate(S.tasks, group.date),
+  }));
+  $('dailyReview').innerHTML = renderDailyReview(reviewData);
   initializeMarkdownPreviews($('dailyReview'));
 }
 
@@ -622,6 +628,14 @@ function hideReviewCalendarTooltip() {
   if (!tooltip) return;
   tooltip.hidden = true;
   tooltip.classList.remove('is-visible');
+}
+
+function renderCompletedTodoButtons(tasks, className = '') {
+  if (!tasks?.length) return '';
+  const buttons = tasks.map((task) => `<button type="button" class="daily-review-todo ${className}" data-report-task-id="${esc(task.id)}">
+    <span aria-hidden="true">[x]</span> ${esc(task.title?.trim() || translateText('report.dueAlertsNoTitle'))}
+  </button>`).join('');
+  return `<div class="daily-review-todos"><span class="cap">${translateText('report.completedTodos')}</span>${buttons}</div>`;
 }
 
 function showReviewCalendarTooltip(target) {
@@ -670,9 +684,10 @@ function renderReviewCalendar(groups) {
     const top = ((minute - calendar.axis.from) / span) * 100;
     labels.push(`<span class="review-calendar-axis-label num" style="top:${top}%">${String(Math.floor(minute / 60)).padStart(2, '0')}:00</span>`);
   }
+  const completedByDate = new Map(groups.map((group) => [group.date, group.completedTodos || []]));
   const dayHeaders = calendar.days.map((day) => {
     const date = new Date(`${day.date}T00:00:00`);
-    return `<div class="review-calendar-day-head"><strong>${esc(displayDate(day.date))}</strong><span>${esc(weekdays[date.getDay()])}</span></div>`;
+    return `<div class="review-calendar-day-head"><strong>${esc(displayDate(day.date))}</strong><span>${esc(weekdays[date.getDay()])}</span>${renderCompletedTodoButtons(completedByDate.get(day.date), 'review-calendar-todo')}</div>`;
   }).join('');
   const dayBodies = calendar.days.map((day) => {
     const entries = day.entries.map((item) => {
@@ -759,6 +774,7 @@ function renderReviewList(groups) {
         <strong>${esc(displayDate(group.date))}</strong>
         <span class="cap">${fmtHM(total)} · ${translateText('report.entryCount', { count: group.entries.length })}</span>
       </div>
+      ${renderCompletedTodoButtons(group.completedTodos)}
       <div class="daily-review-list">${entries}</div>
     </section>`;
   }).join('');
@@ -1531,10 +1547,83 @@ $('dailyReview').addEventListener('focusout', (e) => {
   hideReviewCalendarTooltip();
 });
 
+$('dailyReview').addEventListener('click', (e) => {
+  const taskId = e.target.closest('[data-report-task-id]')?.dataset.reportTaskId;
+  if (taskId) focusReportTodo(taskId);
+});
+
 window.addEventListener('resize', repositionReviewCalendarTooltip);
 window.addEventListener('scroll', repositionReviewCalendarTooltip, true);
 
 /* ---------------- 專案 ---------------- */
+function renderWorkPage() {
+  const list = $('workProjectList');
+  if (!list) return;
+  const projects = sortProjectsByRecentActivity(S.projects, S.entries, S.tasks);
+  if (!workProjectId || !projects.some((project) => project.id === workProjectId)) workProjectId = projects[0]?.id || null;
+  list.innerHTML = projects.length
+    ? projects.map((project) => {
+      const label = project.latestActivity
+        ? translateText('work.latestActivity', { date: `${displayDate(project.latestActivity)} ${displayClock(project.latestActivity)}` })
+        : translateText('work.noActivity');
+      return `<button type="button" class="work-project-item${project.id === workProjectId ? ' is-active' : ''}" data-work-project-id="${esc(project.id)}">
+        <span class="work-project-name">${esc(project.name)}</span><span class="work-project-path">${esc(project.path.join(' / '))}</span><span class="cap">${esc(label)}</span>
+      </button>`;
+    }).join('')
+    : `<div class="empty">${translateText('project.noProjects')}</div>`;
+  renderWorkProjectDetail(workProjectId);
+}
+
+function renderWorkProjectDetail(id) {
+  const mount = $('workProjectDetail');
+  if (!mount) return;
+  const project = S.projects.find((item) => item.id === id);
+  if (!project) { mount.hidden = true; mount.innerHTML = ''; return; }
+  const ids = new Set([id, ...descendantSet(id)]);
+  const tasks = S.tasks.filter((task) => task.projectId && ids.has(task.projectId));
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const entries = S.entries.filter((entry) => !entry.deletedAt && entry.endedAt
+    && ((entry.projectId && ids.has(entry.projectId)) || (entry.taskId && taskIds.has(entry.taskId))))
+    .sort((a, b) => String(b.endedAt).localeCompare(String(a.endedAt)));
+  const visibleTasks = tasks.filter((task) => task.status !== 'archived');
+  const doneToday = completedTodosOnDate(visibleTasks, fmtDate(new Date().toISOString()));
+  const rows = flattenTodoTree(visibleTasks);
+  const done = visibleTasks.filter((task) => task.status === 'done').length;
+  const seconds = entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
+  const taskRows = rows.length ? rows.map((task) => `<button type="button" class="work-todo-row" data-work-todo-id="${esc(task.id)}" style="--todo-depth:${task.depth}">
+    <span class="work-todo-status">${task.status === 'done' ? '[x]' : task.status === 'doing' ? '[>]' : '[ ]'}</span><span class="grow"><strong>${esc(task.title?.trim() || translateText('report.dueAlertsNoTitle'))}</strong></span><span class="cap">${esc(task.dueDate || translateText('todo.noDueDate'))}</span>
+  </button>`).join('') : `<div class="empty">${translateText('project.noItems')}</div>`;
+  const completedRows = doneToday.map((task) => `<button type="button" class="work-completed-todo" data-work-todo-id="${esc(task.id)}"><span aria-hidden="true">[x]</span> ${esc(task.title?.trim() || translateText('report.dueAlertsNoTitle'))}</button>`).join('');
+  const todaySection = doneToday.length
+    ? `<div class="work-section"><div class="work-section-head"><h3>${translateText('work.todayCompleted')}</h3><span class="cap">${fmtDate(new Date().toISOString())}</span></div><div class="work-completed-list">${completedRows}</div></div>`
+    : '';
+  const recentRows = entries.slice(0, 8).map((entry) => {
+    const task = S.tasks.find((item) => item.id === entry.taskId);
+    const title = entry.description || task?.title || translateText('common.unnamedWork');
+    return `<button type="button" class="work-log-row" data-work-entry-id="${esc(entry.id)}"><span class="num mute">${esc(fmtDate(entry.endedAt))}<br>${esc(fmtClock(entry.endedAt))}</span><span class="grow"><strong>${esc(title)}</strong></span><span class="num">${fmtHM(db.durationSec(entry))}</span></button>`;
+  }).join('');
+  mount.hidden = false;
+  mount.innerHTML = `<div class="work-detail-head"><div><h2>${esc(project.name)}</h2><span class="cap">${esc(pathOf(S.projects, project.id).join(' / '))}</span></div></div>
+    <div class="workspace-kpis work-kpis"><span class="badge">${fmtHM(seconds)} ${translateText('report.totalWork')}</span><span class="badge">${done}/${visibleTasks.length} ${translateText('report.todoCompleted')}</span><span class="badge">${entries.length} ${translateText('report.workEntries')}</span></div>
+    ${todaySection}
+    <div class="work-section"><div class="work-section-head"><h3>Todo</h3><span class="cap">${translateText('project.todoItems', { count: visibleTasks.length })}</span></div><div class="work-todo-list">${taskRows}</div></div>
+    <div class="work-section"><div class="work-section-head"><h3>${translateText('work.recentWork')}</h3><span class="cap">${translateText('report.entryCount', { count: entries.length })}</span></div><div class="work-log-list">${recentRows || `<div class="empty">${translateText('work.noRecentWork')}</div>`}</div></div>`;
+  initializeMarkdownPreviews(mount);
+}
+
+document.getElementById('workProjectList')?.addEventListener('click', (event) => {
+  const id = event.target.closest('[data-work-project-id]')?.dataset.workProjectId;
+  if (!id) return;
+  workProjectId = id;
+  renderWorkPage();
+});
+document.getElementById('workProjectDetail')?.addEventListener('click', (event) => {
+  const todoId = event.target.closest('[data-work-todo-id]')?.dataset.workTodoId;
+  if (todoId) { focusReportTodo(todoId); return; }
+  const entryId = event.target.closest('[data-work-entry-id]')?.dataset.workEntryId;
+  if (entryId) focusReportEntry(entryId);
+});
+
 function renderProjects() {
   const own = db.secondsByProject(S.entries.filter((e) => e.endedAt));
   const roll = rollup(S.projects, own);
@@ -2529,7 +2618,7 @@ function selectTab(name, preserveFocus = false) {
     if (hadFocusedTarget) { renderEntries(); renderTodos(); }
   }
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-  ['report', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
+  ['report', 'work', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
 }
@@ -2564,7 +2653,7 @@ function focusReportTodo(id) {
   enUI.focusId = next.entryId;
   todoFocusId = next.todoId;
   $('tdFilter').value = '';
-  $('tdStatusFilter').value = 'active';
+  $('tdStatusFilter').value = task.status === 'done' ? 'all' : 'active';
   $('tdPriorityFilter').value = '';
   selectTab('todos', true);
   renderTodos();

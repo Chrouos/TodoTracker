@@ -92,6 +92,12 @@ export function todoHealth(tasks, today = fmtDate(new Date().toISOString())) {
 }
 
 /** 報表上方的截止提醒：逾期、今天及未來幾天內到期的未完成 Todo。 */
+export function completedTodosOnDate(tasks, date) {
+  return tasks
+    .filter((task) => task.status === 'done' && task.completedAt && fmtDate(task.completedAt) === date)
+    .sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)));
+}
+
 export function dueTodoAlerts(tasks, today = fmtDate(new Date().toISOString()), limit = 3, horizonDays = 3) {
   const max = Number.isFinite(Number(limit)) ? Math.max(0, Math.floor(Number(limit))) : 3;
   const horizon = Number.isFinite(Number(horizonDays)) ? Math.max(0, Number(horizonDays)) : 3;

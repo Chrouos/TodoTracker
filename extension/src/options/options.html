@@ -15,6 +15,7 @@
   </header>
 
   <nav class="tabs" id="tabs">
+    <button class="tab" data-tab="work" data-i18n="nav.work">工作</button>
     <button class="tab active" data-tab="report" data-i18n="nav.report">報表</button>
     <button class="tab" data-tab="timer" data-i18n="timer.running">計時</button>
     <button class="tab" data-tab="projects" data-i18n="nav.projects">專案</button>
@@ -76,6 +77,17 @@
   </section>
 
   <!-- ── 報表 ── -->
+  <section id="p-work" hidden>
+    <div class="work-layout">
+      <aside class="card work-project-panel">
+        <div class="work-section-head"><div><h2 data-i18n="work.title">工作區</h2><span class="cap" data-i18n="work.subtitle">把專案、Todo 與工作紀錄放在一起</span></div></div>
+        <h3 class="work-project-heading" data-i18n="work.projects">專案</h3>
+        <div id="workProjectList" class="work-project-list"></div>
+      </aside>
+      <section id="workProjectDetail" class="card work-detail" hidden></section>
+    </div>
+  </section>
+
   <section id="p-report">
     <div class="toolbar">
       <div class="seg" id="range">

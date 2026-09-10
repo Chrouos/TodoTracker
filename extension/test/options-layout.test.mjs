@@ -15,6 +15,10 @@ assert.match(html, /id="tdPriorityFilter"/, 'Todo should have a priority filter'
 assert.match(html, /id="scPriority"/, 'Schedule should have a priority field');
 assert.match(html, /data-tab="timer"/, 'Management timer should have its own tab');
 assert.match(html, /id="p-timer"/, 'Management timer should be inside its own panel');
+assert.match(html, /data-tab="work"/, 'Options should expose the combined work tab');
+assert.match(html, /id="p-work"/, 'Combined work tab should have its own panel');
+assert.match(html, /id="workProjectList"/, 'Combined work tab should expose the recent project list');
+assert.match(html, /id="workProjectDetail"/, 'Combined work tab should expose a project detail panel');
 assert.match(html, /id="reportDueAlerts"/, 'Report should reserve a first-glance area for due Todo alerts');
 assert.match(html,
   /data-tab="report"[\s\S]*data-tab="timer"[\s\S]*data-tab="projects"[\s\S]*data-tab="todos"[\s\S]*data-tab="entries"[\s\S]*data-tab="schedules"[\s\S]*data-tab="tags"[\s\S]*data-tab="settings"/,
@@ -146,7 +150,11 @@ assert.match(options, /highlightProjectId/, 'Project selection should highlight 
 assert.match(options, /trendOverview/, 'Report should show a useful summary before hover');
 assert.match(options, /focusReportEntry/, 'Report should navigate directly to work records');
 assert.match(options, /focusReportTodo/, 'Report should navigate directly to Todo items');
+assert.match(options, /tdStatusFilter.*task\.status === 'done' \? 'all' : 'active'/, 'Completed Todo navigation should keep the target visible');
 assert.match(options, /dueTodoAlerts/, 'Report should derive a compact list of upcoming Todo deadlines');
+assert.match(options, /sortProjectsByRecentActivity/, 'Work tab should sort projects by recent activity');
+assert.match(options, /completedTodosOnDate/, 'Daily review and work tab should show completed Todos by date');
+assert.match(options, /\$\{done\}\/\$\{visibleTasks\.length\}/, 'Work KPI should use the same visible Todo count as its list');
 assert.match(options, /data-report-task-id/, 'Due Todo alerts should link directly to Todo items');
 assert.match(options, /buildWorkspaceTodoProgress/, 'Workspace status should derive its Todo completion progress');
 assert.match(options, /report\.todoProgress/, 'Workspace status should show Todo completion progress');

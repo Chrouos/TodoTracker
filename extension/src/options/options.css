@@ -610,6 +610,9 @@ section[hidden] { display: none; }
 .daily-review-title .cap { margin-left: 6px; }
 .daily-review-notes { margin-top: 6px; color: var(--text-body); }
 .daily-review-empty { padding: 14px 0 4px; color: var(--text-ash); }
+.daily-review-todos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 0; }
+.daily-review-todo { border: 1px solid var(--hairline); border-radius: 999px; padding: 4px 8px; background: var(--surface-soft); color: var(--text-body); font-size: 12px; text-align: left; }
+.daily-review-todo:hover { border-color: var(--ink); color: var(--text-ink); }
 .review-calendar {
   display: grid;
   grid-template-columns: repeat(var(--review-days), minmax(0, 1fr));
@@ -655,6 +658,10 @@ section[hidden] { display: none; }
 }
 .review-calendar-day-head strong { font-size: 14px; }
 .review-calendar-day-head span { color: var(--text-mute); font-size: 12px; }
+.review-calendar-day-head { flex-wrap: wrap; }
+.review-calendar-day-head .daily-review-todos { width: 100%; padding: 3px 0 0; }
+.review-calendar-day-head .daily-review-todos > .cap { display: none; }
+.review-calendar-todo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-calendar-axis,
 .review-calendar-day-body {
   position: relative;
@@ -1183,6 +1190,31 @@ dialog .field { margin-bottom: var(--md); }
 .workspace-day-bar { flex: 1; height: 8px; background: var(--surface-card); }
 .workspace-day-bar i { display: block; height: 100%; background: var(--ink); }
 
+.work-layout { display: grid; grid-template-columns: minmax(220px, .78fr) minmax(0, 1.7fr); gap: var(--lg); align-items: start; }
+.work-project-panel { min-width: 0; }
+.work-project-heading { margin: var(--lg) 0 var(--sm); font-size: 13px; }
+.work-project-list { display: grid; gap: 5px; }
+.work-project-item { display: grid; gap: 2px; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--text-body); text-align: left; }
+.work-project-item:hover { background: var(--surface-soft); }
+.work-project-item.is-active { border-color: var(--hairline-strong); background: var(--surface-soft); color: var(--text-ink); }
+.work-project-name { font-weight: 700; overflow-wrap: anywhere; }
+.work-project-path { color: var(--text-mute); font-size: 11px; overflow-wrap: anywhere; }
+.work-detail { min-width: 0; }
+.work-detail-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--md); }
+.work-detail-head h2 { margin: 0; }
+.work-kpis { flex-wrap: wrap; }
+.work-section { margin-top: var(--lg); padding-top: var(--lg); border-top: 1px solid var(--hairline); }
+.work-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sm); margin-bottom: var(--sm); }
+.work-section-head h3 { margin: 0; }
+.work-completed-list, .work-todo-list, .work-log-list { display: grid; }
+.work-completed-todo, .work-todo-row, .work-log-row { display: flex; align-items: flex-start; gap: var(--sm); width: 100%; padding: 9px 0; border: 0; border-top: 1px solid var(--hairline); background: transparent; color: var(--text-body); text-align: left; }
+.work-completed-todo:hover, .work-todo-row:hover, .work-log-row:hover { color: var(--text-ink); background: var(--surface-soft); }
+.work-todo-row { padding-left: calc(var(--todo-depth) * 16px); }
+.work-todo-status { color: var(--text-mute); font-family: var(--font-mono, monospace); }
+.work-log-row .num:first-child { width: 92px; flex: 0 0 92px; }
+.work-log-row .grow, .work-todo-row .grow { min-width: 0; }
+.work-log-row strong, .work-todo-row strong { overflow-wrap: anywhere; }
+
 /* TODO／紀錄沿用「每日工作回顧」的閱讀順序：左側資訊、專案色條、內容、右側工時。 */
 .activity-row {
   display: grid;
@@ -1409,6 +1441,8 @@ dialog .field { margin-bottom: var(--md); }
 .report-metrics-table th { color: var(--text-mute); font-size: 11px; font-weight: 500; }
 
 @media (max-width: 720px) {
+  .work-layout { grid-template-columns: 1fr; }
+  .work-project-panel { margin-bottom: 0; }
   .report-status { align-items: flex-start; flex-direction: column; gap: 5px; }
   .report-status-detail { text-align: left; }
   .report-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
