@@ -14,7 +14,7 @@ import {
   dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
-import { timelineSVG, stackedAreaSVG, heatmapSVG } from '../lib/charts.js';
+import { timelineSVG, stackedAreaSVG, heatmapSVG, lineSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
@@ -154,11 +154,22 @@ let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: 
 function renderEntryTasks(selectedTaskId = '') {
   const projectId = $('enProject').value;
   const tasks = sortTasksForManualEntry(tasksForProject(S.tasks, projectId), S.entries);
+  const includeCompleted = $('enTaskIncludeDone')?.checked;
+  const activeTasks = tasks.filter((task) => task.status !== 'done');
+  const completedTasks = tasks.filter((task) => task.status === 'done');
+  const visibleCompleted = includeCompleted
+    ? completedTasks
+    : completedTasks.filter((task) => task.id === selectedTaskId);
+  const option = (task) => `<option value="${task.id}">${esc(task.title)}</option>`;
   $('enTask').innerHTML = `<option value="">${esc(translateText('common.noTodoOption'))}</option>` +
-    tasks.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('');
-  $('enTask').value = tasks.some((task) => task.id === selectedTaskId) ? selectedTaskId : '';
+    activeTasks.map(option).join('') +
+    (visibleCompleted.length
+      ? `<optgroup label="${esc(translateText('todo.status.done'))}">${visibleCompleted.map(option).join('')}</optgroup>`
+      : '');
+  $('enTask').value = [...activeTasks, ...visibleCompleted].some((task) => task.id === selectedTaskId) ? selectedTaskId : '';
 }
 $('enProject').addEventListener('change', () => renderEntryTasks());
+$('enTaskIncludeDone').addEventListener('change', () => renderEntryTasks($('enTask').value));
 $('enTask').addEventListener('change', (event) => {
   $('enProject').value = projectIdForTask(event.target.value, S.tasks, $('enProject').value);
 });
@@ -773,10 +784,7 @@ function renderDueAlerts() {
   const overdueCount = all.filter((task) => task.alertKind === 'overdue').length;
   const todayCount = all.filter((task) => task.alertKind === 'today').length;
   if (!visible.length) {
-    mount.innerHTML = `<section class="report-due-alerts report-due-alerts-clear">
-      <div class="report-due-alerts-head"><strong>${translateText('report.dueAlerts')}</strong>
-        <span class="cap">${translateText('report.dueAlertsClear')}</span></div>
-    </section>`;
+    mount.innerHTML = '';
     return;
   }
   const counts = [
@@ -1695,7 +1703,102 @@ $('pjNoteList').addEventListener('keydown', (e) => {
   }
 });
 
-function renderProjectWorkspace(id) {
+function workspaceTodoDepth(task, tasks) {
+  let depth = 0;
+  let parent = task.parentId ? tasks.find((item) => item.id === task.parentId) : null;
+  const seen = new Set();
+  while (parent && !seen.has(parent.id)) {
+    seen.add(parent.id);
+    depth += 1;
+    parent = parent.parentId ? tasks.find((item) => item.id === parent.parentId) : null;
+  }
+  return depth;
+}
+
+function renderWorkspaceTodoLog(task) {
+  const workEntries = entriesForTask(task, S.entries);
+  const total = workEntries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
+  return `<details class="workspace-todo-log">
+    <summary><span>${translateText('project.workLog')}</span><span class="workspace-todo-log-stats">${fmtHM(total)} · ${translateText('report.entryCount', { count: workEntries.length })}</span></summary>
+    ${workEntries.length ? `<div class="workspace-log-list workspace-todo-log-list">${workEntries.map((entry) => renderWorkspaceLogEntry(entry, task)).join('')}</div>` : `<div class="workspace-todo-log-empty">${translateText('report.entryCount', { count: 0 })}</div>`}
+  </details>`;
+}
+
+function renderWorkspaceTodo(task, project, allTasks) {
+  const done = task.status === 'done';
+  const metrics = taskMetrics(task, S.entries);
+  const due = task.dueDate
+    ? `${task.dueDate}${task.dueTime ? ` ${task.dueTime}` : ''}`
+    : translateText('todo.noDueDate');
+  const noteLabel = translateText('todo.notes');
+  return `<article class="workspace-todo-card${done ? ' is-done' : ''}" style="--workspace-task-depth:${workspaceTodoDepth(task, allTasks)}">
+    <button type="button" class="workspace-todo-check" data-workspace-todo-check="${esc(task.id)}" aria-label="${esc(done ? translateText('todo.reopen') : translateText('todo.markDone'))}" aria-pressed="${done}">${done ? '✓' : '○'}</button>
+    <div class="workspace-todo-body">
+      <div class="workspace-todo-title-row"><strong class="workspace-todo-title">${esc(task.title)}</strong>${task.status === 'doing' ? `<span class="badge workspace-todo-status">${translateText('todo.status.doing')}</span>` : ''}</div>
+      <div class="workspace-todo-meta"><span>${esc(due)}</span>${metrics.worked ? `<span>${fmtHM(metrics.worked)}</span>` : ''}${project ? `<span>${esc(project.name)}</span>` : ''}</div>
+      <details class="workspace-todo-note">
+        <summary>${esc(noteLabel)}</summary>
+        <div class="workspace-todo-note-editor">
+          <textarea data-workspace-todo-note-input="${esc(task.id)}" aria-label="${esc(noteLabel)}" placeholder="${esc(translateText('todo.notesPlaceholder'))}">${esc(task.notes || '')}</textarea>
+          <button type="button" class="btn-sm btn-primary" data-workspace-todo-save="${esc(task.id)}">${translateText('common.save')}</button>
+        </div>
+      </details>
+      ${renderWorkspaceTodoLog(task)}
+    </div>
+  </article>`;
+}
+
+function renderWorkspaceTodoGroup(label, items, status, allTasks) {
+  const doneClass = status === 'done' ? ' workspace-todo-group-done' : '';
+  const body = items.length ? items.map((task) => {
+      const project = S.projects.find((item) => item.id === task.projectId);
+      return renderWorkspaceTodo(task, project, allTasks);
+    }).join('') : `<div class="empty">${translateText('project.noItems')}</div>`;
+  if (status === 'done') {
+    const total = items.reduce((sum, task) => sum + taskMetrics(task, S.entries).worked, 0);
+    return `<details class="workspace-todo-group${doneClass}" data-workspace-todo-group="done">
+      <summary class="workspace-todo-group-head"><span>${label}</span><span class="badge">${items.length}</span><span class="workspace-todo-group-stats">${fmtHM(total)}</span></summary>
+      <div class="workspace-todo-group-content">${body}</div>
+    </details>`;
+  }
+  return `<div class="workspace-todo-group${doneClass}" data-workspace-todo-group="${status}">
+    <div class="workspace-todo-group-head"><span>${label}</span><span class="badge">${items.length}</span></div>
+    ${body}
+  </div>`;
+}
+
+function renderWorkspaceLogEntry(entry, task) {
+  return `<div class="workspace-log"><div class="workspace-log-time"><strong>${fmtDate(entry.startedAt)}</strong><span>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span></div><div class="workspace-log-dot" aria-hidden="true"></div><div class="grow"><strong>${esc(entry.description || task?.title || translateText('common.unnamedWork'))}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num workspace-log-duration">${fmtHM(db.durationSec(entry))}</span></div>`;
+}
+
+function renderWorkspaceLog(entries, tasks) {
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const groups = new Map();
+  entries.forEach((entry) => {
+    const task = entry.taskId ? taskById.get(entry.taskId) : null;
+    const key = task?.id || 'unlinked';
+    if (!groups.has(key)) groups.set(key, { task, entries: [] });
+    groups.get(key).entries.push(entry);
+  });
+
+  return [...groups.values()]
+    .sort((a, b) => {
+      if (!a.task && b.task) return 1;
+      if (a.task && !b.task) return -1;
+      return String(b.entries[0]?.startedAt || '').localeCompare(String(a.entries[0]?.startedAt || ''));
+    })
+    .map(({ task, entries: groupEntries }) => {
+      const total = groupEntries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
+      const title = task?.title || translateText('entry.uncategorized');
+      const status = task?.status === 'done' ? translateText('todo.status.done') : task?.status === 'doing' ? translateText('todo.status.doing') : '';
+      return `<details class="workspace-log-group" data-workspace-log-task="${esc(task?.id || 'unlinked')}">
+        <summary><span class="workspace-log-group-title"><strong>${esc(title)}</strong>${status ? `<span class="badge">${status}</span>` : ''}</span><span class="workspace-log-group-stats">${fmtHM(total)} · ${translateText('report.entryCount', { count: groupEntries.length })}</span></summary>
+        <div class="workspace-log-list">${groupEntries.map((entry) => renderWorkspaceLogEntry(entry, task)).join('')}</div>
+      </details>`;
+    }).join('');
+}
+
+function renderProjectWorkspace(id, { openSections = [] } = {}) {
   const project = S.projects.find((item) => item.id === id);
   if (!project) return;
   const notesBox = $('pjNotesBox');
@@ -1707,6 +1810,7 @@ function renderProjectWorkspace(id) {
     .filter((entry) => !entry.deletedAt && ((entry.projectId && ids.has(entry.projectId)) || (entry.taskId && taskIds.has(entry.taskId))))
     .filter((entry) => entry.endedAt)
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const unlinkedEntries = entries.filter((entry) => !entry.taskId || !taskIds.has(entry.taskId));
   const seconds = entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
   const done = tasks.filter((task) => task.status === 'done').length;
   const taskGroups = {
@@ -1720,14 +1824,12 @@ function renderProjectWorkspace(id) {
     daily.set(date, (daily.get(date) || 0) + db.durationSec(entry));
   }
   const dailyRows = [...daily.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  const maxDaily = Math.max(1, ...dailyRows.map(([, value]) => value));
-  const taskGroup = (label, items) => `<div class="workspace-task-group"><div class="workspace-subhead"><span>${label}</span><span class="badge">${items.length}</span></div>${items.length ? items.map((task) => `<div class="workspace-task"><div><strong>${esc(task.title)}</strong>${task.notes ? renderMarkdownPreview(task.notes) : ''}</div><span class="num">${task.dueDate || translateText('todo.noDueDate')}</span></div>`).join('') : `<div class="empty">${translateText('project.noItems')}</div>`}</div>`;
+  const dailyChartRows = [...dailyRows].reverse();
   $('projectWorkspace').hidden = false;
   $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} ${translateText('project.workspace')}</h2><button class="btn-sm" data-close-workspace>${translateText('common.close')}</button></div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>${translateText('project.summary')}</h3><span class="cap">${translateText('project.summaryHint')}</span></div><div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} ${translateText('report.totalWork')}</span><span class="badge">${done}/${tasks.length} ${translateText('report.todoCompleted')}</span><span class="badge">${entries.length} ${translateText('report.workEntries')}</span></div></div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${translateText('project.todoItems', { count: tasks.length })}</span></div>${taskGroup(translateText('todo.status.doing'), taskGroups.doing)}${taskGroup(translateText('todo.status.todo'), taskGroups.todo)}${taskGroup(translateText('todo.status.done'), taskGroups.done)}</div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>${translateText('project.workLog')}</h3><span class="cap">${translateText('report.entryCount', { count: entries.length })}</span></div>${entries.length ? entries.map((entry) => { const task = tasks.find((item) => item.id === entry.taskId); return `<div class="workspace-log"><div class="num mute">${fmtDate(entry.startedAt)}<br />${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div><div class="grow"><strong>${esc(task?.title || entry.description || translateText('common.unnamedWork'))}</strong>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div><span class="num">${fmtHM(db.durationSec(entry))}</span></div>`; }).join('') : `<div class="empty">${translateText('project.noWorkLog')}</div>`}</div>
-    <div class="workspace-section"><div class="workspace-section-head"><h3>${translateText('project.process')}</h3><span class="cap">${translateText('project.byDate')}</span></div>${dailyRows.length ? dailyRows.map(([date, value]) => `<div class="workspace-day"><span class="num">${date}</span><div class="workspace-day-bar"><i style="width:${Math.round((value / maxDaily) * 100)}%"></i></div><span class="num">${fmtHM(value)}</span></div>`).join('') : `<div class="empty">${translateText('project.noWorkData')}</div>`}</div>`;
+    <div class="workspace-section" data-workspace-section="summary"><div class="workspace-section-head"><h3>${translateText('project.summary')}</h3><span class="cap">${translateText('project.summaryHint')}</span></div><div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} ${translateText('report.totalWork')}</span><span class="badge">${done}/${tasks.length} ${translateText('report.todoCompleted')}</span><span class="badge">${entries.length} ${translateText('report.workEntries')}</span></div></div>
+    <div class="workspace-section" data-workspace-section="todo"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${translateText('project.todoItems', { count: tasks.length })}</span></div><div class="workspace-todo-board">${renderWorkspaceTodoGroup(translateText('todo.status.doing'), taskGroups.doing, 'doing', tasks)}${renderWorkspaceTodoGroup(translateText('todo.status.todo'), taskGroups.todo, 'todo', tasks)}${renderWorkspaceTodoGroup(translateText('todo.status.done'), taskGroups.done, 'done', tasks)}${unlinkedEntries.length ? `<div class="workspace-todo-unlinked"><div class="workspace-todo-unlinked-head"><strong>${translateText('entry.uncategorized')}</strong><span class="cap">${translateText('report.entryCount', { count: unlinkedEntries.length })}</span></div><div class="workspace-log-groups">${renderWorkspaceLog(unlinkedEntries, [])}</div></div>` : ''}</div></div>
+    <div class="workspace-section" data-workspace-section="process"><div class="workspace-section-head"><h3>${translateText('project.process')}</h3><span class="cap">${translateText('project.byDate')}</span></div><div class="workspace-process">${dailyChartRows.length ? lineSVG({ dates: dailyChartRows.map(([date]) => date), values: dailyChartRows.map(([, value]) => value) }, currentLocale) : `<div class="empty">${translateText('project.noWorkData')}</div>`}</div></div>`;
   if (notesBox) {
     $('projectWorkspace').appendChild(notesBox);
     notesBox.hidden = false;
@@ -1738,9 +1840,10 @@ function renderProjectWorkspace(id) {
   const workspaceSections = $('projectWorkspace').querySelectorAll('.workspace-section');
   workspaceSections[0]?.classList.add('workspace-section-first');
   workspaceSections.forEach((section, index) => {
-    if (index > 0) section.classList.add('is-collapsed');
+    if (index > 0 && !openSections.includes(section.dataset.workspaceSection)) section.classList.add('is-collapsed');
     const head = section.querySelector('.workspace-section-head');
     if (!head) return;
+    if (section.dataset.workspaceSection === 'summary') return;
     head.insertAdjacentHTML('beforeend', `<button type="button" class="btn-sm workspace-toggle" data-workspace-toggle>${section.classList.contains('is-collapsed') ? '[+]' : '[−]'}</button>`);
   });
   const noteHead = notesBox?.querySelector('.row');
@@ -1755,12 +1858,35 @@ document.getElementById('projList').addEventListener('click', (event) => {
   if (open) renderProjectWorkspace(open);
   else if (row && !event.target.closest('button')) renderProjectWorkspace(row.dataset.workspaceP);
 });
-document.getElementById('projectWorkspace').addEventListener('click', (event) => {
+document.getElementById('projectWorkspace').addEventListener('click', async (event) => {
   const toggle = event.target.closest('[data-workspace-toggle]');
   if (toggle) {
     const section = toggle.closest('.workspace-section, #pjNotesBox');
     section.classList.toggle('is-collapsed');
     toggle.textContent = section.classList.contains('is-collapsed') ? '[+]' : '[−]';
+    return;
+  }
+  const checkId = event.target.closest('[data-workspace-todo-check]')?.dataset.workspaceTodoCheck;
+  const saveNoteId = event.target.closest('[data-workspace-todo-save]')?.dataset.workspaceTodoSave;
+  if (checkId || saveNoteId) {
+    event.preventDefault();
+    const taskId = checkId || saveNoteId;
+    const task = S.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const projectId = workspaceProjectId;
+    const section = event.target.closest('[data-workspace-section="todo"]');
+    const keepOpen = section && !section.classList.contains('is-collapsed');
+    if (checkId) {
+      await db.upsertTask({ ...task, status: task.status === 'done' ? 'todo' : 'done' });
+      showToast(translateText(task.status === 'done' ? 'toast.todoReopened' : 'toast.todoCompleted', { title: task.title }));
+    } else {
+      const textarea = section?.querySelector(`[data-workspace-todo-note-input="${saveNoteId}"]`);
+      if (!textarea) return;
+      await db.upsertTask({ ...task, notes: textarea.value });
+      showToast(translateText('toast.todoUpdated', { title: task.title }));
+    }
+    await load();
+    if (workspaceProjectId === projectId) renderProjectWorkspace(projectId, { openSections: keepOpen ? ['todo'] : [] });
     return;
   }
   if (event.target.closest('[data-close-workspace]')) {
@@ -2403,6 +2529,7 @@ function openEntryDialog(e) {
     flattenTree(S.projects).map((p) =>
       `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   $('enProject').value = e.projectId || '';
+  $('enTaskIncludeDone').checked = S.tasks.some((task) => task.id === e.taskId && task.status === 'done');
   renderEntryTasks(e.taskId || '');
   $('enStart').value = toLocalInput(e.startedAt);
   $('enEnd').value = toLocalInput(e.endedAt);

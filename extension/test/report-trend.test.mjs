@@ -3,7 +3,7 @@ import {
   buildProjectTrendData,
   buildProjectDetailData,
 } from '../src/lib/project-trend.js';
-import { heatmapSVG, stackedAreaSVG } from '../src/lib/charts.js';
+import { heatmapSVG, lineSVG, stackedAreaSVG } from '../src/lib/charts.js';
 
 const projects = [
   { id: 'project-a', parentId: null, name: '專案 A', color: '#61b5dc' },
@@ -51,6 +51,7 @@ assert.equal(detail.tasksTotal, 2);
 
 const stacked = stackedAreaSVG(data);
 const heatmap = heatmapSVG(data);
+const line = lineSVG({ dates: data.dates, values: data.dailyTotals });
 assert.match(stacked, /role="img"/);
 assert.match(stacked, /data-trend-date="2026-08-10"/);
 assert.match(stacked, /<title>/);
@@ -62,12 +63,18 @@ assert.match(heatmap, /role="img"/);
 assert.match(heatmap, /data-trend-date="2026-08-11"/);
 assert.match(heatmap, /data-project-id="project-a"/);
 assert.match(heatmap, /專案 A/);
+assert.match(line, /class="workspace-process-svg"/);
+assert.match(line, /<polyline[^>]+stroke="var\(--ink\)"/);
+assert.match(line, /data-process-date="2026-08-10"/);
+assert.match(line, /<circle[^>]+data-process-date="2026-08-11"/);
+assert.match(line, /<title>/);
 
 const empty = buildProjectTrendData({
   entries: [], projects, dates: [], durationSec: () => 0,
 });
 assert.match(stackedAreaSVG(empty), /沒有可顯示的資料/);
 assert.match(heatmapSVG(empty), /沒有可顯示的資料/);
+assert.match(lineSVG({ dates: [], values: [] }), /沒有可顯示的資料/);
 
 const overnight = buildProjectTrendData({
   entries: [{

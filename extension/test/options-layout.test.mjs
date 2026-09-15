@@ -64,6 +64,13 @@ assert.match(options, /enTask.*addEventListener\('change'/, 'Entry Todo selectio
 assert.match(options, /tasksForProject/, 'Manual entry Todo options should use the selected project');
 assert.match(options, /sortTasksForManualEntry/, 'Manual entry Todo options should prioritize recent activity');
 assert.match(options, /enProject.*addEventListener\('change'/, 'Manual entry project changes should refresh Todo options');
+assert.match(html, /id="enTaskIncludeDone"/, 'Manual entry should expose a completed Todo visibility toggle');
+assert.match(html, /data-i18n="entry\.includeCompletedTodos"/, 'Completed Todo visibility toggle should be translatable');
+assert.match(options, /const includeCompleted = \$\('enTaskIncludeDone'\)\?\.checked/, 'Manual entry should read the completed Todo visibility toggle');
+assert.match(options, /filter\(\(task\) => task\.status !== 'done'\)/, 'Manual entry should hide completed Todos by default');
+assert.match(options, /<optgroup label="\$\{esc\(translateText\('todo\.status\.done'\)\)\}">/, 'Completed Todos should render in a separate group');
+assert.match(options, /enTaskIncludeDone.*addEventListener\('change'/s, 'Manual entry should refresh Todo options when completed visibility changes');
+assert.match(css, /\.entry-task-filter\s*\{/, 'Manual entry completed Todo toggle should have a dedicated style');
 assert.match(options, /class="project-list-head"/, 'Project list should expose readable column labels');
 assert.match(options, /class="row-item project-row"/, 'Project list rows should have a dedicated layout class');
 assert.match(options, /class="project-color"/, 'Project rows should show a prominent color marker');
@@ -148,6 +155,7 @@ assert.match(options, /focusReportEntry/, 'Report should navigate directly to wo
 assert.match(options, /focusReportTodo/, 'Report should navigate directly to Todo items');
 assert.match(options, /dueTodoAlerts/, 'Report should derive a compact list of upcoming Todo deadlines');
 assert.match(options, /data-report-task-id/, 'Due Todo alerts should link directly to Todo items');
+assert.match(options, /if \(!visible\.length\) \{\s*mount\.innerHTML = '';/, 'Report should hide the due alert region when there is nothing to remind');
 assert.match(options, /buildWorkspaceTodoProgress/, 'Workspace status should derive its Todo completion progress');
 assert.match(options, /report\.todoProgress/, 'Workspace status should show Todo completion progress');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
@@ -195,6 +203,8 @@ assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap',
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
 assert.match(css, /\.report-due-alerts\s*\{/, 'Report due alerts should have a dedicated compact style');
+assert.match(css, /\.report-due-alerts\s*\{[^}]*border:\s*0;[^}]*border-left:\s*3px\s+solid/s, 'Due alerts should use a single accent edge instead of a nested frame');
+assert.match(css, /\.report-due-alert\s*\{[^}]*border:\s*0;[^}]*border-top:\s*1px\s+solid/s, 'Due alert rows should use separators instead of individual boxes');
 assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
 assert.match(css, /\.report-project-work\s*\{[^}]*white-space:\s*nowrap/s,
   'Project status work durations should stay on one line');
@@ -245,10 +255,44 @@ assert.doesNotMatch(options, /<div class="review-calendar-tooltip" role="tooltip
 assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');
 assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
 assert.match(options,
-  /const workspaceSections = \$\('projectWorkspace'\)\.querySelectorAll\('\.workspace-section'\);[\s\S]*?workspaceSections\.forEach\(\(section, index\) => \{\s*if \(index > 0\) section\.classList\.add\('is-collapsed'\);/,
+  /const workspaceSections = \$\('projectWorkspace'\)\.querySelectorAll\('\.workspace-section'\);[\s\S]*?workspaceSections\.forEach\(\(section, index\) => \{\s*if \(index > 0 && !openSections\.includes\(section\.dataset\.workspaceSection\)\) section\.classList\.add\('is-collapsed'\);/,
   'Project workspace should keep the summary open and collapse later sections by default');
 assert.doesNotMatch(options, /notesBox\.classList\.add\('is-collapsed'\)/,
   'Project notes should remain open by default');
+assert.match(options, /data-workspace-todo-check/, 'Workspace Todo items should expose a completion control');
+assert.match(options, /data-workspace-todo-note-input/, 'Workspace Todo items should expose an editable note field');
+assert.match(options, /data-workspace-todo-save/, 'Workspace Todo notes should expose a save action');
+assert.match(options, /function renderWorkspaceTodo/, 'Workspace Todo rendering should have its own presentation boundary');
+assert.match(options, /workspace-todo-group-done/, 'Completed workspace Todos should use a dedicated visual group');
+assert.match(options, /if \(status === 'done'\) \{[\s\S]*?<details class="workspace-todo-group\$\{doneClass\}" data-workspace-todo-group="done">/, 'Completed workspace Todos should render inside a collapsed details group');
+assert.doesNotMatch(options, /<details class="workspace-todo-group\$\{doneClass\}"[^>]*\sopen[=>]/, 'Completed workspace Todos should be collapsed by default');
+assert.match(css, /\.workspace-todo-group-done\s*>\s*summary/, 'Completed Todo summary should have an expandable treatment');
+assert.match(options, /db\.upsertTask\(\{ \.\.\.task, status:/, 'Workspace Todo completion should persist through the shared database boundary');
+assert.match(css, /\.workspace-todo-card\s*\{/, 'Workspace Todo items should have a dedicated card style');
+assert.match(css, /\.workspace-todo-group-done\s+\.workspace-todo-card\s*\{/, 'Completed workspace Todos should have distinct styling');
+assert.match(options, /function renderWorkspaceLog/, 'Workspace work logs should have a Todo-aware grouping boundary');
+assert.match(options, /data-workspace-log-task/, 'Workspace work log groups should expose their related Todo');
+assert.match(options, /entry\.uncategorized/, 'Workspace work logs should keep unlinked records in a separate group');
+assert.match(options, /workspace-todo-log/, 'Each workspace Todo should expose its related work log');
+assert.match(options, /entriesForTask\(task, S\.entries\)/, 'Workspace Todo cards should derive work logs from the Todo relation');
+assert.doesNotMatch(options, /<details class="workspace-todo-log" open>/, 'Workspace Todo work logs should remain collapsed by default');
+assert.match(options, /workspace-todo-unlinked/, 'Unlinked work should remain visible under the Todo workspace');
+assert.doesNotMatch(options, /data-workspace-section="work-log"/, 'Workspace should not render a separate work log section');
+assert.match(options, /function renderProjectWorkspace\(id, \{ openSections = \[\] \}/, 'Workspace Todo should remain collapsed by default');
+assert.match(options, /if \(section\.dataset\.workspaceSection === 'summary'\) return;/, 'Project summary should be treated as a fixed open section');
+assert.match(css, /\.workspace-log-group\s*\{/, 'Workspace work log groups should have a dedicated style');
+assert.match(css, /\.workspace-log-group\s*>\s*summary/, 'Workspace work log groups should be expandable by Todo');
+assert.match(css, /\.workspace-todo-log\s*\{/, 'Todo cards should have a dedicated related-work-log style');
+assert.match(css, /\.workspace-todo-unlinked\s*\{/, 'Unlinked work should have a dedicated workspace style');
+assert.match(css, /#projectWorkspace\.card\s*\{[^}]*border:\s*0/s, 'Workspace should avoid a nested outer card frame');
+assert.match(css, /\.workspace-todo-card\s*\{[^}]*border-bottom:/s, 'Todo rows should use light separators instead of nested cards');
+assert.match(css, /#projectWorkspace\s*>\s*#pjNotesBox\s*\{[^}]*margin-top:\s*18px/s, 'Project notes should be separated from the section above');
+assert.match(css, /\.workspace-log\s*\{[^}]*border-left:/s, 'Workspace work logs should use a timeline treatment');
+assert.match(css, /\.workspace-process\s*\{/, 'Workspace process should have a dedicated visual container');
+assert.match(css, /\.daily-review-entry\s*\{[^}]*grid-template-columns:\s*126px\s+8px\s+minmax\(0,\s*1fr\)\s+max-content/s, 'Daily review should reserve the natural width for durations');
+assert.match(css, /\.daily-review-duration\s*\{[^}]*white-space:\s*nowrap/s, 'Daily review durations should stay on one line');
+assert.match(css, /\.activity-row\s*\{[^}]*grid-template-columns:[^;]*max-content/s, 'Entry rows should reserve the natural width for durations');
+assert.match(css, /\.activity-row \.activity-duration\s*\{[^}]*white-space:\s*nowrap/s, 'Entry row durations should stay on one line');
 assert.match(css, /\.markdown-editor-toolbar\s*\{/, 'Markdown fields should render an editor toolbar');
 assert.match(editor, /data-markdown-command/, 'Markdown toolbar controls should be discoverable');
 assert.match(options, /mountMarkdownEditor/, 'Options should mount the native Markdown block editor');

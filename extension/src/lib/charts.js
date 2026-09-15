@@ -85,6 +85,46 @@ function trendColor(level) {
   return ['#fafafa', '#dfeef5', '#9ccde5', '#5fb5dc', '#2d8fbe'][level];
 }
 
+/** 每日工時折線圖：保留日期順序，適合快速看出工作量的起伏。 */
+export function lineSVG(data, locale = 'zh-TW') {
+  if (!data?.dates?.length || !data.values?.length) return trendEmpty(locale);
+
+  const dates = data.dates;
+  const values = dates.map((_, index) => Math.max(0, Number(data.values[index]) || 0));
+  const W = 760, H = 260, PL = 48, PR = 18, PT = 20, PB = 34;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const maxSeconds = Math.max(3600, Math.ceil(Math.max(...values, 0) / 3600) * 3600);
+  const x = (index) => dates.length === 1
+    ? PL + iw / 2
+    : PL + (index * iw) / (dates.length - 1);
+  const y = (seconds) => trendY(seconds, maxSeconds, PT, ih);
+  const gridStep = Math.max(1, Math.ceil((maxSeconds / 3600) / 4));
+  let grid = '';
+  for (let h = 0; h <= maxSeconds / 3600; h += gridStep) {
+    const value = h * 3600;
+    grid += `<line x1="${PL}" x2="${W - PR}" y1="${y(value)}" y2="${y(value)}" stroke="var(--hairline)" stroke-width="1"></line>
+      <text x="${PL - 8}" y="${y(value) + 4}" text-anchor="end" class="axis-label">${h}h</text>`;
+  }
+
+  const points = values.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ');
+  const labels = dates.map((date, index) =>
+    (index % Math.max(1, Math.ceil(dates.length / 8)) === 0 || index === dates.length - 1)
+      ? `<text x="${x(index)}" y="${H - 10}" text-anchor="middle" class="axis-label">${esc(String(date).slice(5))}</text>`
+      : '').join('');
+  const zones = dates.map((date, index) => {
+    const step = dates.length > 1 ? iw / (dates.length - 1) : iw;
+    const left = dates.length === 1 ? PL : Math.max(PL, x(index) - step / 2);
+    const width = dates.length === 1 ? iw : index === 0 || index === dates.length - 1 ? step / 2 : step;
+    return `<rect data-process-date="${esc(date)}" x="${left}" y="${PT}" width="${width}" height="${ih}" fill="transparent" tabindex="0"><title>${esc(date)} · ${esc(formatDuration(values[index], locale))}</title></rect>`;
+  }).join('');
+  const circles = values.map((value, index) =>
+    `<circle data-process-date="${esc(dates[index])}" cx="${x(index).toFixed(1)}" cy="${y(value).toFixed(1)}" r="4" fill="var(--canvas)" stroke="var(--ink)" stroke-width="2"><title>${esc(dates[index])} · ${esc(formatDuration(value, locale))}</title></circle>`).join('');
+
+  return `<svg class="workspace-process-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${Math.min(W, Math.max(420, dates.length * 56))}px" role="img" aria-label="${esc(translate(locale, 'project.process'))}">
+    ${grid}<polyline points="${points}" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${circles}${zones}${labels}
+  </svg>`;
+}
+
 export function stackedAreaSVG(data, locale = 'zh-TW') {
   if (!data?.dates?.length || !data.series?.length) return trendEmpty(locale);
 
