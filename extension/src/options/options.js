@@ -1517,6 +1517,7 @@ function renderProjects() {
         const r = roll.get(p.id) || { own: 0, total: 0 };
         const kids = childrenOf(S.projects, p.id).length;
         const color = esc(p.color || '#9a9898');
+        const archiveLabel = p.archivedAt ? translateText('common.restored') : translateText('common.archive');
         return `<div class="row-item project-row" data-workspace-p="${p.id}"
           style="--project-color:${color};--project-depth:${p.depth}">
           <div class="project-info">
@@ -1538,11 +1539,9 @@ function renderProjects() {
             <span class="num">${fmtHM(r.own)}</span>
           </div>
           <div class="act project-actions">
-            <button class="btn-sm workspace-open" data-open-workspace="${p.id}">${translateText('project.openWorkspace')}</button>
             <div class="project-secondary-actions">
-              <button class="btn-sm" data-edit-p="${p.id}">${translateText('project.edit')}</button>
-              <button class="btn-sm" data-arch-p="${p.id}">${p.archivedAt ? `[${translateText('common.restored')}]` : `[${translateText('common.archive')}]`}</button>
-              <button class="btn-sm btn-danger" data-del-p="${p.id}">[x]</button>
+              <button class="btn-sm project-icon-action" data-edit-p="${p.id}" aria-label="${esc(translateText('project.edit'))}" title="${esc(translateText('project.edit'))}">✎</button>
+              <button class="btn-sm project-icon-action" data-arch-p="${p.id}" aria-label="${esc(archiveLabel)}" title="${esc(archiveLabel)}">▣</button>
             </div>
           </div>
         </div>`;
@@ -1775,7 +1774,7 @@ function renderProjectWorkspace(id, { openSections = [] } = {}) {
   const dailyRows = [...daily.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   const dailyChartRows = [...dailyRows].reverse();
   $('projectWorkspace').hidden = false;
-  $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} ${translateText('project.workspace')}</h2><button class="btn-sm" data-close-workspace>${translateText('common.close')}</button></div>
+  $('projectWorkspace').innerHTML = `<div class="row"><h2 class="grow">${esc(project.name)} ${translateText('project.workspace')}</h2><button class="btn-sm" data-close-workspace data-i18n="common.back">${translateText('common.back')}</button></div>
     <div class="workspace-section" data-workspace-section="summary"><div class="workspace-section-head"><h3>${translateText('project.summary')}</h3><span class="cap">${translateText('project.summaryHint')}</span></div><div class="workspace-kpis"><span class="badge">${fmtHM(seconds)} ${translateText('report.totalWork')}</span><span class="badge">${done}/${tasks.length} ${translateText('report.todoCompleted')}</span><span class="badge">${entries.length} ${translateText('report.workEntries')}</span></div></div>
     <div class="workspace-section" data-workspace-section="todo"><div class="workspace-section-head"><h3>Todo</h3><span class="cap">${translateText('project.todoItems', { count: tasks.length })}</span></div><div class="workspace-todo-board">${renderWorkspaceTodoGroup(translateText('todo.status.doing'), taskGroups.doing, 'doing', tasks)}${renderWorkspaceTodoGroup(translateText('todo.status.todo'), taskGroups.todo, 'todo', tasks)}${renderWorkspaceTodoGroup(translateText('todo.status.done'), taskGroups.done, 'done', tasks)}${unlinkedEntries.length ? `<div class="workspace-todo-unlinked"><div class="workspace-todo-unlinked-head"><strong>${translateText('entry.uncategorized')}</strong><span class="cap">${translateText('report.entryCount', { count: unlinkedEntries.length })}</span></div><div class="workspace-log-groups">${renderWorkspaceLog(unlinkedEntries, [])}</div></div>` : ''}</div></div>
     <div class="workspace-section" data-workspace-section="process"><div class="workspace-section-head"><h3>${translateText('project.process')}</h3><span class="cap">${translateText('project.byDate')}</span></div><div class="workspace-process">${dailyChartRows.length ? lineSVG({ dates: dailyChartRows.map(([date]) => date), values: dailyChartRows.map(([, value]) => value) }, currentLocale) : `<div class="empty">${translateText('project.noWorkData')}</div>`}</div></div>`;
@@ -1801,11 +1800,20 @@ function renderProjectWorkspace(id, { openSections = [] } = {}) {
   }
 }
 
+function scrollToProjectWorkspace() {
+  requestAnimationFrame(() => $('projectWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+function scrollToProjectList() {
+  requestAnimationFrame(() => $('projList')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
 document.getElementById('projList').addEventListener('click', (event) => {
   const row = event.target.closest('[data-workspace-p]');
-  const open = event.target.closest('[data-open-workspace]')?.dataset.openWorkspace;
-  if (open) renderProjectWorkspace(open);
-  else if (row && !event.target.closest('button')) renderProjectWorkspace(row.dataset.workspaceP);
+  if (row && !event.target.closest('button')) {
+    renderProjectWorkspace(row.dataset.workspaceP);
+    scrollToProjectWorkspace();
+  }
 });
 document.getElementById('projectWorkspace').addEventListener('click', async (event) => {
   const toggle = event.target.closest('[data-workspace-toggle]');
@@ -1842,6 +1850,7 @@ document.getElementById('projectWorkspace').addEventListener('click', async (eve
     document.getElementById('projectWorkspace').hidden = true;
     $('pjNotesBox').hidden = true;
     workspaceProjectId = null;
+    scrollToProjectList();
   }
 });
 

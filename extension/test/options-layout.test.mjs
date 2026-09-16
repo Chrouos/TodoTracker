@@ -75,7 +75,10 @@ assert.match(options, /class="project-list-head"/, 'Project list should expose r
 assert.match(options, /class="row-item project-row"/, 'Project list rows should have a dedicated layout class');
 assert.match(options, /class="project-color"/, 'Project rows should show a prominent color marker');
 assert.match(options, /class="project-hours"/, 'Project hours should have readable labels');
-assert.match(options, /class="project-secondary-actions"/, 'Secondary project actions should be visually quieter');
+assert.match(options, /class="project-secondary-actions"/, 'Project rows should keep the compact secondary action group');
+assert.match(options, /class="btn-sm project-icon-action"[^>]*data-edit-p=/, 'Project rows should keep an edit icon action');
+assert.match(options, /class="btn-sm project-icon-action"[^>]*data-arch-p=/, 'Project rows should keep an archive icon action');
+assert.doesNotMatch(options, /workspace-open|data-open-workspace|data-del-p=/, 'Project rows should not render a workspace or delete action button');
 assert.match(html, /id="tdStatusFilter"/, 'Options Todo should expose a status filter');
 assert.doesNotMatch(html, /id="tdToggleDone"/, 'Options Todo should replace the completed toggle with a status filter');
 assert.match(options, /statusFilter/, 'Options Todo should pass the selected status to filtering');
@@ -89,7 +92,7 @@ assert.match(css, /\.project-row\s*\{[^}]*grid-template-columns:/s,
   'Project rows should align project, hours, and actions into columns');
 assert.match(css, /\.project-list-head\s*\{[^}]*grid-template-columns:/s,
   'Project list should align its column labels with project rows');
-assert.match(css, /--project-list-columns:\s*minmax\(0,\s*1fr\)\s+110px\s+110px\s+96px/s,
+assert.match(css, /--project-list-columns:\s*minmax\(0,\s*1fr\)\s+110px\s+110px\s+72px/s,
   'Project list should define one shared column template');
 assert.doesNotMatch(css, /--project-list-columns:[^;]*\bauto\b/s,
   'Project list should not let content change the shared action column width');
@@ -105,6 +108,8 @@ assert.match(css, /\.project-row\s*>\s*\.project-hours-direct\s*\{[^}]*grid-colu
   'Direct work should stay in the third project column');
 assert.match(css, /\.project-row\s*>\s*\.project-actions\s*\{[^}]*grid-column:\s*4[^}]*justify-self:\s*stretch/s,
   'Workspace actions should stay in the fourth project column');
+assert.match(css, /\.project-icon-action\s*\{[^}]*width:\s*28px[^}]*height:\s*28px[^}]*padding:\s*0/s,
+  'Project actions should use compact icon buttons');
 assert.match(css, /\.project-list-head\s*\{[^}]*color:\s*var\(--text-body\)/s,
   'Project list column labels should remain readable on light backgrounds');
 assert.match(css, /\.project-row\s*\{[^}]*color:\s*var\(--text-ink\)/s,
@@ -241,8 +246,12 @@ assert.match(css, /\.kpi \.num\s*\{[^}]*white-space:\s*nowrap/s,
   'Report KPI durations should stay on one line');
 assert.doesNotMatch(options, /const metricRows\s*=|report-details-collapse|report\.averageCycle/, 'Report should not render the duplicate full project report');
 assert.doesNotMatch(css, /\.report-details-collapse\s*>\s*summary/, 'Report should not keep the duplicate full project report styles');
-assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/s,
-  'Report action cards should remain compact on narrow screens');
+assert.match(css, /\.report-section-heading\s*\{[^}]*min-width:\s*0[^}]*flex-wrap:\s*wrap/s,
+  'Report attention headings should wrap within narrow containers');
+assert.match(css, /\.report-action\s*\{[^}]*min-width:\s*0[^}]*overflow-wrap:\s*anywhere/s,
+  'Report action cards should contain long content');
+assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[^}]*grid-template-columns:\s*1fr/s,
+  'Report action cards should stack on narrow screens');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-project-row\s*\{[^}]*grid-template-columns:/s,
   'Report project rows should reflow on narrow screens');
 assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
@@ -317,6 +326,10 @@ assert.match(options, /workspace-todo-unlinked/, 'Unlinked work should remain vi
 assert.doesNotMatch(options, /data-workspace-section="work-log"/, 'Workspace should not render a separate work log section');
 assert.match(options, /function renderProjectWorkspace\(id, \{ openSections = \[\] \}/, 'Workspace Todo should remain collapsed by default');
 assert.match(options, /if \(section\.dataset\.workspaceSection === 'summary'\) return;/, 'Project summary should be treated as a fixed open section');
+assert.match(options, /data-close-workspace[^>]*data-i18n="common\.back"/, 'Project workspace should expose a return action');
+assert.match(options, /scrollIntoView\(\{\s*behavior:\s*'smooth'/, 'Project workspace navigation should use smooth scrolling');
+assert.match(options, /projectWorkspace\.scrollIntoView|\$\('projectWorkspace'\)\??\.scrollIntoView/, 'Opening a project should scroll to its workspace');
+assert.match(options, /projectList\.scrollIntoView|\$\('projList'\)\??\.scrollIntoView/, 'Returning from a project should scroll back to the project list');
 assert.match(css, /\.workspace-log-group\s*\{/, 'Workspace work log groups should have a dedicated style');
 assert.match(css, /\.workspace-log-group\s*>\s*summary/, 'Workspace work log groups should be expandable by Todo');
 assert.match(css, /\.workspace-todo-log\s*\{/, 'Todo cards should have a dedicated related-work-log style');

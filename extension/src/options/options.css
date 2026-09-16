@@ -298,7 +298,7 @@ section[hidden] { display: none; }
 .row-item[data-workspace-p] { cursor: pointer; }
 
 /* Project list hierarchy and readable workload columns. */
-:root { --project-list-columns: minmax(0, 1fr) 110px 110px 96px; }
+:root { --project-list-columns: minmax(0, 1fr) 110px 110px 72px; }
 .project-list-head {
   display: grid;
   grid-template-columns: var(--project-list-columns);
@@ -369,11 +369,13 @@ section[hidden] { display: none; }
 .project-hours-label { color: var(--text-body); font-size: 11px; font-weight: 500; }
 .project-hours .num { color: var(--text-ink); font-weight: 700; }
 .project-actions { align-items: center; justify-content: flex-end; }
-.project-secondary-actions { display: flex; gap: var(--xs); opacity: 0; pointer-events: none; }
-.project-row:hover .project-secondary-actions,
-.project-row:focus-within .project-secondary-actions {
-  opacity: 1;
-  pointer-events: auto;
+.project-secondary-actions { display: flex; gap: var(--xs); }
+.project-icon-action {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* Todo 清單：以卡片呈現，讓優先級、截止日與提醒一眼可見 */
@@ -1289,8 +1291,11 @@ dialog .field { margin-bottom: var(--md); }
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
   margin-bottom: 10px;
 }
+.report-section-heading > * { min-width: 0; overflow-wrap: anywhere; }
 .report-section-heading strong { font-size: 13px; }
 .report-due-alerts { margin: 18px 0 20px; padding: 0 0 0 14px; border: 0; border-left: 3px solid var(--warning); border-radius: 0; background: transparent; }
 .report-due-alerts-clear { color: var(--text-mute); }
@@ -1309,18 +1314,20 @@ dialog .field { margin-bottom: var(--md); }
 .report-action-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .report-action {
   min-height: 76px;
+  min-width: 0;
   padding: 11px 12px;
   border: 1px solid var(--hairline);
   border-left: 3px solid var(--hairline-strong);
   border-radius: 7px;
   background: var(--surface-soft);
+  overflow-wrap: anywhere;
 }
 .report-action-danger { border-left-color: var(--danger); }
 .report-action-warning { border-left-color: var(--warning); }
 .report-action-success { border-left-color: var(--success); }
 .report-action-label,
 .report-action-hint { display: block; color: var(--text-mute); font-size: 11px; }
-.report-action strong { display: block; margin: 6px 0 2px; font-size: 17px; }
+.report-action strong { display: block; min-width: 0; margin: 6px 0 2px; font-size: 17px; overflow-wrap: anywhere; }
 .report-action-details { margin-top: 7px; }
 .report-action-detail {
   display: block;
@@ -1398,7 +1405,8 @@ dialog .field { margin-bottom: var(--md); }
   .report-status-side { align-items: flex-start; width: 100%; }
   .report-status-metrics { justify-content: flex-start; }
   .report-status-detail { text-align: left; }
-  .report-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-section-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .report-action-grid { grid-template-columns: 1fr; }
   .report-due-alerts-head { align-items: flex-start; flex-direction: column; gap: 4px; }
   .report-due-alert { grid-template-columns: 1fr; align-items: flex-start; gap: 4px; }
   .report-due-alert-meta { justify-content: space-between; width: 100%; }
