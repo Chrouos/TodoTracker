@@ -214,6 +214,9 @@ assert.match(options, /\$\('entriesApplyRange'\)\.addEventListener\('click', \(\
   'Applying a custom entry range should clear a stale focused entry');
 assert.doesNotMatch(options, /移動滑鼠到日期或儲存格查看明細/, 'Report should not use a meaningless hover placeholder');
 assert.match(options, /buildProjectDetailData/, 'Project selection should render project detail data');
+assert.match(options, /projectSeries/, 'Project detail should render project-level time data');
+assert.match(options, /trend-detail-project-chart/, 'Project detail should render a project time chart');
+assert.doesNotMatch(options, /trend-detail-entry/, 'Project detail should not render individual work records');
 assert.match(options, /buildReportQuality/, 'Report should render data quality metrics');
 assert.match(options, /buildProjectTaskMetrics/, 'Report should render project Todo performance metrics');
 assert.match(options, /buildProjectHealthRows/, 'Report should sort project status by attention');
@@ -222,6 +225,7 @@ assert.match(options, /reportActionTarget/, 'Report action items should expose n
 assert.match(options, /data-report-entry-id/, 'Report should expose a direct target for work records');
 assert.match(options, /data-report-task-id/, 'Report should expose a direct target for Todo items');
 assert.match(options, /translateText\('report\.attention'\)/, 'Report should show actionable attention items');
+assert.doesNotMatch(options, /report\.attentionHint/, 'Report attention should not show a redundant instruction hint');
 assert.match(options, /const attentionMarkup = statusItem\.kind === 'clear'/, 'Report should hide the attention section when there are no actionable items');
 assert.match(options, /translateText\('report\.projectStatus'\)/, 'Report should show a scannable project status list');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
@@ -240,6 +244,9 @@ assert.match(options, /data-report-project-tooltip/, 'Project progress bars shou
 assert.match(options, /class="report-project-color"/, 'Project status rows should expose a project color marker');
 assert.match(css, /\.report-project-progress::after\s*\{/, 'Project progress bars should render a hover summary');
 assert.match(css, /\.report-project-color\s*\{/, 'Project status rows should style the project color marker');
+assert.match(css, /\.trend-detail-project-chart\s*\{/, 'Project detail chart should have dedicated styles');
+assert.match(css, /\.trend-detail-project-bar\s*\{[^}]*width:\s*var\(--bar-width\)/s,
+  'Project detail chart bars should scale to project time');
 assert.match(css, /\.report-project-work\s*\{[^}]*white-space:\s*nowrap/s,
   'Project status work durations should stay on one line');
 assert.match(css, /\.kpi \.num\s*\{[^}]*white-space:\s*nowrap/s,
@@ -250,6 +257,12 @@ assert.match(css, /\.report-section-heading\s*\{[^}]*min-width:\s*0[^}]*flex-wra
   'Report attention headings should wrap within narrow containers');
 assert.match(css, /\.report-action\s*\{[^}]*min-width:\s*0[^}]*overflow-wrap:\s*anywhere/s,
   'Report action cards should contain long content');
+assert.match(css, /\.report-action-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*220px\),\s*1fr\)\)/s,
+  'Report action cards should use the available width when there are fewer items');
+assert.match(css, /\.report-action-details\s*\{[^}]*min-width:\s*0[^}]*overflow-wrap:\s*anywhere/s,
+  'Report action details should be allowed to shrink and wrap');
+assert.match(css, /\.report-action-detail\s*\{[^}]*white-space:\s*normal/s,
+  'Report action detail buttons should override the global nowrap rule');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[^}]*grid-template-columns:\s*1fr/s,
   'Report action cards should stack on narrow screens');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-project-row\s*\{[^}]*grid-template-columns:/s,
@@ -294,8 +307,8 @@ assert.doesNotMatch(options, /dailyReview'\)\.addEventListener\('pointerout'/, '
 assert.doesNotMatch(options, /class="review-calendar-entry"[^>]*\stitle=/, 'Calendar entries should not create a second native title preview');
 assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*position:\s*fixed/s,
   'Calendar tooltip should escape the scrollable calendar');
-assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*pointer-events:\s*none/s,
-  'Calendar tooltip should not capture the pointer');
+assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*pointer-events:\s*auto/s,
+  'Calendar tooltip should capture the pointer for scrolling');
 assert.doesNotMatch(options, /<div class="review-calendar-tooltip" role="tooltip">/,
   'Calendar entries should not own tooltips inside the scrollable grid');
 assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');

@@ -885,31 +885,18 @@ function renderTrendDetails(projectId) {
   const project = S.projects.find((item) => item.id === projectId);
   if (!project) return;
   const projectPath = pathOf(S.projects, project.id).join(' / ');
-  const grouped = new Map();
-  for (const entry of detail.entries) {
-    const date = fmtDate(entry.startedAt);
-    if (!grouped.has(date)) grouped.set(date, []);
-    grouped.get(date).push(entry);
-  }
-  const dailyTotals = new Map(projectTrendSource.dates.map((date, index) => [date, detail.dailyTotals[index] || 0]));
-  const taskById = new Map(S.tasks.map((task) => [task.id, task]));
-  const dayMarkup = [...grouped.entries()].map(([date, entries]) => `
-    <section class="trend-detail-day">
-      <div class="trend-detail-day-head"><strong>${esc(date)}</strong><span class="num">${fmtHM(dailyTotals.get(date) || 0)} · ${translateText('report.entryCount', { count: entries.length })}</span></div>
-      ${entries.map((entry) => {
-        const task = taskById.get(entry.taskId);
-        const title = entry.description || task?.title || translateText('common.unnamedWork');
-        const projectItem = S.projects.find((item) => item.id === entry.projectId);
-        const location = projectItem ? pathOf(S.projects, projectItem.id).join(' / ') : translateText('report.locationViaTodo');
-        return `<div class="trend-detail-entry">
-          <span class="num mute">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
-          <div class="grow"><strong>${esc(title)}</strong>${task && entry.description ? ` <span class="badge">${esc(task.title)}</span>` : ''}<div class="sub">${esc(location)}</div></div>
-          <span class="num">${fmtHM(entry.seconds)}</span>
-        </div>`;
-      }).join('')}
-    </section>`).join('');
+  const maxProjectSeconds = Math.max(...detail.projectSeries.map((series) => series.seconds), 0);
+  const projectMarkup = detail.projectSeries.map((series) => {
+    const seriesProject = S.projects.find((item) => item.id === series.id);
+    const seriesPath = seriesProject ? pathOf(S.projects, seriesProject.id).join(' / ') : series.name;
+    const width = maxProjectSeconds ? Math.max(4, Math.round((series.seconds / maxProjectSeconds) * 100)) : 0;
+    return `<div class="trend-detail-project-row" role="listitem">
+      <div class="trend-detail-project-name"><span class="trend-detail-project-color" style="--project-color:${esc(series.color)}"></span><div><strong>${esc(series.name)}</strong><div class="sub">${esc(seriesPath)}</div></div></div>
+      <div class="trend-detail-project-track"><span class="trend-detail-project-bar" style="--bar-width:${width}%;--project-color:${esc(series.color)}"></span></div>
+      <span class="num trend-detail-project-time">${fmtHM(series.seconds)}</span>
+    </div>`;
+  }).join('');
 
-  const truncated = detail.totalEntries - detail.entries.length;
   box.hidden = false;
   box.innerHTML = `<div class="trend-detail-head">
     <div><strong>${esc(project.name)} ${translateText('report.detail')}</strong><div class="sub">${esc(projectPath)} · ${translateText('project.includesChildren')}</div></div>
@@ -918,10 +905,8 @@ function renderTrendDetails(projectId) {
   <div class="trend-detail-kpis">
     <span class="badge">${fmtHM(detail.totalSeconds)} ${translateText('report.totalWork')}</span>
     <span class="badge">${detail.tasksDone}/${detail.tasksTotal} ${translateText('report.todoCompleted')}</span>
-    <span class="badge">${detail.totalEntries} ${translateText('report.workEntries')}</span>
   </div>
-  <div class="trend-detail-list">${dayMarkup || `<div class="empty">${translateText('report.noEntriesInRange')}</div>`}</div>
-  ${truncated > 0 ? `<div class="cap trend-detail-more">${translateText('report.moreEntries', { count: truncated })}</div>` : ''}`;
+  <div class="trend-detail-project-chart" role="list" aria-label="${esc(translateText('project.includesChildren'))}">${projectMarkup || `<div class="empty">${translateText('report.noEntriesInRange')}</div>`}</div>`;
 }
 
 function todoStatusLabel(status) {
@@ -1031,7 +1016,7 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
     </div>`).join('');
   const attentionMarkup = statusItem.kind === 'clear' ? '' : `
   <section class="report-attention" aria-label="${esc(translateText('report.attention'))}">
-    <div class="report-section-heading"><strong>${translateText('report.attention')}</strong><span class="cap">${translateText('report.attentionHint')}</span></div>
+    <div class="report-section-heading"><strong>${translateText('report.attention')}</strong></div>
     <div class="report-action-grid">${actionMarkup}</div>
   </section>`;
   const projectMarkup = healthRows.length

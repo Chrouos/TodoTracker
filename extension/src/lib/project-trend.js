@@ -135,8 +135,10 @@ export function buildProjectDetailData({
   const safeDates = [...dates];
   const dateSet = new Set(safeDates);
   const projectIds = descendantIds(projectId, projects);
+  const projectsById = projectMap(projects);
   const scopedTasks = tasks.filter((task) => task.projectId && projectIds.has(task.projectId));
   const taskIds = new Set(scopedTasks.map((task) => task.id));
+  const taskProjectById = new Map(scopedTasks.map((task) => [task.id, task.projectId]));
   const relevant = entries
     .flatMap((entry) => {
       const parts = splitEntryByDay(entry);
@@ -145,9 +147,27 @@ export function buildProjectDetailData({
     .filter((entry) => !entry.deletedAt && dateSet.has(fmtDate(entry.startedAt)))
     .filter((entry) => (entry.projectId && projectIds.has(entry.projectId))
       || (entry.taskId && taskIds.has(entry.taskId)))
-    .map((entry) => ({ ...entry, seconds: Math.max(0, Number(entry.seconds ?? durationSec(entry)) || 0) }))
+    .map((entry) => ({
+      ...entry,
+      detailProjectId: projectIds.has(entry.projectId)
+        ? entry.projectId
+        : taskProjectById.get(entry.taskId) || null,
+      seconds: Math.max(0, Number(entry.seconds ?? durationSec(entry)) || 0),
+    }))
+    .filter((entry) => entry.detailProjectId)
     .filter((entry) => entry.seconds > 0)
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+  const projectTotals = new Map();
+  for (const entry of relevant) {
+    projectTotals.set(entry.detailProjectId, (projectTotals.get(entry.detailProjectId) || 0) + entry.seconds);
+  }
+  const projectSeries = [...projectTotals.entries()]
+    .map(([id, seconds]) => {
+      const project = projectsById.get(id);
+      return project ? { id, name: project.name, color: project.color, seconds } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.seconds - a.seconds);
   const dailyTotals = safeDates.map((date) => relevant
     .filter((entry) => fmtDate(entry.startedAt) === date)
     .reduce((sum, entry) => sum + entry.seconds, 0));
@@ -158,6 +178,7 @@ export function buildProjectDetailData({
     entries: relevant.slice(0, limit),
     totalEntries: relevant.length,
     totalSeconds: relevant.reduce((sum, entry) => sum + entry.seconds, 0),
+    projectSeries,
     dailyTotals,
     tasksTotal: scopedTasks.length,
     tasksDone: scopedTasks.filter((task) => task.status === 'done').length,

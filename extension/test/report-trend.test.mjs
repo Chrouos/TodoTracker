@@ -48,6 +48,10 @@ assert.equal(detail.totalEntries, 3);
 assert.deepEqual(detail.dailyTotals, [10800, 1800]);
 assert.equal(detail.tasksDone, 1);
 assert.equal(detail.tasksTotal, 2);
+assert.deepEqual(detail.projectSeries.map(({ id, seconds }) => ({ id, seconds })), [
+  { id: 'project-a-child', seconds: 9000 },
+  { id: 'project-a', seconds: 3600 },
+]);
 
 const stacked = stackedAreaSVG(data);
 const heatmap = heatmapSVG(data);

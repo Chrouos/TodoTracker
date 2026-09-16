@@ -701,7 +701,7 @@ section[hidden] { display: none; }
   display: block;
   opacity: 0;
   visibility: hidden;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 1000;
 }
 .review-calendar-tooltip[hidden] { display: none; }
@@ -777,11 +777,23 @@ section[hidden] { display: none; }
 .project-trend-detail { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--hairline); }
 .trend-detail-head { display: flex; align-items: center; justify-content: space-between; gap: var(--md); }
 .trend-detail-kpis { display: flex; flex-wrap: wrap; gap: var(--sm); margin: 12px 0; }
-.trend-detail-day { margin-top: 14px; }
-.trend-detail-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--md); padding: 8px 0; border-bottom: 1px solid var(--hairline); }
-.trend-detail-entry { display: grid; grid-template-columns: 126px minmax(0, 1fr) 76px; align-items: start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
-.trend-detail-entry .sub { margin-top: 3px; }
-.trend-detail-more { margin-top: 10px; }
+.trend-detail-project-chart { display: grid; min-width: 0; margin-top: 12px; }
+.trend-detail-project-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 2fr) max-content;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+}
+.trend-detail-project-name { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.trend-detail-project-name > div { min-width: 0; }
+.trend-detail-project-name strong { display: block; overflow-wrap: anywhere; }
+.trend-detail-project-color { flex: 0 0 5px; width: 5px; min-height: 28px; border-radius: var(--r-full); background: var(--project-color); }
+.trend-detail-project-track { min-width: 0; height: 9px; overflow: hidden; border-radius: var(--r-full); background: var(--surface-card); }
+.trend-detail-project-bar { display: block; width: var(--bar-width); min-width: 4px; height: 100%; border-radius: inherit; background: var(--project-color); }
+.trend-detail-project-time { min-width: 72px; text-align: right; white-space: nowrap; }
 
 .todo-tracker {
   --todo-tracker-label-width: 220px;
@@ -953,8 +965,9 @@ dialog .field { margin-bottom: var(--md); }
   .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
   .daily-review-entry { grid-template-columns: 104px 8px minmax(0, 1fr); }
   .daily-review-duration { grid-column: 3; text-align: left; padding-top: 0; }
-  .trend-detail-entry { grid-template-columns: 1fr auto; }
-  .trend-detail-entry > .mute { grid-column: 1 / -1; }
+  .trend-detail-project-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .trend-detail-project-track { grid-column: 1 / -1; grid-row: 2; }
+  .trend-detail-project-time { grid-column: 2; grid-row: 1; min-width: 0; }
   .todo-tracker { --todo-tracker-label-width: 160px; }
   .todo-tracker-entry { grid-template-columns: 1fr auto; }
   .todo-tracker-entry > .mute { grid-column: 1 / -1; }
@@ -1311,7 +1324,7 @@ dialog .field { margin-bottom: var(--md); }
 .report-due-alert-overdue { box-shadow: inset 2px 0 0 #c65a5a; padding-left: 8px; }
 .report-due-alert-today { box-shadow: inset 2px 0 0 #c58a32; padding-left: 8px; }
 .report-due-alert-upcoming { box-shadow: inset 2px 0 0 #b8a35c; padding-left: 8px; }
-.report-action-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.report-action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; }
 .report-action {
   min-height: 76px;
   min-width: 0;
@@ -1328,7 +1341,7 @@ dialog .field { margin-bottom: var(--md); }
 .report-action-label,
 .report-action-hint { display: block; color: var(--text-mute); font-size: 11px; }
 .report-action strong { display: block; min-width: 0; margin: 6px 0 2px; font-size: 17px; overflow-wrap: anywhere; }
-.report-action-details { margin-top: 7px; }
+.report-action-details { min-width: 0; margin-top: 7px; overflow-wrap: anywhere; }
 .report-action-detail {
   display: block;
   width: 100%;
@@ -1339,6 +1352,7 @@ dialog .field { margin-bottom: var(--md); }
   color: var(--text-body);
   font-size: 11px;
   line-height: 1.5;
+  white-space: normal;
   overflow-wrap: anywhere;
   text-align: left;
   cursor: pointer;
