@@ -97,6 +97,14 @@ assert.match(css, /\.project-list-head\s*,\s*\.project-row\s*\{[^}]*grid-templat
   'Project list header and rows should use the same column template');
 assert.match(css, /\.project-list-head\s*,\s*\.project-row\s*\{[^}]*width:\s*100%[^}]*box-sizing:\s*border-box/s,
   'Project list header and rows should share the same available width');
+assert.match(css, /\.project-row\s*>\s*\.project-info\s*\{[^}]*grid-column:\s*1/s,
+  'Project information should stay in the first project column');
+assert.match(css, /\.project-row\s*>\s*\.project-hours:not\(\.project-hours-direct\)\s*\{[^}]*grid-column:\s*2/s,
+  'Total work should stay in the second project column');
+assert.match(css, /\.project-row\s*>\s*\.project-hours-direct\s*\{[^}]*grid-column:\s*3/s,
+  'Direct work should stay in the third project column');
+assert.match(css, /\.project-row\s*>\s*\.project-actions\s*\{[^}]*grid-column:\s*4[^}]*justify-self:\s*stretch/s,
+  'Workspace actions should stay in the fourth project column');
 assert.match(css, /\.project-list-head\s*\{[^}]*color:\s*var\(--text-body\)/s,
   'Project list column labels should remain readable on light backgrounds');
 assert.match(css, /\.project-row\s*\{[^}]*color:\s*var\(--text-ink\)/s,

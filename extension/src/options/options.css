@@ -329,6 +329,14 @@ section[hidden] { display: none; }
   width: 100%;
   box-sizing: border-box;
 }
+.project-row > .project-info { grid-column: 1; }
+.project-row > .project-hours:not(.project-hours-direct) { grid-column: 2; }
+.project-row > .project-hours-direct { grid-column: 3; }
+.project-row > .project-actions {
+  grid-column: 4;
+  justify-self: stretch;
+  min-width: 0;
+}
 .project-row:hover,
 .project-row:focus-within {
   background: color-mix(in srgb, var(--project-color) 8%, var(--canvas));
