@@ -298,7 +298,7 @@ section[hidden] { display: none; }
 .row-item[data-workspace-p] { cursor: pointer; }
 
 /* Project list hierarchy and readable workload columns. */
-:root { --project-list-columns: minmax(0, 1fr) 110px 110px auto; }
+:root { --project-list-columns: minmax(0, 1fr) 110px 110px 96px; }
 .project-list-head {
   display: grid;
   grid-template-columns: var(--project-list-columns);

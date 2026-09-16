@@ -89,8 +89,10 @@ assert.match(css, /\.project-row\s*\{[^}]*grid-template-columns:/s,
   'Project rows should align project, hours, and actions into columns');
 assert.match(css, /\.project-list-head\s*\{[^}]*grid-template-columns:/s,
   'Project list should align its column labels with project rows');
-assert.match(css, /--project-list-columns:\s*minmax\(0,\s*1fr\)\s+110px\s+110px\s+auto/s,
+assert.match(css, /--project-list-columns:\s*minmax\(0,\s*1fr\)\s+110px\s+110px\s+96px/s,
   'Project list should define one shared column template');
+assert.doesNotMatch(css, /--project-list-columns:[^;]*\bauto\b/s,
+  'Project list should not let content change the shared action column width');
 assert.match(css, /\.project-list-head\s*,\s*\.project-row\s*\{[^}]*grid-template-columns:\s*var\(--project-list-columns\)/s,
   'Project list header and rows should use the same column template');
 assert.match(css, /\.project-list-head\s*,\s*\.project-row\s*\{[^}]*width:\s*100%[^}]*box-sizing:\s*border-box/s,
