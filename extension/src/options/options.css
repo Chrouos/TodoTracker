@@ -298,9 +298,10 @@ section[hidden] { display: none; }
 .row-item[data-workspace-p] { cursor: pointer; }
 
 /* Project list hierarchy and readable workload columns. */
+:root { --project-list-columns: minmax(0, 1fr) 110px 110px auto; }
 .project-list-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px 110px auto;
+  grid-template-columns: var(--project-list-columns);
   align-items: center;
   gap: var(--md);
   padding: 0 var(--md) var(--xs);
@@ -313,7 +314,7 @@ section[hidden] { display: none; }
 .project-list-head span:nth-child(4) { text-align: right; }
 .project-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px 110px auto;
+  grid-template-columns: var(--project-list-columns);
   align-items: center;
   gap: var(--md);
   min-height: 72px;
@@ -321,6 +322,12 @@ section[hidden] { display: none; }
   border-left: 4px solid var(--project-color);
   color: var(--text-ink);
   background: color-mix(in srgb, var(--project-color) 4%, var(--canvas));
+}
+.project-list-head,
+.project-row {
+  grid-template-columns: var(--project-list-columns);
+  width: 100%;
+  box-sizing: border-box;
 }
 .project-row:hover,
 .project-row:focus-within {
@@ -530,13 +537,11 @@ section[hidden] { display: none; }
 #p-report > #timeline { width: 100%; box-sizing: border-box; }
 
 #p-report > .report-panel { min-width: 0; }
-#p-report > .report-panel-health { grid-column: 1 / -1; }
 #p-report > .report-panel-donut { grid-column: 1; }
 #p-report {
   grid-template-columns: minmax(0, 1fr);
   column-gap: 0;
 }
-#p-report > .report-panel-health,
 #p-report > .report-panel-donut,
 #p-report > .report-panel-review { grid-column: 1; }
 #p-report > .report-panel > h2.sec {
@@ -558,21 +563,6 @@ section[hidden] { display: none; }
 .review-mode .btn-sm { border-color: var(--hairline); background: var(--surface-soft); color: var(--text-mute); }
 .review-mode .btn-sm.active { background: var(--ink); border-color: var(--ink); color: var(--canvas); }
 .review-mode .btn-sm:disabled { opacity: .45; }
-.todo-tracker-section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sm);
-  margin: 22px 20px 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--hairline);
-  color: var(--text-ink);
-  font-size: 14px;
-  cursor: pointer;
-  user-select: none;
-}
-.todo-tracker-section-head:focus-visible { outline: 1px solid var(--ink); outline-offset: 4px; }
-.todo-tracker-section-head .mark { color: var(--text-mute); font-weight: 400; }
-
 #p-report > .report-panel-review > #dailyReview {
   border: 1px solid var(--hairline);
   border-radius: 12px;
@@ -612,17 +602,6 @@ section[hidden] { display: none; }
 .daily-review-title .cap { margin-left: 6px; }
 .daily-review-notes { margin-top: 6px; color: var(--text-body); }
 .daily-review-empty { padding: 14px 0 4px; color: var(--text-ash); }
-.review-calendar {
-  display: grid;
-  grid-template-columns: repeat(var(--review-days), minmax(0, 1fr));
-  overflow-x: auto;
-}
-.review-calendar-day { min-width: 132px; padding: 16px 10px 18px; border-right: 1px solid var(--hairline); }
-.review-calendar-day:last-child { border-right: 0; }
-.review-calendar-day > header { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin: 0 0 4px; }
-.review-calendar-day > header strong { font-size: 14px; }
-.review-calendar-day > header span { color: var(--text-mute); font-size: 12px; }
-.review-calendar-total { margin-bottom: 10px; color: var(--text-mute); font-size: 12px; }
 .review-calendar-entry {
   margin-top: 8px;
   padding: 7px 8px;
@@ -630,14 +609,9 @@ section[hidden] { display: none; }
   background: color-mix(in srgb, var(--project-color) 10%, var(--canvas));
   overflow-wrap: anywhere;
 }
-.review-calendar-time { color: var(--text-mute); font-size: 11px; }
-.review-calendar-title { margin-top: 3px; font-size: 12px; line-height: 1.45; }
-.review-calendar-duration { margin-top: 4px; color: var(--text-mute); font-size: 11px; }
-.review-calendar-empty { padding-top: 8px; color: var(--text-ash); }
-.review-calendar-time,
-.review-calendar-duration { display: none; }
 .review-calendar-title { margin-top: 0; font-size: 13px; font-weight: 700; }
 .review-calendar {
+  display: grid;
   grid-template-columns: 58px repeat(var(--review-days), minmax(112px, 1fr));
   grid-template-rows: auto var(--calendar-height);
   overflow-x: auto;
@@ -909,36 +883,6 @@ section[hidden] { display: none; }
     0 2px 8px color-mix(in srgb, var(--todo-color) 18%, transparent);
   outline: none;
 }
-.todo-tracker-bar {
-  position: absolute;
-  left: var(--todo-left);
-  top: 10px;
-  width: max(var(--todo-width), 2px);
-  height: 26px;
-  min-width: 2px;
-  padding: 0 8px;
-  overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--todo-color) 70%, var(--hairline));
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--todo-color) 28%, var(--canvas));
-  color: var(--text-body);
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
-}
-.todo-tracker-bar-done { background: color-mix(in srgb, var(--todo-color) 45%, var(--canvas)); }
-.todo-tracker-bar-doing { background: color-mix(in srgb, var(--todo-color) 30%, var(--canvas)); }
-.todo-tracker-bar:hover,
-.todo-tracker-bar:focus-visible,
-.todo-tracker-bar.is-hovered,
-.todo-tracker-bar.is-selected {
-  z-index: 3;
-  border-color: var(--todo-color);
-  background: color-mix(in srgb, var(--todo-color) 48%, var(--canvas));
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--todo-color) 18%, transparent);
-  outline: none;
-}
 .todo-tracker-tooltip {
   position: fixed;
   left: 0;
@@ -960,11 +904,6 @@ section[hidden] { display: none; }
   pointer-events: none;
 }
 .todo-tracker-tooltip[hidden] { display: none; }
-.todo-tracker-empty { display: flex; align-items: baseline; gap: var(--md); margin-top: 18px; padding: 18px; border-top: 1px solid var(--hairline); color: var(--text-mute); }
-.todo-tracker-empty strong { color: var(--text-body); }
-.todo-tracker-bar:hover .todo-tracker-tooltip,
-.todo-tracker-bar:focus-visible .todo-tracker-tooltip,
-.todo-tracker-bar.is-hovered .todo-tracker-tooltip,
 .todo-tracker-work:hover .todo-tracker-tooltip,
 .todo-tracker-work:focus-visible .todo-tracker-tooltip,
 .todo-tracker-work.is-hovered .todo-tracker-tooltip { display: block; }
@@ -979,30 +918,7 @@ section[hidden] { display: none; }
 .todo-tracker-entry { display: grid; grid-template-columns: 126px minmax(0, 1fr) 76px; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
 .todo-tracker-entry .markdown-preview { margin-top: 6px; }
 
-.legend { flex: 1; min-width: 0; }
-.legend-row {
-  display: flex; align-items: center; gap: var(--md);
-  padding: var(--sm) 0; border-bottom: 1px solid var(--hairline);
-  font-size: 13px; font-variant-numeric: tabular-nums;
-}
-.legend-row:last-child { border-bottom: 0; }
-.legend-row.drillable { cursor: pointer; }
-.legend-row.drillable:hover { background: var(--surface-soft); }
-
-/* 麵包屑：往下鑽之後回上層用 */
-.crumbs { display: flex; align-items: center; gap: var(--sm); font-size: 12px; margin-bottom: var(--sm); }
-.crumb { cursor: pointer; color: var(--text-mute); }
-.crumb:hover { color: var(--text-ink); text-decoration: underline; }
-.crumbs .crumb:last-child { color: var(--text-ink); font-weight: 700; }
-
 .tree-branch { flex: 0 0 auto; }
-
-/* 條狀圖：純填色矩形，radius 0 */
-.bar-wrap { display: flex; align-items: center; gap: var(--md); padding: var(--sm) 0; border-bottom: 1px solid var(--hairline); }
-.bar-label { width: 160px; flex: 0 0 160px; display: flex; align-items: center; gap: var(--sm); font-size: 13px; }
-.bar-track { flex: 1; height: 12px; background: var(--surface-card); }
-.bar-fill { height: 100%; background: var(--ink); }
-.bar-val { width: 110px; flex: 0 0 110px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
 
 dialog {
   /* tokens.css 的 `* { margin: 0 }` 會蓋掉 dialog 預設的 margin:auto，導致貼在左上角 */
@@ -1023,8 +939,6 @@ dialog .field { margin-bottom: var(--md); }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .kpi:nth-child(2) { border-right: 0; }
   .grid4, .grid2 { grid-template-columns: 1fr; }
-  .legend { width: 100%; }
-  .bar-label { width: 110px; flex: 0 0 110px; }
   #p-report { display: block; }
   .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
   .daily-review-entry { grid-template-columns: 104px 8px minmax(0, 1fr); }

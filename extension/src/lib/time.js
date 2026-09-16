@@ -235,18 +235,6 @@ export function calendarReviewData(entries, dates, defaultFrom = 8 * 60, default
   return { axis: { from: axisFrom, to: axisTo }, days };
 }
 
-export function calendarEntryTooltip(title, entry, projectName) {
-  const note = String(entry.notes || '')
-    .replace(/[\n\r]+/g, ' ')
-    .replace(/[`*_#[\]()>]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160);
-  return [title, `${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}`, projectName, note]
-    .filter(Boolean)
-    .join('\n');
-}
-
 /** 兩個 YYYY-MM-DD 之間相差幾天（b - a）。用 UTC 算避免日光節約時間誤差 */
 export function daysBetween(a, b) {
   if (!a || !b) return null;
@@ -322,12 +310,6 @@ export function timelineData(entries, dates) {
 
   if (maxMin === 0) { minMin = 9 * 60; maxMin = 18 * 60; } // 沒資料時給個預設視窗
   return { days, minMin, maxMin };
-}
-
-export function addDays(d, n) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
 }
 
 /** 從 datetime-local input 值轉 ISO，反之亦然 */

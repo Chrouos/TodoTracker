@@ -18,10 +18,6 @@ function runtime(): any | null {
   return c?.runtime?.sendMessage ? c.runtime : null;
 }
 
-export function bridgeAvailable(): boolean {
-  return runtime() !== null;
-}
-
 export function call<T = unknown>(type: string, payload?: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
     const rt = runtime();

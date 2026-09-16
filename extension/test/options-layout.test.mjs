@@ -89,6 +89,12 @@ assert.match(css, /\.project-row\s*\{[^}]*grid-template-columns:/s,
   'Project rows should align project, hours, and actions into columns');
 assert.match(css, /\.project-list-head\s*\{[^}]*grid-template-columns:/s,
   'Project list should align its column labels with project rows');
+assert.match(css, /--project-list-columns:\s*minmax\(0,\s*1fr\)\s+110px\s+110px\s+auto/s,
+  'Project list should define one shared column template');
+assert.match(css, /\.project-list-head\s*,\s*\.project-row\s*\{[^}]*grid-template-columns:\s*var\(--project-list-columns\)/s,
+  'Project list header and rows should use the same column template');
+assert.match(css, /\.project-list-head\s*,\s*\.project-row\s*\{[^}]*width:\s*100%[^}]*box-sizing:\s*border-box/s,
+  'Project list header and rows should share the same available width');
 assert.match(css, /\.project-list-head\s*\{[^}]*color:\s*var\(--text-body\)/s,
   'Project list column labels should remain readable on light backgrounds');
 assert.match(css, /\.project-row\s*\{[^}]*color:\s*var\(--text-ink\)/s,
@@ -137,8 +143,8 @@ assert.match(html, /data-collapse="rep-insights"[^>]*data-collapse-default="clos
 assert.match(html, /data-collapse="rep-donut"[^>]*data-collapse-default="closed"/, 'Project analytics should default to collapsed');
 assert.doesNotMatch(html, /data-collapse="rep-review"[^>]*data-collapse-default="closed"/, 'Daily review should remain open by default');
 assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-review"[\s\S]*data-collapse="rep-donut"/, 'Report panels should put the important sections first');
-assert.match(html, /data-collapse="rep-todo-tracker"[\s\S]*data-collapse-default="closed"/, 'Todo Tracker should default to collapsed');
-assert.match(html, /data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should have a collapsible body');
+assert.doesNotMatch(html, /data-collapse="rep-todo-tracker"|data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should not keep the obsolete nested collapse markup');
+assert.match(options, /const todoTrackerMount = report\.querySelector\('#todoTracker'\)/, 'Todo Tracker should preserve its mount when the project report rerenders');
 assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
 assert.doesNotMatch(html, /id="byDay"/, 'Report should not render a separate daily trend panel');
 assert.match(options, /buildProjectTrendData/, 'Report should build the fused project trend data');
@@ -250,6 +256,7 @@ assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*240px[^}]
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
 assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar should scroll horizontally');
+assert.match(css, /\.review-calendar\s*\{[^}]*display:\s*grid/s, 'Calendar should keep its grid layout');
 assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/s,
   'Calendar should allow vertical scrolling while keeping horizontal scrolling');
 assert.match(css, /\.review-calendar\s*\{[^}]*max-height:\s*min\(72vh,\s*640px\)/s,

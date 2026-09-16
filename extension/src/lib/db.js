@@ -482,23 +482,6 @@ export function secondsByProject(entries) {
   return m;
 }
 
-/** 依專案彙總 → [{projectId, name, color, seconds}]，時數由多到少 */
-export function groupByProject(entries, projects) {
-  const map = new Map();
-  for (const e of entries) {
-    const key = e.projectId || '__none__';
-    if (!map.has(key)) map.set(key, { projectId: e.projectId, seconds: 0 });
-    const g = map.get(key);
-    g.seconds += durationSec(e);
-  }
-  return [...map.values()]
-    .map((g) => {
-      const p = projects.find((x) => x.id === g.projectId);
-      return { ...g, name: p ? p.name : '（未分類）', color: p ? p.color : '#9a9898' };
-    })
-    .sort((a, b) => b.seconds - a.seconds);
-}
-
 /* ---------------- 匯出 / 匯入 ---------------- */
 
 export async function exportAll() {

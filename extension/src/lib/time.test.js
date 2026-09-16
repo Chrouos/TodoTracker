@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activeRange,
-  calendarEntryTooltip,
   calendarReviewData,
   clipEntryToRange,
   currentWeekDateRange,
@@ -28,16 +27,6 @@ test('range helpers include and clip overnight work by the selected local window
   const clipped = clipEntryToRange(overnight, dayAfter, nextDay);
   assert.equal(clipped.startedAt, dayAfter.toISOString());
   assert.equal(clipped.endedAt, new Date(2026, 7, 11, 1, 30).toISOString());
-});
-
-test('calendarEntryTooltip includes readable work context', () => {
-  const tooltip = calendarEntryTooltip('API 問題', {
-    startedAt: '2026-08-10T09:00:00+08:00',
-    endedAt: '2026-08-10T10:30:00+08:00',
-    notes: '**回覆** c01\n第二行',
-  }, '客服內部應用');
-
-  assert.equal(tooltip, 'API 問題\n09:00–10:30\n客服內部應用\n回覆 c01 第二行');
 });
 
 test('calendarReviewData maps work to a shared time axis', () => {

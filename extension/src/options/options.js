@@ -10,8 +10,8 @@ import {
   translate,
 } from '../lib/i18n.js';
 import {
-  fmtDate, fmtClock, startOfDay, startOfWeek, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
-  dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
+  fmtDate, fmtClock, startOfDay, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
+  dailyReviewData, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
 import { timelineSVG, stackedAreaSVG, heatmapSVG, lineSVG, donutSVG } from '../lib/charts.js';
@@ -705,36 +705,6 @@ function renderReviewCalendar(groups) {
   </div>`;
 }
 
-function renderReviewCalendarLegacy(groups) {
-  const weekdays = [
-    translateText('schedule.days.sun'), translateText('schedule.days.mon'), translateText('schedule.days.tue'),
-    translateText('schedule.days.wed'), translateText('schedule.days.thu'), translateText('schedule.days.fri'),
-    translateText('schedule.days.sat'),
-  ];
-  const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
-  return `<div class="review-calendar" style="--review-days:${groups.length}">${groups.map((group) => {
-    const day = new Date(`${group.date}T00:00:00`);
-    const total = group.entries.reduce((sum, entry) => sum + db.durationSec(entry), 0);
-    const items = group.entries.length
-      ? group.entries.map((entry) => {
-        const project = S.projects.find((item) => item.id === entry.projectId);
-        const task = S.tasks.find((item) => item.id === entry.taskId);
-        const title = entry.description || task?.title || translateText('common.unnamedWork');
-        return `<div class="review-calendar-entry" style="--project-color:${safeColor(project?.color)}">
-          <div class="review-calendar-time num">${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</div>
-          <div class="review-calendar-title">${esc(project?.name || translateText('common.generalWork'))}</div>
-          <div class="review-calendar-duration num">${fmtHM(db.durationSec(entry))}</div>
-        </div>`;
-      }).join('')
-      : '<div class="review-calendar-empty">—</div>';
-    return `<article class="review-calendar-day">
-      <header><strong>${esc(displayDate(group.date))}</strong><span>${esc(weekdays[day.getDay()])}</span></header>
-      <div class="review-calendar-total num">${fmtHM(total)}</div>
-      <div class="review-calendar-list">${items}</div>
-    </article>`;
-  }).join('')}</div>`;
-}
-
 function renderReviewList(groups) {
   const weekdays = [
     translateText('schedule.days.sun'), translateText('schedule.days.mon'), translateText('schedule.days.tue'),
@@ -1353,8 +1323,8 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
 
 function renderProjectTrend(entries, dates, trackerEntries = entries) {
   const report = $('byProject');
-  const todoTrackerHead = report.querySelector('[data-collapse="rep-todo-tracker"]');
-  const todoTrackerBody = report.querySelector('[data-collapse-body="rep-todo-tracker"]');
+  const todoTrackerMount = report.querySelector('#todoTracker');
+  const todoTrackerDetail = report.querySelector('#todoTrackerDetail');
   const data = buildProjectTrendData({
     entries,
     projects: S.projects,
@@ -1380,8 +1350,8 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
   </div>`;
   const trendDetail = report.querySelector('#projectTrendDetail');
-  if (todoTrackerHead && todoTrackerBody && trendDetail) {
-    trendDetail.before(todoTrackerHead, todoTrackerBody);
+  if (todoTrackerMount && todoTrackerDetail && trendDetail) {
+    trendDetail.before(todoTrackerMount, todoTrackerDetail);
   }
   wrapReportChartContent();
   applyTrendHighlight();

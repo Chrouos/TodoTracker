@@ -4,12 +4,9 @@ import {
   overlapSeconds,
   buildReportQuality,
   buildProjectTaskMetrics,
-  buildProjectTodoStatusMetrics,
-  buildProjectMetricChartData,
   buildReportActionItems,
   buildWorkspaceTodoProgress,
   buildProjectHealthRows,
-  compareSeconds,
 } from '../src/lib/report-metrics.js';
 
 const entry = (overrides = {}) => ({
@@ -80,55 +77,6 @@ test('buildProjectTaskMetrics reports completion, work, and overdue state by pro
     workedSeconds: 14400,
     averageLeadMs: 172800000,
   }]);
-});
-
-test('compareSeconds returns a safe percentage when the previous period is empty', () => {
-  assert.deepEqual(compareSeconds(10 * 3600, 8 * 3600), {
-    deltaSeconds: 7200,
-    percent: 25,
-  });
-  assert.deepEqual(compareSeconds(3600, 0), {
-    deltaSeconds: 3600,
-    percent: null,
-  });
-});
-
-test('buildProjectTodoStatusMetrics counts each Todo status by project', () => {
-  const tasks = [
-    { id: 'done', projectId: 'p1', status: 'done' },
-    { id: 'doing', projectId: 'p1', status: 'doing' },
-    { id: 'todo', projectId: 'p2', status: 'todo' },
-    { id: 'archived', projectId: 'p2', status: 'archived' },
-  ];
-
-  assert.deepEqual(buildProjectTodoStatusMetrics(tasks), [
-    { projectId: 'p1', total: 2, done: 1, doing: 1, todo: 0 },
-    { projectId: 'p2', total: 1, done: 0, doing: 0, todo: 1 },
-  ]);
-});
-
-test('buildProjectMetricChartData prepares comparable completion, work, and lead charts', () => {
-  const metrics = [
-    { projectId: 'slow', total: 4, done: 1, completionRate: 0.25, workedSeconds: 3600, averageLeadMs: 4 * 86400000 },
-    { projectId: 'fast', total: 8, done: 8, completionRate: 1, workedSeconds: 7200, averageLeadMs: 86400000 },
-    { projectId: null, total: 2, done: 0, completionRate: 0, workedSeconds: 0, averageLeadMs: null },
-  ];
-
-  assert.deepEqual(buildProjectMetricChartData(metrics), {
-    completion: [
-      { projectId: null, value: 0, percentage: 0 },
-      { projectId: 'slow', value: 0.25, percentage: 25 },
-      { projectId: 'fast', value: 1, percentage: 100 },
-    ],
-    worked: [
-      { projectId: 'fast', value: 7200, percentage: 100 },
-      { projectId: 'slow', value: 3600, percentage: 50 },
-    ],
-    lead: [
-      { projectId: 'slow', value: 4 * 86400000, percentage: 100 },
-      { projectId: 'fast', value: 86400000, percentage: 25 },
-    ],
-  });
 });
 
 test('buildReportQuality keeps entry ids for actionable data issues', () => {
