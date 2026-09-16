@@ -14,13 +14,13 @@ import {
   dailyReviewData, calendarEntryTooltip, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
-import { timelineSVG, stackedAreaSVG, heatmapSVG, lineSVG } from '../lib/charts.js';
+import { timelineSVG, stackedAreaSVG, heatmapSVG, lineSVG, donutSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { autoGrow } from '../lib/autogrow.js';
 import { createToast } from '../lib/toast.js';
-import { compareTodoTasks, dueTodoAlerts, flattenTodoTree, taskMetrics, entriesForTask, todoHealth, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
+import { compareTodoTasks, dueTodoAlerts, flattenTodoTree, taskMetrics, entriesForTask, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
 import {
   TODO_PRIORITIES, TODO_STATUSES, filterTasks, normalizePriority, normalizeStatus,
@@ -197,7 +197,7 @@ let timerNotesSaveTimer = null;
 let timerCompleteChoice = false;
 let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
 let timerNotesPreviewOpen = false;
-let reviewCalendarHoveredTarget = null;
+let reviewCalendarSelectedTarget = null;
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, timer, settings] = await Promise.all([
@@ -481,7 +481,6 @@ function groupReportPanels() {
   const report = $('p-report');
   if (report.querySelector('.report-panel')) return;
   [
-    ['rep-health', 'todoHealth', 'report-panel-health'],
     ['rep-donut', 'byProject', 'report-panel-donut'],
     ['rep-review', 'dailyReview', 'report-panel-review'],
   ].forEach(([collapseId, bodyId, className]) => {
@@ -562,7 +561,6 @@ function renderReport() {
   $('kAvg').textContent = rows.length ? fmtHM(sec / rows.length) : '—';
   $('kDays').textContent = dayKeys.size;
   renderDueAlerts();
-  renderTodoHealth();
   renderReportInsights(rows, from, to);
 
   // 融合專案分配與每日趨勢：區間太短就往前補，才看得出趨勢
@@ -591,7 +589,7 @@ function renderReport() {
   // 時間軸：太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
   const reviewDates = range === 'week' && !customBounds
-    ? dailySeries([], lineFrom, new Date(lineFrom.getTime() + 6 * 864e5), () => 0).map((d) => d.date)
+    ? dailySeries([], lineFrom, lineTo, () => 0).map((d) => d.date)
     : tlDates;
   $('reviewLabel').textContent = tlDates.length
     ? `· ${tlDates[0]} ～ ${tlDates[tlDates.length - 1]}`
@@ -628,7 +626,7 @@ function renderDailyReview(groups) {
 }
 
 function hideReviewCalendarTooltip() {
-  reviewCalendarHoveredTarget = null;
+  reviewCalendarSelectedTarget = null;
   const tooltip = $('reviewCalendarHoverTooltip');
   if (!tooltip) return;
   tooltip.hidden = true;
@@ -638,7 +636,7 @@ function hideReviewCalendarTooltip() {
 function showReviewCalendarTooltip(target) {
   const tooltip = $('reviewCalendarHoverTooltip');
   if (!tooltip || !target) return;
-  reviewCalendarHoveredTarget = target;
+  reviewCalendarSelectedTarget = target;
   const notePreview = target.dataset.reviewNotes
     ? renderMarkdownPreview(target.dataset.reviewNotes, 'review-calendar-tooltip-notes')
     : '';
@@ -663,7 +661,7 @@ function showReviewCalendarTooltip(target) {
 }
 
 function repositionReviewCalendarTooltip() {
-  if (reviewCalendarHoveredTarget?.isConnected) showReviewCalendarTooltip(reviewCalendarHoveredTarget);
+  if (reviewCalendarSelectedTarget?.isConnected) showReviewCalendarTooltip(reviewCalendarSelectedTarget);
 }
 
 function renderReviewCalendar(groups) {
@@ -692,10 +690,10 @@ function renderReviewCalendar(groups) {
       const task = S.tasks.find((taskItem) => taskItem.id === entry.taskId);
       const title = entry.description || task?.title || translateText('common.unnamedWork');
       const projectName = project?.name || translateText('common.generalWork');
-      const tooltip = calendarEntryTooltip(title, entry, projectName);
       const top = ((item.start - calendar.axis.from) / span) * 100;
       const height = Math.max(4, ((item.end - item.start) / span) * 100);
-      return `<div class="review-calendar-entry" tabindex="0" title="${esc(tooltip)}" aria-label="${esc(tooltip)}" aria-describedby="reviewCalendarHoverTooltip" data-review-title="${esc(title)}" data-review-start="${esc(fmtClock(entry.startedAt))}" data-review-end="${esc(fmtClock(entry.endedAt))}" data-review-project="${esc(projectName)}" data-review-notes="${esc(entry.notes || '')}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
+      const entryLabel = `${projectName} ${title} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}`;
+      return `<div class="review-calendar-entry" tabindex="0" aria-label="${esc(entryLabel)}" data-review-title="${esc(title)}" data-review-start="${esc(fmtClock(entry.startedAt))}" data-review-end="${esc(fmtClock(entry.endedAt))}" data-review-project="${esc(projectName)}" data-review-notes="${esc(entry.notes || '')}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
         <span class="review-calendar-title">${esc(projectName)}</span>
       </div>`;
     }).join('');
@@ -812,40 +810,13 @@ function renderDueAlerts() {
   </section>`;
 }
 
-function renderTodoHealth() {
-  const health = todoHealth(S.tasks);
-  const completionRate = health.total ? `${Math.round(health.completionRate * 100)}%` : '—';
-  const completedLabel = translate(currentLocale, 'report.completed');
-  const activeLabel = translate(currentLocale, 'report.inProgress');
-  const overdueLabel = translate(currentLocale, 'report.overdue');
-
-  $('todoHealth').innerHTML = `<div class="todo-health">
-    <div class="todo-health-item">
-      <span class="cap">${translateText('report.todoTotal')}</span>
-      <span class="num">${health.total}</span>
-    </div>
-    <div class="todo-health-item todo-health-complete">
-      <span class="cap">${completedLabel}</span>
-      <span class="num">${health.done}<small>${completionRate}</small></span>
-    </div>
-    <div class="todo-health-item">
-      <span class="cap">${activeLabel}</span>
-      <span class="num">${health.active}</span>
-    </div>
-    <div class="todo-health-item todo-health-overdue">
-      <span class="cap">${overdueLabel}</span>
-      <span class="num">${health.overdue}</span>
-    </div>
-  </div>`;
-}
-
 /* ---------------- 專案趨勢（完整資料 + highlight） ---------------- */
 
 let highlightProjectId = null;
 
 let projectTrendState = null;
 let projectTrendSource = null;
-let reportChartCollapsed = new Set(['trend', 'heatmap', 'tracker']);
+let reportChartCollapsed = new Set(['trend', 'heatmap']);
 let todoTrackerState = null;
 let todoTrackerSource = null;
 let todoTrackerSelectedId = null;
@@ -1038,12 +1009,19 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
       : ids.map((id) => S.tasks.find((task) => task.id === id)).filter(Boolean).slice(0, 2).map((task) =>
         `<button type="button" class="report-action-detail" data-report-task-id="${esc(task.id)}">${esc(task.title)} · ${translateText('todo.dueDate')} ${esc(task.dueDate || translateText('common.notSet'))}</button>`
       ).join('');
-    const matchingCount = target.type === 'entry'
+  const matchingCount = target.type === 'entry'
       ? rows.filter((entry) => ids.includes(entry.id)).length
       : ids.filter((id) => S.tasks.some((task) => task.id === id)).length;
     const rest = matchingCount - Math.min(2, matchingCount);
     return details + (rest > 0 ? `<div>${translateText('report.moreCount', { count: rest })}</div>` : '');
   };
+  const todoStatusCounts = S.tasks.reduce((summary, task) => {
+    if (task.status === 'archived') return summary;
+    if (task.status === 'done') summary.done += 1;
+    else if (task.status === 'doing') summary.doing += 1;
+    else summary.todo += 1;
+    return summary;
+  }, { done: 0, doing: 0, todo: 0 });
   const statusItem = actionItems[0];
   const allTodosDone = statusItem.kind === 'clear'
     && todoProgress.total > 0
@@ -1054,13 +1032,26 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
       ? translateText('report.statusGood')
     : statusItem.tone === 'danger' ? translateText('report.needsWork') : translateText('report.needsOrganizing');
   const statusDetail = statusItem.kind === 'clear'
-    ? todoProgress.total > 0
-      ? translateText('report.todoProgress', todoProgress)
-      : translateText('report.noIssues')
-    : [
-      todoProgress.total > 0 ? translateText('report.todoProgress', todoProgress) : '',
-      translateText('report.topPriority', { label: translateText(actionLabels[statusItem.kind]) }),
-    ].filter(Boolean).join(' · ');
+    ? translateText('report.noIssues')
+    : translateText('report.topPriority', { label: translateText(actionLabels[statusItem.kind]) });
+  const todoSegments = [
+    { label: translate(currentLocale, 'report.completed'), value: todoProgress.done, color: '#22c55e' },
+    { label: translateText('report.inProgress'), value: todoStatusCounts.doing, color: '#60a5fa' },
+    { label: translateText('todo.status.todo'), value: todoStatusCounts.todo, color: '#d6d3d1' },
+  ];
+  const completionRate = todoProgress.total
+    ? `${Math.round((todoProgress.done / todoProgress.total) * 100)}%`
+    : '—';
+  const todoDonut = donutSVG(todoSegments, currentLocale, {
+    centerValue: completionRate,
+    centerLabel: translateText('report.completionRate'),
+  });
+  const statusMetrics = [
+    { label: translate(currentLocale, 'report.completed'), value: `${todoProgress.done} / ${todoProgress.total}`, tone: 'success' },
+    { label: translateText('report.inProgress'), value: todoStatusCounts.doing, tone: 'info' },
+    { label: translateText('todo.status.todo'), value: todoStatusCounts.todo, tone: 'muted' },
+    { label: translateText('report.overdue'), value: quality.overdueTodoCount, tone: quality.overdueTodoCount ? 'danger' : 'muted' },
+  ].map((item) => `<div class="report-status-metric report-status-metric-${item.tone}"><span>${esc(item.label)}</span><strong class="num">${esc(item.value)}</strong></div>`).join('');
   const actionMarkup = actionItems.map((item) => `
     <div class="report-action report-action-${item.tone}">
       <span class="report-action-label">${esc(translateText(actionLabels[item.kind]))}</span>
@@ -1068,14 +1059,25 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
       <span class="report-action-hint">${item.kind === 'clear' ? translateText('report.canContinue') : translateText('report.organize')}</span>
       ${actionDetails(item) ? `<div class="report-action-details">${actionDetails(item)}</div>` : ''}
     </div>`).join('');
+  const attentionMarkup = statusItem.kind === 'clear' ? '' : `
+  <section class="report-attention" aria-label="${esc(translateText('report.attention'))}">
+    <div class="report-section-heading"><strong>${translateText('report.attention')}</strong><span class="cap">${translateText('report.attentionHint')}</span></div>
+    <div class="report-action-grid">${actionMarkup}</div>
+  </section>`;
   const projectMarkup = healthRows.length
     ? healthRows.map((row) => {
       const label = projectLabel(row.projectId);
+      const project = row.projectId && S.projects.find((item) => item.id === row.projectId);
+      const projectColor = /^#[0-9a-f]{6}$/i.test(project?.color || '') ? project.color : '#9a9898';
       const percentage = Math.round(Math.max(0, Math.min(1, row.completionRate)) * 100);
+      const progressTooltip = `Todo ${row.done} / ${row.total} · ${translateText('report.completionRate')} ${percentage}% · ${translateText('report.overdue')} ${row.overdue}`;
       return `<div class="report-project-row">
-        <div class="report-project-name" title="${esc(label)}">${esc(label)}</div>
+        <div class="report-project-name">
+          <span class="report-project-color" style="--project-color:${projectColor}" aria-hidden="true"></span>
+          <span class="report-project-name-text" title="${esc(label)}">${esc(label)}</span>
+        </div>
         <span class="report-project-status report-project-status-${row.tone}">${esc(translateText(statusLabels[row.status] || 'report.projectStatus.inProgress'))}</span>
-        <div class="report-project-progress">
+        <div class="report-project-progress" tabindex="0" role="img" aria-label="${esc(progressTooltip)}" data-report-project-tooltip="${esc(progressTooltip)}">
           <span class="report-project-track"><span style="--bar-width:${percentage}%"></span></span>
           <span class="report-project-count num">${row.done} / ${row.total}</span>
         </div>
@@ -1083,39 +1085,25 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
       </div>`;
     }).join('')
     : `<div class="report-empty">${translateText('report.noTodoPerformance')}</div>`;
-  const metricRows = metrics.slice(0, 8).map((metric) => {
-    const project = metric.projectId && S.projects.find((item) => item.id === metric.projectId);
-    return `<tr>
-      <td>${esc(project ? pathOf(S.projects, project.id).join(' / ') : translateText('todo.unclassified'))}</td>
-      <td>${metric.done} / ${metric.total}</td>
-      <td>${Math.round(metric.completionRate * 100)}%</td>
-      <td class="${metric.overdue ? 'report-warning-text' : ''}">${metric.overdue}</td>
-      <td>${fmtHM(metric.workedSeconds)}</td>
-      <td>${metric.averageLeadMs === null ? '—' : fmtHM(metric.averageLeadMs / 1000)}</td>
-    </tr>`;
-  }).join('');
   mount.innerHTML = `<div class="report-status">
-    <div>
-    <span class="cap">${translateText('report.workspaceStatus')}</span>
-      <strong class="report-status-label report-status-${statusItem.tone}">${statusLabel}</strong>
+    <div class="report-status-overview">
+      <div class="report-status-donut">${todoDonut}</div>
+      <div class="report-status-copy">
+        <span class="cap">${translateText('report.workspaceStatus')}</span>
+        <strong class="report-status-label report-status-${statusItem.tone}">${statusLabel}</strong>
+      </div>
     </div>
-    <span class="report-status-detail">${statusDetail}</span>
+    <div class="report-status-side">
+      <span class="report-status-detail">${statusDetail}</span>
+      <div class="report-status-metrics" aria-label="${esc(translateText('report.todoHealth'))}">${statusMetrics}</div>
+    </div>
   </div>
-  <section class="report-attention" aria-label="${esc(translateText('report.attention'))}">
-    <div class="report-section-heading"><strong>${translateText('report.attention')}</strong><span class="cap">${translateText('report.attentionHint')}</span></div>
-    <div class="report-action-grid">${actionMarkup}</div>
-  </section>
+  ${attentionMarkup}
   <section class="report-projects" aria-label="${esc(translateText('report.projectStatus'))}">
     <div class="report-section-heading"><strong>${translateText('report.projectStatus')}</strong><span class="cap">${translateText('report.projectStatusHint')}</span></div>
     <div class="report-project-list">${projectMarkup}</div>
   </section>
-  <details class="report-details-collapse">
-    <summary><span class="mark">[+]</span><span>${translateText('report.viewFull')}</span></summary>
-    <div class="report-metrics-table-wrap">
-      <table class="report-metrics-table"><thead><tr><th>${translateText('project.project')}</th><th>Todo</th><th>${translateText('report.completionRate')}</th><th>${translateText('report.overdue')}</th><th>${translateText('report.actualWork')}</th><th>${translateText('report.averageCycle')}</th></tr></thead>
-      <tbody>${metricRows || `<tr><td colspan="6" class="mute">${translateText('report.noTodoPerformance')}</td></tr>`}</tbody></table>
-    </div>
-  </details>`;
+  `;
 }
 
 function todoTrackerColor(project) {
@@ -1506,36 +1494,27 @@ $('byProject').addEventListener('focusout', (e) => {
 window.addEventListener('resize', repositionTodoTrackerTooltip);
 window.addEventListener('scroll', repositionTodoTrackerTooltip, true);
 
-$('dailyReview').addEventListener('pointerover', (e) => {
+$('dailyReview').addEventListener('click', (e) => {
   const target = e.target.closest('[data-review-title]');
-  if (!target || e.relatedTarget && target.contains(e.relatedTarget)) return;
-  showReviewCalendarTooltip(target);
-});
-
-$('dailyReview').addEventListener('pointerout', (e) => {
-  const target = e.target.closest('[data-review-title]');
-  if (!target) return;
-  const next = e.relatedTarget?.closest?.('[data-review-title]');
-  if (next) {
-    showReviewCalendarTooltip(next);
+  if (!target) {
+    hideReviewCalendarTooltip();
     return;
   }
-  hideReviewCalendarTooltip();
+  if (target === reviewCalendarSelectedTarget) hideReviewCalendarTooltip();
+  else showReviewCalendarTooltip(target);
 });
 
-$('dailyReview').addEventListener('focusin', (e) => {
-  const target = e.target.closest('[data-review-title]');
-  if (target) showReviewCalendarTooltip(target);
-});
-
-$('dailyReview').addEventListener('focusout', (e) => {
+$('dailyReview').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
   const target = e.target.closest('[data-review-title]');
   if (!target) return;
-  const next = e.relatedTarget?.closest?.('[data-review-title]');
-  if (next) {
-    showReviewCalendarTooltip(next);
-    return;
-  }
+  e.preventDefault();
+  if (target === reviewCalendarSelectedTarget) hideReviewCalendarTooltip();
+  else showReviewCalendarTooltip(target);
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-review-title]') || e.target.closest('#reviewCalendarHoverTooltip')) return;
   hideReviewCalendarTooltip();
 });
 

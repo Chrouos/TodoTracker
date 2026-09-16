@@ -81,8 +81,9 @@ function trendY(seconds, maxSeconds, top, height) {
   return top + (1 - (maxSeconds ? seconds / maxSeconds : 0)) * height;
 }
 
-function trendColor(level) {
-  return ['#fafafa', '#dfeef5', '#9ccde5', '#5fb5dc', '#2d8fbe'][level];
+function compactDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.floor(Number(seconds) / 60));
+  return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, '0')}m`;
 }
 
 /** 每日工時折線圖：保留日期順序，適合快速看出工作量的起伏。 */
@@ -122,6 +123,36 @@ export function lineSVG(data, locale = 'zh-TW') {
 
   return `<svg class="workspace-process-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${Math.min(W, Math.max(420, dates.length * 56))}px" role="img" aria-label="${esc(translate(locale, 'project.process'))}">
     ${grid}<polyline points="${points}" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${circles}${zones}${labels}
+  </svg>`;
+}
+
+export function donutSVG(segments, locale = 'zh-TW', { centerValue = '', centerLabel = '', selectedStatus = '' } = {}) {
+  const visible = (segments || []).filter((segment) => Number(segment?.value) > 0);
+  const total = visible.reduce((sum, segment) => sum + Number(segment.value), 0);
+  const W = 180, H = 180, cx = 90, cy = 90, radius = 58;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+  const rings = visible.map((segment) => {
+    const value = Number(segment.value);
+    const length = circumference * value / total;
+    const status = segment.id || segment.status || '';
+    const classes = ['todo-health-donut-segment'];
+    if (selectedStatus && status && selectedStatus !== status) classes.push('is-dimmed');
+    if (selectedStatus && selectedStatus === status) classes.push('is-selected');
+    const controls = status
+      ? ` data-todo-health-status="${esc(status)}" tabindex="0" role="button" aria-pressed="${String(selectedStatus === status)}"`
+      : '';
+    const ring = `<circle class="todo-health-donut-segment" cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${esc(segment.color || '#9a9898')}" stroke-width="20" stroke-dasharray="${length.toFixed(2)} ${(circumference - length).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"><title>${esc(segment.label)} · ${value}</title></circle>`;
+    offset += length;
+    return ring.replace('class="todo-health-donut-segment"', `class="${classes.join(' ')}"${controls}`);
+  }).join('');
+  const value = centerValue || (total ? String(total) : '0');
+  const label = centerLabel || translate(locale, 'report.todoTotal');
+  return `<svg class="todo-health-donut-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
+    <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="var(--surface-card)" stroke-width="20"></circle>
+    ${rings}
+    <text x="${cx}" y="${cy - 2}" text-anchor="middle" class="todo-health-donut-value">${esc(value)}</text>
+    <text x="${cx}" y="${cy + 18}" text-anchor="middle" class="todo-health-donut-label">${esc(label)}</text>
   </svg>`;
 }
 
@@ -192,9 +223,10 @@ export function heatmapSVG(data, locale = 'zh-TW') {
       const level = value === 0 ? 0 : Math.min(4, Math.max(1, Math.ceil((value / maxCell) * 4)));
       const total = data.dailyTotals[index] || 0;
       const pct = total ? Math.round((value / total) * 100) : 0;
+      const opacity = value ? (0.2 + level * 0.16).toFixed(2) : '1';
       return `<g class="heatmap-cell" data-project-id="${esc(series.id)}" data-trend-date="${esc(date)}" tabindex="0">
-        <rect x="${x(index) + 2}" y="${y + 2}" width="${colW - 4}" height="${rowH - 4}" rx="2" fill="${trendColor(level)}"></rect>
-        <text x="${x(index) + colW / 2}" y="${y + 21}" text-anchor="middle" class="heatmap-cell-text">${value ? esc(formatDuration(value, locale)) : '—'}</text>
+        <rect x="${x(index) + 3}" y="${y + 3}" width="${colW - 6}" height="${rowH - 6}" rx="4" fill="${value ? esc(series.color) : 'var(--surface-soft)'}" style="--heatmap-opacity:${opacity}"></rect>
+        <text x="${x(index) + colW / 2}" y="${y + 21}" text-anchor="middle" class="heatmap-cell-text">${value ? esc(compactDuration(value)) : '—'}</text>
         <title>${esc(date)} · ${esc(series.name)} · ${esc(formatDuration(value, locale))} · ${pct}%</title>
       </g>`;
     }).join('');

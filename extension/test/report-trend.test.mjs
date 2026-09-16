@@ -3,7 +3,7 @@ import {
   buildProjectTrendData,
   buildProjectDetailData,
 } from '../src/lib/project-trend.js';
-import { heatmapSVG, lineSVG, stackedAreaSVG } from '../src/lib/charts.js';
+import { donutSVG, heatmapSVG, lineSVG, stackedAreaSVG } from '../src/lib/charts.js';
 
 const projects = [
   { id: 'project-a', parentId: null, name: '專案 A', color: '#61b5dc' },
@@ -52,6 +52,12 @@ assert.equal(detail.tasksTotal, 2);
 const stacked = stackedAreaSVG(data);
 const heatmap = heatmapSVG(data);
 const line = lineSVG({ dates: data.dates, values: data.dailyTotals });
+const donut = donutSVG([
+  { label: '已完成', value: 3, color: '#22c55e' },
+  { label: '進行中', value: 2, color: '#60a5fa' },
+  { label: '待辦', value: 1, color: '#d6d3d1' },
+]);
+const interactiveDonut = donutSVG([{ id: 'done', label: 'Done', value: 1, color: '#22c55e' }]);
 assert.match(stacked, /role="img"/);
 assert.match(stacked, /data-trend-date="2026-08-10"/);
 assert.match(stacked, /<title>/);
@@ -63,11 +69,19 @@ assert.match(heatmap, /role="img"/);
 assert.match(heatmap, /data-trend-date="2026-08-11"/);
 assert.match(heatmap, /data-project-id="project-a"/);
 assert.match(heatmap, /專案 A/);
+assert.match(heatmap, />3h 00m</, 'Heatmap cell labels should use a compact duration format');
+assert.doesNotMatch(heatmap, /class="heatmap-cell-text"[^>]*>[^<]*(?:小時|分)/, 'Heatmap cell labels should not overflow with the full duration format');
 assert.match(line, /class="workspace-process-svg"/);
 assert.match(line, /<polyline[^>]+stroke="var\(--ink\)"/);
 assert.match(line, /data-process-date="2026-08-10"/);
 assert.match(line, /<circle[^>]+data-process-date="2026-08-11"/);
 assert.match(line, /<title>/);
+assert.match(donut, /class="todo-health-donut-svg"/);
+assert.match(donut, /stroke-dasharray=/);
+assert.match(donut, /已完成/);
+assert.match(donut, /role="img"/);
+assert.match(interactiveDonut, /data-todo-health-status="done"/);
+assert.match(interactiveDonut, /tabindex="0"/);
 
 const empty = buildProjectTrendData({
   entries: [], projects, dates: [], durationSec: () => 0,

@@ -189,6 +189,31 @@ export function buildProjectTaskMetrics(tasks, entries, today) {
     .sort((a, b) => b.workedSeconds - a.workedSeconds || b.total - a.total);
 }
 
+export function buildProjectTodoStatusMetrics(tasks) {
+  const byProject = new Map();
+  const ensure = (projectId) => {
+    if (!byProject.has(projectId)) byProject.set(projectId, {
+      projectId,
+      total: 0,
+      done: 0,
+      doing: 0,
+      todo: 0,
+    });
+    return byProject.get(projectId);
+  };
+
+  for (const task of tasks || []) {
+    if (task.status === 'archived') continue;
+    const row = ensure(task.projectId || null);
+    row.total += 1;
+    if (task.status === 'done') row.done += 1;
+    else if (task.status === 'doing') row.doing += 1;
+    else row.todo += 1;
+  }
+
+  return [...byProject.values()];
+}
+
 function chartRows(metrics, valueKey, sortDirection = 'desc', limit = 8) {
   const rows = metrics
     .filter((metric) => Number.isFinite(metric[valueKey]) && metric[valueKey] > 0)

@@ -4,6 +4,7 @@ import {
   overlapSeconds,
   buildReportQuality,
   buildProjectTaskMetrics,
+  buildProjectTodoStatusMetrics,
   buildProjectMetricChartData,
   buildReportActionItems,
   buildWorkspaceTodoProgress,
@@ -90,6 +91,20 @@ test('compareSeconds returns a safe percentage when the previous period is empty
     deltaSeconds: 3600,
     percent: null,
   });
+});
+
+test('buildProjectTodoStatusMetrics counts each Todo status by project', () => {
+  const tasks = [
+    { id: 'done', projectId: 'p1', status: 'done' },
+    { id: 'doing', projectId: 'p1', status: 'doing' },
+    { id: 'todo', projectId: 'p2', status: 'todo' },
+    { id: 'archived', projectId: 'p2', status: 'archived' },
+  ];
+
+  assert.deepEqual(buildProjectTodoStatusMetrics(tasks), [
+    { projectId: 'p1', total: 2, done: 1, doing: 1, todo: 0 },
+    { projectId: 'p2', total: 1, done: 0, doing: 0, todo: 1 },
+  ]);
 });
 
 test('buildProjectMetricChartData prepares comparable completion, work, and lead charts', () => {

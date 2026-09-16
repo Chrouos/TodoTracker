@@ -38,9 +38,7 @@ export function trendDateBounds(range, now = new Date(), weekStartsOn = 1) {
 
   if (range === 'week') {
     const from = startOfWeek(today, weekStartsOn);
-    const to = new Date(from);
-    to.setDate(to.getDate() + 6);
-    return { from, to };
+    return { from, to: today };
   }
 
   throw new Error(`Unsupported trend range: ${range}`);

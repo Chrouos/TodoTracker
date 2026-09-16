@@ -25,10 +25,10 @@ test('today trend bounds include today and the five preceding dates', () => {
   });
 });
 
-test('week trend bounds cover Monday through Sunday', () => {
-  const now = new Date(2026, 7, 17);
+test('week trend bounds stop at today instead of showing future dates', () => {
+  const now = new Date(2026, 7, 19);
   assert.deepEqual(formatBounds(trendDateBounds('week', now, 1)), {
-    from: '2026-08-17', to: '2026-08-23',
+    from: '2026-08-17', to: '2026-08-19',
   });
 });
 

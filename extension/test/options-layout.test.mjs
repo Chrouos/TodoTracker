@@ -134,10 +134,9 @@ assert.match(html, /id="reportInsights"/, 'Report should expose data quality and
 assert.match(html, /data-collapse="rep-insights"/, 'Workspace status should have its own collapsible heading');
 assert.match(html, /data-collapse-body="rep-insights"/, 'Workspace status should have a collapsible body');
 assert.match(html, /data-collapse="rep-insights"[^>]*data-collapse-default="closed"/, 'Workspace status should default to collapsed');
-assert.match(html, /data-collapse="rep-health"[^>]*data-collapse-default="closed"/, 'Todo health should default to collapsed');
 assert.match(html, /data-collapse="rep-donut"[^>]*data-collapse-default="closed"/, 'Project analytics should default to collapsed');
 assert.doesNotMatch(html, /data-collapse="rep-review"[^>]*data-collapse-default="closed"/, 'Daily review should remain open by default');
-assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-health"[\s\S]*data-collapse="rep-review"[\s\S]*data-collapse="rep-donut"/, 'Report panels should put the important sections first');
+assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-review"[\s\S]*data-collapse="rep-donut"/, 'Report panels should put the important sections first');
 assert.match(html, /data-collapse="rep-todo-tracker"[\s\S]*data-collapse-default="closed"/, 'Todo Tracker should default to collapsed');
 assert.match(html, /data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should have a collapsible body');
 assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
@@ -157,7 +156,17 @@ assert.match(options, /dueTodoAlerts/, 'Report should derive a compact list of u
 assert.match(options, /data-report-task-id/, 'Due Todo alerts should link directly to Todo items');
 assert.match(options, /if \(!visible\.length\) \{\s*mount\.innerHTML = '';/, 'Report should hide the due alert region when there is nothing to remind');
 assert.match(options, /buildWorkspaceTodoProgress/, 'Workspace status should derive its Todo completion progress');
-assert.match(options, /report\.todoProgress/, 'Workspace status should show Todo completion progress');
+assert.match(options, /report-status-metrics/, 'Workspace status should show compact Todo completion metrics');
+assert.match(options, /donutSVG\(/, 'Workspace status should retain a compact Todo status donut');
+assert.match(options, /report-status-donut/, 'Workspace status should mount the compact Todo status donut');
+assert.doesNotMatch(html, /id="todoHealth"|data-collapse="rep-health"/, 'Report should not render a separate Todo health section');
+assert.doesNotMatch(options, /renderTodoHealth\(|todoHealthSelectedStatus/, 'Todo health should not render as a separate chart');
+assert.match(options, /report-status-metrics/, 'Workspace status should contain the compact Todo summary');
+assert.match(css, /\.report-status-metrics\s*\{/, 'Compact Todo summary should have a dedicated layout style');
+assert.match(css, /\.report-status-donut\s*\{[^}]*flex:\s*0\s+0\s+128px/s, 'Todo donut should be large enough to read');
+assert.match(css, /\.report-status-donut \.todo-health-donut-svg\s*\{[^}]*width:\s*128px[^}]*height:\s*128px/s, 'Todo donut SVG should use the larger size');
+assert.match(css, /#p-report > h2\.sec,\s*#p-report > \.report-panel > h2\.sec\s*\{/, 'Report section headings should share one typography rule');
+assert.match(css, /\.project-heatmap-svg \.heatmap-cell rect\s*\{[^}]*fill-opacity:/s, 'Heatmap cells should use a readable translucent project color');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
   'Report navigation should expose one way to clear a stale focused target');
 assert.match(options, /function selectTab\(name, preserveFocus = false\)/,
@@ -192,25 +201,30 @@ assert.match(options, /reportActionTarget/, 'Report action items should expose n
 assert.match(options, /data-report-entry-id/, 'Report should expose a direct target for work records');
 assert.match(options, /data-report-task-id/, 'Report should expose a direct target for Todo items');
 assert.match(options, /translateText\('report\.attention'\)/, 'Report should show actionable attention items');
+assert.match(options, /const attentionMarkup = statusItem\.kind === 'clear'/, 'Report should hide the attention section when there are no actionable items');
 assert.match(options, /translateText\('report\.projectStatus'\)/, 'Report should show a scannable project status list');
-assert.match(options, /translateText\('report\.viewFull'\)/, 'Report should keep detailed project metrics behind an expandable section');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /createReportChartSection/, 'Report charts should be wrapped in independent collapse sections');
 assert.match(options, /dataset\.reportChart = id/, 'Report chart sections should expose a collapse identity');
 assert.match(options, /wrapReportChartContent/, 'Report charts should be grouped after rendering');
 assert.match(options, /reportChartCollapsed/, 'Report chart collapse state should be tracked');
-assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap', 'tracker'\]\)/, 'Report chart sections should default to collapsed');
+assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap'\]\)/, 'Todo Tracker should be visible when the project report is opened');
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
 assert.match(css, /\.report-due-alerts\s*\{/, 'Report due alerts should have a dedicated compact style');
 assert.match(css, /\.report-due-alerts\s*\{[^}]*border:\s*0;[^}]*border-left:\s*3px\s+solid/s, 'Due alerts should use a single accent edge instead of a nested frame');
 assert.match(css, /\.report-due-alert\s*\{[^}]*border:\s*0;[^}]*border-top:\s*1px\s+solid/s, 'Due alert rows should use separators instead of individual boxes');
 assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
+assert.match(options, /data-report-project-tooltip/, 'Project progress bars should expose Todo summary tooltips');
+assert.match(options, /class="report-project-color"/, 'Project status rows should expose a project color marker');
+assert.match(css, /\.report-project-progress::after\s*\{/, 'Project progress bars should render a hover summary');
+assert.match(css, /\.report-project-color\s*\{/, 'Project status rows should style the project color marker');
 assert.match(css, /\.report-project-work\s*\{[^}]*white-space:\s*nowrap/s,
   'Project status work durations should stay on one line');
 assert.match(css, /\.kpi \.num\s*\{[^}]*white-space:\s*nowrap/s,
   'Report KPI durations should stay on one line');
-assert.match(css, /\.report-details-collapse\s*>\s*summary/, 'Detailed project metrics should be expandable');
+assert.doesNotMatch(options, /const metricRows\s*=|report-details-collapse|report\.averageCycle/, 'Report should not render the duplicate full project report');
+assert.doesNotMatch(css, /\.report-details-collapse\s*>\s*summary/, 'Report should not keep the duplicate full project report styles');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/s,
   'Report action cards should remain compact on narrow screens');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-project-row\s*\{[^}]*grid-template-columns:/s,
@@ -242,10 +256,16 @@ assert.match(css, /\.review-calendar\s*\{[^}]*max-height:\s*min\(72vh,\s*640px\)
   'Calendar should cap its viewport height');
 assert.match(css, /\.review-calendar-tooltip\[hidden\]\s*\{[^}]*display:\s*none/s,
   'Hidden calendar tooltips should not expand the scroll range');
-assert.match(options, /reviewCalendarHoverTooltip/, 'Calendar should use one shared hover tooltip');
+assert.match(options, /reviewCalendarHoverTooltip/, 'Calendar should use one shared click preview');
 assert.match(html, /id="reviewCalendarHoverTooltip"[^>]*role="tooltip"/, 'Calendar tooltip should live outside the scrollable grid');
-assert.match(options, /showReviewCalendarTooltip/, 'Calendar hover should position the shared tooltip');
-assert.match(options, /repositionReviewCalendarTooltip/, 'Calendar tooltip should reposition while the viewport moves');
+assert.match(options, /dailyReview'\)\.addEventListener\('click'/, 'Calendar preview should open from a click');
+assert.match(options, /dailyReview'\)\.addEventListener\('keydown'/, 'Calendar preview should support keyboard activation');
+assert.match(options, /reviewCalendarSelectedTarget/, 'Calendar preview should keep the selected entry stable');
+assert.match(options, /showReviewCalendarTooltip/, 'Calendar click should position the shared preview');
+assert.match(options, /repositionReviewCalendarTooltip/, 'Calendar preview should reposition while the viewport moves');
+assert.doesNotMatch(options, /dailyReview'\)\.addEventListener\('pointerover'/, 'Calendar preview should not depend on hover');
+assert.doesNotMatch(options, /dailyReview'\)\.addEventListener\('pointerout'/, 'Calendar preview should not close when the pointer leaves an entry');
+assert.doesNotMatch(options, /class="review-calendar-entry"[^>]*\stitle=/, 'Calendar entries should not create a second native title preview');
 assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*position:\s*fixed/s,
   'Calendar tooltip should escape the scrollable calendar');
 assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*pointer-events:\s*none/s,

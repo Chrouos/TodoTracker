@@ -492,11 +492,13 @@ section[hidden] { display: none; }
 }
 #p-report > .kpis .kpi { min-height: 92px; justify-content: center; padding: 18px 20px; }
 #p-report > .kpis .kpi .num { font-size: 30px; line-height: 1.1; letter-spacing: -.4px; }
-#p-report > h2.sec {
-  margin: 24px 0 10px;
-  padding: 0 2px;
-  border: 0;
-  font-size: 15px;
+#p-report > h2.sec,
+#p-report > .report-panel > h2.sec {
+    margin: 24px 0 10px;
+    padding: 0 2px;
+    border: 0;
+    font-size: 15px;
+    line-height: 1.45;
 }
 #p-report > h2.sec .mark { color: var(--text-mute); font-weight: 400; }
 #p-report > #byProject,
@@ -741,39 +743,6 @@ section[hidden] { display: none; }
 }
 .review-calendar-tooltip { overflow-wrap: anywhere; word-break: break-word; }
 
-.todo-health {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  background: var(--canvas, #fff);
-  box-shadow: 0 3px 12px rgba(24, 24, 24, .035);
-  overflow: hidden;
-}
-.todo-health-item {
-  min-height: 88px;
-  padding: 16px 18px;
-  border-right: 1px solid var(--hairline);
-}
-.todo-health-item:last-child { border-right: 0; }
-.todo-health-item .cap { display: block; line-height: 1.5; }
-.todo-health-item .num {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.todo-health-item small {
-  color: var(--text-mute);
-  font-size: 12px;
-  font-weight: 500;
-}
-.todo-health-complete .num small { color: var(--success); }
-.todo-health-overdue .num { color: var(--danger); }
-
 .project-trend-wrap { padding: 18px 20px 22px; }
 .report-chart-collapse { border-top: 1px solid var(--hairline); }
 .report-chart-collapse:first-child { border-top: 0; }
@@ -809,7 +778,9 @@ section[hidden] { display: none; }
 .project-heatmap-svg .heatmap-cell.is-project-hovered rect { stroke: var(--ink); stroke-width: 2; }
 .project-heatmap-scroll { overflow-x: auto; border-top: 1px solid var(--hairline); padding-top: 12px; }
 .project-heatmap-svg .heatmap-cell { cursor: pointer; outline: none; }
-.project-heatmap-svg .heatmap-cell.is-hovered rect { stroke: var(--hairline-strong); stroke-width: 1.5; }
+.project-heatmap-svg .heatmap-cell rect { fill-opacity: var(--heatmap-opacity, 1); transition: fill-opacity 120ms ease, stroke 120ms ease; }
+.project-heatmap-svg .heatmap-cell.is-hovered rect { stroke: color-mix(in srgb, var(--ink) 42%, transparent); stroke-width: 2; }
+.project-heatmap-svg .heatmap-cell-text { font-size: 10px; }
 .project-heatmap-svg .heatmap-cell:focus rect { stroke: var(--ink); stroke-width: 2; }
 .project-heatmap-title { margin-top: 18px; font-size: 12px; font-weight: 700; color: var(--text-mute); }
 .project-trend-tooltip { height: 82px; box-sizing: border-box; margin: 10px 0; padding: 8px 10px; border-left: 3px solid var(--ink); background: var(--surface-soft); font-size: 12px; line-height: 1.6; overflow: hidden; }
@@ -1055,11 +1026,6 @@ dialog .field { margin-bottom: var(--md); }
   .legend { width: 100%; }
   .bar-label { width: 110px; flex: 0 0 110px; }
   #p-report { display: block; }
-  .todo-health { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .todo-health-item:nth-child(2) { border-right: 0; }
-  .todo-health-item:nth-child(-n + 2) { border-bottom: 1px solid var(--hairline); }
-  .todo-health-item:nth-child(3) { border-right: 1px solid var(--hairline); }
-  .todo-health-item:nth-child(4) { border-right: 0; }
   .todo-worklog-row { grid-template-columns: 96px minmax(0, 1fr) 58px; }
   .daily-review-entry { grid-template-columns: 104px 8px minmax(0, 1fr); }
   .daily-review-duration { grid-column: 3; text-align: left; padding-top: 0; }
@@ -1378,7 +1344,21 @@ dialog .field { margin-bottom: var(--md); }
 .report-status-success { color: var(--success); }
 .report-status-warning { color: var(--warning); }
 .report-status-danger { color: var(--danger); }
+.report-status-overview { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.report-status-donut { flex: 0 0 128px; width: 128px; }
+.report-status-donut .todo-health-donut-svg { display: block; width: 128px; height: 128px; }
+.report-status-donut .todo-health-donut-segment { stroke-width: 16; }
+.report-status-donut .todo-health-donut-value { font-size: 20px; }
+.report-status-donut .todo-health-donut-label { font-size: 9px; }
+.report-status-copy { min-width: 0; }
 .report-status-detail { color: var(--text-mute); font-size: 12px; text-align: right; }
+.report-status-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; }
+.report-status-metrics { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.report-status-metric { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 7px; border: 1px solid var(--hairline); border-radius: var(--r-full); background: var(--surface-soft); color: var(--text-mute); font-size: 11px; white-space: nowrap; }
+.report-status-metric strong { color: var(--text-body); font-size: 12px; }
+.report-status-metric-success strong { color: var(--success); }
+.report-status-metric-info strong { color: var(--info, #4f8fd8); }
+.report-status-metric-danger strong { color: var(--danger); }
 .report-attention,
 .report-projects { padding: 16px 18px; }
 .report-attention { border-bottom: 1px solid var(--hairline); }
@@ -1450,38 +1430,51 @@ dialog .field { margin-bottom: var(--md); }
   border-top: 1px solid var(--hairline);
   font-size: 12px;
 }
-.report-project-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-project-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.report-project-color { flex: 0 0 4px; width: 4px; height: 20px; border-radius: var(--r-full); background: var(--project-color); }
+.report-project-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .report-project-status { white-space: nowrap; font-size: 11px; }
 .report-project-status-danger { color: var(--danger); }
 .report-project-status-warning { color: var(--warning); }
 .report-project-status-success { color: var(--success); }
-.report-project-progress { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.report-project-progress { position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; outline: 0; }
+.report-project-progress::after {
+  content: attr(data-report-project-tooltip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 4;
+  max-width: min(280px, calc(100vw - 40px));
+  padding: 6px 8px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r);
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+.report-project-progress:hover::after,
+.report-project-progress:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
 .report-project-track { flex: 1; height: 7px; overflow: hidden; border-radius: var(--r-full); background: var(--surface-card); }
 .report-project-track span { display: block; width: var(--bar-width); height: 100%; min-width: 2px; border-radius: inherit; background: var(--success); }
 .report-project-count { min-width: 34px; color: var(--text-mute); font-size: 11px; text-align: right; }
 .report-project-work { color: var(--text-body); text-align: right; white-space: nowrap; }
 .report-empty { padding: 12px 0 2px; color: var(--text-mute); font-size: 12px; }
-.report-details-collapse { border-top: 1px solid var(--hairline); }
-.report-details-collapse > summary {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 12px 18px;
-  cursor: pointer;
-  color: var(--text-mute);
-  font-size: 12px;
-  list-style: none;
-}
-.report-details-collapse > summary::-webkit-details-marker { display: none; }
-.report-details-collapse > summary:hover { color: var(--text-ink); background: var(--surface-soft); }
-.report-metrics-table-wrap { overflow-x: auto; padding: 0 18px 12px; }
-.report-metrics-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.report-metrics-table th,
-.report-metrics-table td { padding: 9px 8px; border-top: 1px solid var(--hairline); text-align: left; white-space: nowrap; }
-.report-metrics-table th { color: var(--text-mute); font-size: 11px; font-weight: 500; }
 
 @media (max-width: 720px) {
-  .report-status { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .report-status { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .report-status-side { align-items: flex-start; width: 100%; }
+  .report-status-metrics { justify-content: flex-start; }
   .report-status-detail { text-align: left; }
   .report-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-due-alerts-head { align-items: flex-start; flex-direction: column; gap: 4px; }
