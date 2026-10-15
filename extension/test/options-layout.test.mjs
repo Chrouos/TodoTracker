@@ -42,6 +42,11 @@ const db = await readFile(new URL('../src/lib/db.js', import.meta.url), 'utf8');
 const editor = await readFile(new URL('../src/lib/markdown-editor.js', import.meta.url), 'utf8');
 assert.match(options, /projectIdForTask/, 'Entry Todo selection should synchronize its project');
 assert.match(options, /normalizeMarkdownEditorMode/, 'Options should normalize the shared Markdown editor setting');
+assert.doesNotMatch(
+  options,
+  /return mode === 'source' \? 'source' : 'simple'/,
+  'Toolbar settings should mount the block editor instead of the plain textarea editor',
+);
 assert.match(html, /id="stLanguage"/, 'Settings should expose a language selector');
 for (const value of ['auto', 'zh-TW', 'en', 'ja']) {
   assert.match(html, new RegExp(`<option value="${value}"`), `Language selector should include ${value}`);
@@ -283,8 +288,8 @@ assert.match(css, /\.timer-complete input\[type="checkbox"\]/,
   'Management timer checkbox should have compact custom styling');
 assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr\s+1\.5fr/s,
   'Management timer should give project and Todo selectors enough width');
-assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*240px[^}]*overflow-y:\s*auto\s*!important/s,
-  'Management timer notes should be larger and scrollable');
+assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*300px[^}]*max-height:\s*none/s,
+  'Management timer notes should grow with the source instead of nesting scroll areas');
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
 assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar should scroll horizontally');
@@ -368,12 +373,15 @@ assert.match(options, /showToast\(translateText\(/, 'Options Todo actions should
 assert.match(css, /\.app-toast\s*\{[^}]*position:\s*fixed[^}]*right:/s,
   'Options toast should stay compact in the lower-right viewport');
 assert.match(editor, /dataset\.markdownEditorRoot\s*=\s*'true'/,
-  'Options Markdown editors should mount one delegated editable root');
+  'Options Markdown editors should mount one delegated preview root');
 assert.doesNotMatch(editor, /data-editor-surface|editorSurface|activeSurface/,
   'Options Markdown editors should not reintroduce independent editable surfaces');
 assert.match(editor, /\['todo',/, 'Markdown editor should expose a Todo command');
 assert.match(editor, /\['table',/, 'Markdown editor should expose a table command');
 assert.match(css, /\.markdown-editor-content\s*\{/, 'Markdown editor should expose a block content surface');
-assert.match(css, /\.markdown-editor\.is-source\s+textarea/, 'Source mode should keep the original textarea discoverable');
+assert.match(css, /\.markdown-editor\.is-source\s*>\s*textarea/,
+  'Source mode should keep the original textarea discoverable');
+assert.match(css, /\.markdown-editor-active-source\s*\{/,
+  'Toolbar mode should visibly expose one active Markdown source textarea');
 assert.match(options, /data-note-input="\$\{n\.id\}" data-markdown-editor-input/, 'Dynamic Project Notes should mount the Markdown editor');
 console.log('options layout contract passed');

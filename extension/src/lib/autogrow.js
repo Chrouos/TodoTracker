@@ -17,5 +17,16 @@ export function autoGrow(el, { min = 72, max = 280 } = {}) {
 
   el.addEventListener('input', fit);
   fit();
+  let previousWidth = el.getBoundingClientRect?.().width ?? 0;
+  const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(([entry]) => {
+    if (!entry || entry.contentRect.width === previousWidth) return;
+    previousWidth = entry.contentRect.width;
+    fit();
+  });
+  observer?.observe(el);
+  fit.destroy = () => {
+    el.removeEventListener('input', fit);
+    observer?.disconnect();
+  };
   return fit; // 程式改 value 之後要自己叫一次
 }

@@ -7,6 +7,7 @@ import {
   readEditableBlocks,
   readEditorSelection,
   renderEditableBlocks,
+  renderPreviewBlocks,
   restoreEditorSelection,
 } from './markdown-dom.js';
 
@@ -214,6 +215,17 @@ test('renders semantic Markdown blocks with stable paths and one editable root',
   assert.equal(taskInput.dataset.markdownTaskPath, '4.0');
   assert.deepEqual(blockPathForNode(taskInput), [4, 0]);
   assert.equal(walk(root, (node) => node !== root && node.nodeType === 1 && node.contentEditable === 'true'), null);
+});
+
+test('renders semantic preview blocks without an editable root', () => {
+  const document = new FixtureDocument();
+  const root = document.createElement('div');
+  renderPreviewBlocks(root, fixtureBlocks);
+
+  assert.equal(root.contentEditable, 'false');
+  assert.equal(root.querySelector('[data-block-path="0"]').tagName, 'P');
+  assert.equal(root.querySelector('hr').contentEditable, 'inherit');
+  assert.equal(root.querySelector('[data-markdown-editor-task="true"]').contentEditable, 'false');
 });
 
 test('renders table header and body cells at their containing table path', () => {

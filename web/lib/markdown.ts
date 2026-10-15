@@ -1,4 +1,6 @@
 import {
+  activeToolbarState,
+  formatSourceSelection,
   cloneBlocks,
   continueBlock,
   deleteBackwardAtSelection,
@@ -8,29 +10,39 @@ import {
   exitEmptyBlock,
   indentListItem,
   parseMarkdown,
+  readActiveBlockSource,
+  replaceActiveBlockSource,
   pathToItem,
   removeTableBeforeParagraph,
   replaceEditorSelection,
   renderBlocks,
   renderMarkdown,
   serializeMarkdown,
+  serializeWithActiveBlockSource,
   splitBlockAtSelection,
   toggleTaskItem,
+  toggleBlockSource,
+  toggleInlineSource,
+  toggleTaskSource,
   updateAtPath,
 } from '../../shared/markdown/index.js';
 import type { Block, EditorPoint, EditorSelection, Inline } from '../../shared/markdown/index.js';
 
 export type {
+  BlockSourceCommand,
   Block,
   EditorPoint,
   EditorSelection,
   Inline,
+  InlineSourceCommand,
+  SourceCommand,
   ListItem,
   MarkdownEditorMode,
   Shortcut,
   TableAlignment,
   TaskItem,
   TaskPath,
+  ToolbarState,
 } from '../../shared/markdown/index.js';
 
 export type MarkdownRenderOptions = {
@@ -38,6 +50,8 @@ export type MarkdownRenderOptions = {
 };
 
 export {
+  activeToolbarState,
+  formatSourceSelection,
   cloneBlocks,
   continueBlock,
   deleteBackwardAtSelection,
@@ -47,14 +61,20 @@ export {
   exitEmptyBlock,
   indentListItem,
   parseMarkdown,
+  readActiveBlockSource,
+  replaceActiveBlockSource,
   pathToItem,
   removeTableBeforeParagraph,
   replaceEditorSelection,
   renderBlocks,
   renderMarkdown,
   serializeMarkdown,
+  serializeWithActiveBlockSource,
   splitBlockAtSelection,
   toggleTaskItem,
+  toggleBlockSource,
+  toggleInlineSource,
+  toggleTaskSource,
   updateAtPath,
 };
 

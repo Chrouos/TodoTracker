@@ -591,6 +591,11 @@ const JA = {
 };
 
 const OPTIONS_ZH_TW = {
+  'editor.bold': '粗體', 'editor.heading': '標題', 'editor.unordered-list': '清單', 'editor.link': '連結',
+  'editor.italic': '斜體', 'editor.ordered-list': '編號清單', 'editor.todo': '待辦清單', 'editor.quote': '引用',
+  'editor.code': '程式碼區塊', 'editor.table': '表格', 'editor.rule': '分隔線', 'editor.more': '更多',
+  'editor.wrap': '自動換行', 'editor.wrapHint': '關閉後可橫向捲動，方便閱讀寬表格',
+  'editor.preview': '預覽', 'editor.edit': '繼續編輯',
   'common.restored': '已還原',
   'common.archive': '封存',
   'report.crossDays': '跨 {count} 天',
@@ -819,9 +824,9 @@ const OPTIONS_ZH_TW = {
   'settings.roundNone': '不進位',
   'settings.roundHint': '每筆紀錄長度往上湊到這個倍數。設 15 的話，8 分鐘會記成 15 分鐘。想要精確時數就留「不進位」。',
   'settings.editorLabel': '筆記編輯方式',
-  'settings.editorToolbar': '工具列編輯器',
+  'settings.editorToolbar': '文字編輯器＋格式工具列',
   'settings.editorSource': 'Markdown 原始碼',
-  'settings.editorHint': '工具列會幫你插入粗體、斜體、標題、清單等 Markdown；資料仍以 Markdown 儲存。',
+  'settings.editorHint': '直接編輯整篇文字，保留換行與空白。工具列可插入 Markdown，預覽時呈現格式。',
   'settings.data': '資料',
   'settings.dataHint': '資料只存在這台瀏覽器。換機器或重裝前記得備份。',
   'settings.backup': '↓ 匯出備份 JSON',
@@ -846,6 +851,11 @@ const OPTIONS_ZH_TW = {
 };
 
 const OPTIONS_EN = {
+  'editor.bold': 'Bold', 'editor.heading': 'Heading', 'editor.unordered-list': 'List', 'editor.link': 'Link',
+  'editor.italic': 'Italic', 'editor.ordered-list': 'Numbered list', 'editor.todo': 'Task list', 'editor.quote': 'Quote',
+  'editor.code': 'Code block', 'editor.table': 'Table', 'editor.rule': 'Divider', 'editor.more': 'More',
+  'editor.wrap': 'Wrap lines', 'editor.wrapHint': 'Turn off to scroll horizontally through wide tables',
+  'editor.preview': 'Preview', 'editor.edit': 'Continue editing',
   'common.restored': 'Restored',
   'common.archive': 'Archive',
   'report.crossDays': '{count} calendar days',
@@ -1075,9 +1085,9 @@ const OPTIONS_EN = {
   'settings.roundNone': 'No rounding',
   'settings.roundHint': 'Round each entry up to this multiple. With 15, an 8-minute entry becomes 15 minutes. Leave it at “No rounding” for exact time.',
   'settings.editorLabel': 'Notes editor',
-  'settings.editorToolbar': 'Toolbar editor',
+  'settings.editorToolbar': 'Text editor with formatting toolbar',
   'settings.editorSource': 'Markdown source',
-  'settings.editorHint': 'The toolbar inserts bold, italic, headings, lists, and other Markdown; data is still stored as Markdown.',
+  'settings.editorHint': 'Edit the full text while preserving line breaks and spacing. Use the toolbar for Markdown and Preview to see formatting.',
   'settings.data': 'Data',
   'settings.dataHint': 'Data is stored only in this browser. Back it up before moving to another machine or reinstalling.',
   'settings.backup': '↓ Export backup JSON',
@@ -1103,6 +1113,11 @@ const OPTIONS_EN = {
 
 const OPTIONS_JA = {
   ...OPTIONS_EN,
+  'editor.bold': '太字', 'editor.heading': '見出し', 'editor.unordered-list': 'リスト', 'editor.link': 'リンク',
+  'editor.italic': '斜体', 'editor.ordered-list': '番号付きリスト', 'editor.todo': 'タスクリスト', 'editor.quote': '引用',
+  'editor.code': 'コードブロック', 'editor.table': '表', 'editor.rule': '区切り線', 'editor.more': 'その他',
+  'editor.wrap': '折り返し', 'editor.wrapHint': 'オフにすると横スクロールで幅の広い表を確認できます',
+  'editor.preview': 'プレビュー', 'editor.edit': '編集に戻る',
   'common.back': '戻る', 'project.color': '色', 'report.insights': 'Todoの状態とプロジェクト状況',
   'app.subtitle': 'ローカル時間追跡 · データはこのブラウザに保存されます',
   'timer.current': '現在のタイマー', 'timer.notStarted': '未開始', 'timer.startAndSave': 'タイマーを開始',
@@ -1134,8 +1149,8 @@ const OPTIONS_JA = {
   'entry.copyToday': '今日のまとめをコピー', 'entry.copyRange': '期間のまとめをコピー', 'entry.loadMore': 'さらに読み込む（残り{count}件）',
   'entry.edit': '[編集]', 'entry.todoNotes': 'Todoメモを表示', 'toast.todoCreated': 'Todoを追加しました：「{title}」', 'toast.todoUpdated': 'Todoを保存しました：「{title}」', 'toast.todoCompleted': 'Todoを完了しました：「{title}」', 'toast.todoReopened': 'Todoを再開しました：「{title}」', 'toast.todoDeleted': 'Todoを削除しました：「{title}」', 'tag.example': '例：会議', 'settings.idleLabel': 'アイドル通知（分）', 'settings.idleHint': '計測中にこの時間操作がない場合、または画面ロックから戻った時に、その時間を除外するか確認します。',
   'settings.roundLabel': '記録ごとの丸め（分）', 'settings.roundNone': '丸めない', 'settings.roundHint': '記録時間をこの倍数に切り上げます。正確な時間には「丸めない」を選択してください。',
-  'settings.editorLabel': 'メモエディタ', 'settings.editorToolbar': 'ツールバーエディタ', 'settings.editorSource': 'Markdownソース',
-  'settings.editorHint': 'ツールバーでMarkdownを入力できます。データはMarkdownとして保存されます。', 'settings.data': 'データ',
+  'settings.editorLabel': 'メモエディタ', 'settings.editorToolbar': 'テキスト編集＋書式ツールバー', 'settings.editorSource': 'Markdownソース',
+  'settings.editorHint': '改行と空白を保ったまま全文を編集できます。ツールバーでMarkdownを入力し、プレビューで書式を確認できます。', 'settings.data': 'データ',
   'settings.dataHint': 'データはこのブラウザにのみ保存されます。移行や再インストール前にバックアップしてください。',
   'settings.backup': '↓ バックアップJSONをエクスポート', 'settings.restore': '↑ バックアップをインポート', 'settings.wipe': '[x] すべてのデータを消去',
   'dialog.description': '説明', 'dialog.edit': '記録を編集', 'dialog.startedAt': '開始', 'dialog.endedAt': '終了', 'dialog.workNotes': '作業記録',

@@ -7,6 +7,7 @@ import {
   readEditableBlocks,
   readEditorSelection,
   renderEditableBlocks,
+  renderPreviewBlocks,
   restoreEditorSelection,
 } from './markdown-dom.ts';
 import { readEditableBlocks as readExtensionEditableBlocks } from '../../extension/src/lib/markdown-dom.js';
@@ -213,6 +214,16 @@ test('renders semantic Markdown blocks with stable paths and one editable root',
   assert.equal(taskInput.contentEditable, 'false');
   assert.equal(taskInput.dataset.markdownTaskPath, '4.0');
   assert.deepEqual(blockPathForNode(taskInput), [4, 0]);
+  assert.equal(walk(root, (node) => node !== root && node.nodeType === 1 && node.contentEditable === 'true'), null);
+});
+
+test('renders semantic preview blocks without an editable root', () => {
+  const { root } = fixtureRoot();
+  renderPreviewBlocks(root, fixtureBlocks);
+
+  assert.equal(root.contentEditable, 'false');
+  assert.equal(root.querySelector('p').dataset.blockPath, '0');
+  assert.equal(root.querySelector('hr').dataset.blockPath, '7');
   assert.equal(walk(root, (node) => node !== root && node.nodeType === 1 && node.contentEditable === 'true'), null);
 });
 

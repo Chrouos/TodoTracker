@@ -218,8 +218,8 @@
           <span class="hint" data-i18n="todo.workedHint">由綁在這個 todo 上的計時紀錄累加。</span>
         </label>
       </div>
-      <label class="field" style="margin-top:12px"><span data-i18n="entry.notes">備註</span>
-        <textarea id="tdNotes" data-markdown-editor-input data-i18n-placeholder="todo.notesPlaceholder" placeholder="細節、連結、驗收條件…"></textarea></label>
+      <div class="field" style="margin-top:12px"><label for="tdNotes" data-i18n="entry.notes">備註</label>
+        <textarea id="tdNotes" data-markdown-editor-input data-i18n-placeholder="todo.notesPlaceholder" placeholder="細節、連結、驗收條件…"></textarea></div>
       <div class="actions">
         <button type="submit" class="btn-primary" data-i18n="todo.save">儲存 Todo</button>
         <button type="button" id="tdCancel" hidden data-i18n="todo.cancelEdit">取消編輯</button>
@@ -301,8 +301,8 @@
         </label>
       </div>
 
-      <label class="field" style="margin-top:12px"><span data-i18n="entry.notes">備註</span>
-        <textarea id="scNotes" data-markdown-editor-input data-i18n-placeholder="schedule.notesPlaceholder" placeholder="會一併寫進產生的 Todo"></textarea></label>
+      <div class="field" style="margin-top:12px"><label for="scNotes" data-i18n="entry.notes">備註</label>
+        <textarea id="scNotes" data-markdown-editor-input data-i18n-placeholder="schedule.notesPlaceholder" placeholder="會一併寫進產生的 Todo"></textarea></div>
 
       <div class="actions">
         <button type="submit" class="btn-primary" data-i18n="schedule.save">儲存排程</button>
@@ -427,8 +427,8 @@
       <label class="field"><span data-i18n="dialog.startedAt">開始</span><input id="enStart" type="datetime-local" /></label>
       <label class="field"><span data-i18n="dialog.endedAt">結束</span><input id="enEnd" type="datetime-local" /></label>
     </div>
-    <label class="field"><span data-i18n="dialog.workNotes">工作紀錄</span>
-      <textarea id="enNotes" data-markdown-editor-input data-i18n-placeholder="entry.notesPlaceholder" placeholder="這段時間做了什麼？"></textarea></label>
+    <div class="field"><label for="enNotes" data-i18n="dialog.workNotes">工作紀錄</label>
+      <textarea id="enNotes" data-markdown-editor-input data-i18n-placeholder="entry.notesPlaceholder" placeholder="這段時間做了什麼？"></textarea></div>
     <div class="actions">
       <button type="button" id="entryCancel" value="cancel" data-i18n="dialog.cancel">取消</button>
       <button type="submit" id="entrySave" value="save" class="btn-primary" data-i18n="dialog.save">儲存</button>

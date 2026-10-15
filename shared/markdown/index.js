@@ -3,6 +3,16 @@ export { parseMarkdown } from './parser.js';
 export { serializeMarkdown } from './serializer.js';
 export { renderBlocks, renderMarkdown } from './renderer.js';
 export {
+  activeToolbarState,
+  formatSourceSelection,
+  readActiveBlockSource,
+  replaceActiveBlockSource,
+  serializeWithActiveBlockSource,
+  toggleBlockSource,
+  toggleInlineSource,
+  toggleTaskSource,
+} from './live-preview.js';
+export {
   detectMarkdownShortcut,
   continueBlock,
   exitEmptyBlock,

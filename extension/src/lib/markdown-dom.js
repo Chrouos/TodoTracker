@@ -7,6 +7,12 @@ export function renderEditableBlocks(root, blocks) {
   root.append(...blocks.map((block, index) => renderBlock(root.ownerDocument, block, [index])));
 }
 
+export function renderPreviewBlocks(root, blocks) {
+  root.contentEditable = 'false';
+  root.textContent = '';
+  root.append(...blocks.map((block, index) => renderBlock(root.ownerDocument, block, [index])));
+}
+
 export function readEditableBlocks(root, fallback) {
   const children = elementChildren(root);
   if (!children.length) {
@@ -423,4 +429,27 @@ function clamp(value, minimum, maximum) {
 
 function isSafeUrl(url) {
   return /^https:\/\/[^\s]+$/i.test(url);
+}
+/** Replace only the changed source range as one native undo transaction. */
+export function replaceTextareaSource(textarea, nextValue) {
+  const previous = textarea.value;
+  if (previous === nextValue) return true;
+  if (textarea.hidden || typeof textarea.ownerDocument.execCommand !== 'function') return false;
+  let start = 0;
+  while (start < previous.length && start < nextValue.length && previous[start] === nextValue[start]) start += 1;
+  let beforeEnd = previous.length;
+  let afterEnd = nextValue.length;
+  while (beforeEnd > start && afterEnd > start && previous[beforeEnd - 1] === nextValue[afterEnd - 1]) {
+    beforeEnd -= 1;
+    afterEnd -= 1;
+  }
+  textarea.focus();
+  textarea.setSelectionRange(start, beforeEnd);
+  try {
+    // Chromium's native insert command preserves textarea undo history.
+    return textarea.ownerDocument.execCommand('insertText', false, nextValue.slice(start, afterEnd))
+      && textarea.value === nextValue;
+  } catch {
+    return false;
+  }
 }

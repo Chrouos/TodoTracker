@@ -11,6 +11,7 @@ label.field > span.hint {
   display: block; margin: var(--xs) 0 0;
   font-size: 11px; line-height: 1.6; color: var(--text-ash);
 }
+.field > label { display: block; font-size: 12px; color: var(--text-mute); margin-bottom: var(--xs); }
 
 section { padding-top: var(--xl); }
 section[hidden] { display: none; }
@@ -74,10 +75,9 @@ section[hidden] { display: none; }
   margin-bottom: var(--md);
 }
 .timer-notes-field textarea {
-  height: 240px;
-  min-height: 240px;
-  max-height: 240px;
-  overflow-y: auto !important;
+  min-height: 300px;
+  max-height: none;
+  overflow-y: hidden;
 }
 .timer-notes-preview-actions { display: flex; margin-top: 0; }
 .timer-notes-mode {
@@ -95,9 +95,85 @@ section[hidden] { display: none; }
 .timer-notes-mode .btn-sm:last-child { border-right: 0; }
 .timer-notes-mode .btn-sm.active { background: var(--ink); color: var(--canvas); }
 .markdown-editor { margin-top: var(--xs); }
+.markdown-editor.is-simple {
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  background: var(--canvas);
+}
+.markdown-editor.is-simple:focus-within { border-color: var(--ink); }
+.markdown-editor.is-simple .markdown-editor-toolbar {
+  align-items: center;
+  margin: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+.markdown-editor.is-simple .markdown-editor-toolbar button,
+.markdown-editor-more > summary {
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-mute);
+  cursor: pointer;
+}
+.markdown-editor.is-simple .markdown-editor-toolbar button:hover,
+.markdown-editor-more > summary:hover { background: var(--surface-soft); color: var(--text-ink); }
+.markdown-editor.is-simple .markdown-editor-toolbar button[aria-pressed="true"] {
+  background: var(--surface-card);
+  color: var(--text-ink);
+}
+.markdown-editor-more { position: relative; }
+.markdown-editor-more > summary { display: flex; align-items: center; list-style: none; border-radius: var(--r); }
+.markdown-editor-more > summary::-webkit-details-marker { display: none; }
+.markdown-editor-more > summary::after { content: '⌄'; margin-left: 5px; }
+.markdown-editor-more > summary:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+.markdown-editor-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  width: 160px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r);
+  background: var(--canvas);
+  box-shadow: 0 8px 24px rgba(15, 0, 0, .1);
+}
+.markdown-editor-more-menu button { width: 100%; text-align: left; }
+.markdown-editor.is-simple > textarea.markdown-text-source {
+  display: block;
+  margin: 0;
+  padding: 14px 16px;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  font-family: var(--font);
+  line-height: 1.7;
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+.markdown-editor.is-simple > textarea[wrap="off"] { white-space: pre; }
+.markdown-editor [hidden] { display: none !important; }
+.markdown-text-preview { min-height: 160px; padding: 14px 16px; overflow-x: auto; cursor: text; }
+.markdown-editor[data-preview="true"] [data-markdown-command],
+.markdown-editor[data-preview="true"] .markdown-editor-more,
+.markdown-editor[data-preview="true"] [data-markdown-wrap] { display: none; }
+.markdown-editor-preview-toggle { margin-left: auto; }
+.markdown-text-preview[data-wrap="off"] p,
+.markdown-text-preview[data-wrap="off"] li,
+.timer-notes-preview.is-nowrap p,
+.timer-notes-preview.is-nowrap li { white-space: pre; }
 .markdown-editor textarea { width: 100%; box-sizing: border-box; }
-.markdown-editor:not(.is-source):not(.is-simple) textarea { display: none; }
-.markdown-editor.is-source textarea { display: block; }
+.markdown-editor:not(.is-source):not(.is-simple) > textarea { display: none; }
+.markdown-editor.is-source > textarea { display: block; }
 .markdown-editor-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -119,6 +195,11 @@ section[hidden] { display: none; }
   border-color: var(--ink);
   color: var(--text-ink);
 }
+.markdown-editor-toolbar [data-markdown-command][aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--canvas);
+}
 .markdown-editor-toolbar [data-markdown-command="bold"] { font-weight: 700; }
 .markdown-editor-toolbar [data-markdown-command="italic"] { font-style: italic; }
 .markdown-editor.is-source .markdown-editor-toolbar { display: none; }
@@ -132,6 +213,31 @@ section[hidden] { display: none; }
 }
 .markdown-editor-block { margin: 0 0 10px; }
 .markdown-editor-block:last-child { margin-bottom: 0; }
+.markdown-editor-active-source {
+  display: block;
+  width: 100%;
+  min-height: 2.9em;
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--surface-soft);
+  color: var(--text-ink);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+.markdown-editor-active-source:focus {
+  outline: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.markdown-editor-content hr {
+  min-height: 16px;
+  border: 0;
+  border-top: 1px solid var(--hairline-strong);
+  cursor: text;
+}
 .markdown-editor-surface {
   min-height: 1.45em;
   outline: 0;
@@ -157,15 +263,14 @@ section[hidden] { display: none; }
 .markdown-editor-content table { min-width: 420px; width: 100%; border-collapse: collapse; }
 .markdown-editor-content th,
 .markdown-editor-content td { border: 1px solid var(--hairline-strong); padding: 5px 8px; vertical-align: top; }
-.markdown-editor-content pre { overflow-x: auto; padding: 9px; background: var(--surface-card); border: 1px solid var(--hairline); }
+.markdown-editor-content pre { overflow-x: auto; margin: 12px 0; padding: 14px 18px; line-height: 1.7; background: var(--surface-card); border: 1px solid var(--hairline); }
 .markdown-editor-content pre .markdown-editor-surface { font-family: var(--font-mono, ui-monospace, monospace); }
 .markdown-editor.is-source .markdown-editor-content { display: none; }
-.timer-notes-field .markdown-editor-content { min-height: 180px; max-height: 360px; overflow-y: auto; }
+.timer-notes-field .markdown-editor-content { min-height: 300px; }
 .timer-notes-preview-actions { margin-top: var(--xs); }
 .timer-notes-preview {
-  min-height: 180px;
-  max-height: 360px;
-  overflow-y: auto;
+  min-height: 300px;
+  overflow-x: auto;
   margin-top: var(--md);
   padding: var(--sm);
   border: 1px solid var(--hairline);
@@ -1002,7 +1107,9 @@ dialog .field { margin-bottom: var(--md); }
   outline: 1px solid var(--ink);
   outline-offset: 3px;
 }
-.markdown-preview p { margin: 0 0 8px; }
+.markdown-preview p { margin: 0 0 8px; white-space: pre-wrap; tab-size: 4; }
+.markdown-preview li { white-space: pre-wrap; tab-size: 4; }
+.markdown-preview .markdown-task-list { list-style: none; margin-left: 0; padding-left: 0; }
 .markdown-preview hr {
   display: block;
   width: 100%;
@@ -1030,9 +1137,9 @@ dialog .field { margin-bottom: var(--md); }
 .markdown-preview ul, .markdown-preview ol { margin: 5px 0 8px 22px; }
 .markdown-preview .task-checkbox { width: 13px; height: 13px; margin: 0 4px 0 0; vertical-align: -2px; }
 .markdown-preview blockquote { border-left: 3px solid var(--hairline, #ddd); margin: 8px 0; padding-left: 10px; color: var(--text-ash, #777); }
-.markdown-preview pre { max-width: 100%; overflow-x: auto; padding: 9px; background: var(--surface-card, #f4f4f4); border: 1px solid var(--hairline, #ddd); }
+.markdown-preview pre { max-width: 100%; overflow-x: auto; margin: 12px 0; padding: 14px 18px; line-height: 1.7; background: var(--surface-card, #f4f4f4); border: 1px solid var(--hairline, #ddd); }
 .markdown-preview code { display: inline-block; padding: 1px 5px; border: 1px solid var(--hairline, #ddd); border-radius: 3px; background: var(--surface-card, #f4f4f4); font-family: var(--font-mono, ui-monospace, monospace); font-size: .95em; line-height: 1.4; white-space: pre-wrap; }
-.markdown-preview pre code { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.markdown-preview pre code { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; line-height: 1.7; white-space: pre; overflow-wrap: normal; word-break: normal; }
 .markdown-preview a { text-decoration: underline; }
 .markdown-preview table {
   width: 100%;

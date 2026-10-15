@@ -148,7 +148,7 @@ test('toggles a nested task after a sibling normal list without path collisions'
   const markdown = '- Parent\n  - Plain child\n  - [ ] Nested task\n- [ ] Sibling task';
   assert.equal(
     serializeTaskCheckboxToggle(markdown, '0.0.1.0'),
-    '- Parent\n  - Plain child\n  - [x] Nested task\n\n- [ ] Sibling task',
+    '- Parent\n  - Plain child\n  - [x] Nested task\n- [ ] Sibling task',
   );
 });
 
@@ -315,6 +315,8 @@ class EditorFixtureElement extends EditorFixtureNode {
     this.value = '';
     this.selectionStart = 0;
     this.selectionEnd = 0;
+    this.style = {};
+    this.scrollHeight = 140;
   }
 
   append(...nodes) {
@@ -544,14 +546,14 @@ function setEditorFixtureSelection(document, startNode, startOffset, endNode = s
   document.getSelection().addRange(range);
 }
 
-test('mounts one editable root and no independently editable descendants', () => {
+test('mounts one preview root and no contenteditable descendants', () => {
   const fixture = editorFixture();
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
     const wrapper = fixture.host.querySelector('.markdown-editor');
     const root = wrapper.querySelector('[data-markdown-editor-root="true"]');
 
-    assert.equal(root.contentEditable, 'true');
+    assert.equal(root.contentEditable, 'false');
     assert.equal(root.querySelectorAll('[contenteditable="true"]').length, 0);
     assert.equal(root.querySelectorAll('[data-editor-surface="true"]').length, 0);
     editor.destroy();
@@ -560,14 +562,186 @@ test('mounts one editable root and no independently editable descendants', () =>
   }
 });
 
-test('keeps the textarea bridge synchronized for root and external input', () => {
+test('activates one Markdown source textarea when a preview block is clicked', () => {
+  const fixture = editorFixture('First\n\nSecond');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    assert.equal(root.contentEditable, 'false');
+    assert.equal(active.value, 'First');
+    assert.equal(root.querySelectorAll('.markdown-editor-active-source').length, 1);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('activates the empty first block when the blank editor canvas is clicked', () => {
+  const fixture = editorFixture('');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+
+    const active = root.querySelector('.markdown-editor-active-source');
+    assert.ok(active);
+    assert.equal(active.value, '');
+    assert.equal(fixture.document.activeElement, active);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('commits the previous block before activating the next preview', () => {
+  const fixture = editorFixture('First\n\nSecond');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelectorAll('p')[0].dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const first = root.querySelector('.markdown-editor-active-source');
+    first.value = 'Updated';
+    first.setSelectionRange(7, 7);
+    first.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    root.querySelectorAll('p')[0].dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(fixture.textarea.value, 'Updated\n\nSecond');
+    assert.equal(root.querySelector('.markdown-editor-active-source').value, 'Second');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('clicking outside commits source and leaves only previews', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.value = 'Changed';
+    active.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    active.dispatchEvent(new EditorFixtureEvent('focusout', { bubbles: true, relatedTarget: fixture.host }));
+    assert.equal(root.querySelector('.markdown-editor-active-source'), null);
+    assert.equal(root.querySelector('p').textContent, 'Changed');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('bold toolbar mouse-down preserves selection and toggles bold off on the second click', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const bold = fixture.host.querySelector('[data-markdown-command="bold"]');
+    let active = root.querySelector('.markdown-editor-active-source');
+    active.setSelectionRange(0, 4);
+    bold.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    bold.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(fixture.textarea.value, '**Text**');
+    active = root.querySelector('.markdown-editor-active-source');
+    bold.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    bold.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(fixture.textarea.value, 'Text');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('horizontal rule previews as hr, activates as three hyphens, and toggles to an empty paragraph', () => {
+  const fixture = editorFixture('---');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('hr').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(root.querySelector('.markdown-editor-active-source').value, '---');
+    const rule = fixture.host.querySelector('[data-markdown-command="rule"]');
+    rule.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    rule.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(fixture.textarea.value, '');
+    assert.equal(root.querySelector('.markdown-editor-active-source').value, '');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('Enter inside fenced code inserts a literal newline without submitting or creating a paragraph', () => {
+  const fixture = editorFixture('```js\nfirst\n```');
+  let submits = 0;
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks', onEmptyParagraphEnter: () => { submits += 1; } });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('pre').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.setSelectionRange(11, 11);
+    const enter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    active.dispatchEvent(enter);
+    assert.equal(enter.defaultPrevented, true);
+    assert.equal(fixture.textarea.value, '```js\nfirst\n\n```');
+    assert.equal(submits, 0);
+    assert.equal(root.querySelectorAll('p').length, 0);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('IME composition postpones parsing and preserves the textarea selection', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.dispatchEvent(new EditorFixtureEvent('compositionstart', { bubbles: true }));
+    active.value = '文字';
+    active.setSelectionRange(2, 2);
+    active.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true, isComposing: true }));
+    assert.equal(root.querySelector('.markdown-editor-active-source'), active);
+    active.dispatchEvent(new EditorFixtureEvent('compositionend', { bubbles: true }));
+    assert.equal(fixture.textarea.value, '文字');
+    assert.equal(active.selectionStart, 2);
+    assert.equal(active.selectionEnd, 2);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('preview task checkbox changes Markdown without activating source', () => {
+  const fixture = editorFixture('- [ ] Task');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    const checkbox = root.querySelector('input');
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new EditorFixtureEvent('change', { bubbles: true }));
+    assert.equal(fixture.textarea.value, '- [x] Task');
+    assert.equal(root.querySelector('.markdown-editor-active-source'), null);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('matching external values preserve active source while new external values safely reconcile it', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
+    const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.value = 'Local';
+    active.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    assert.equal(root.querySelector('.markdown-editor-active-source').value, 'Local');
+    fixture.textarea.value = '# Remote';
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    assert.equal(root.querySelector('.markdown-editor-active-source'), null);
+    assert.equal(root.querySelector('h1').textContent, 'Remote');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('keeps the textarea bridge synchronized for active and external input', () => {
   const fixture = editorFixture('Before');
   const emitted = [];
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar', onChange: (value) => emitted.push(value) });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks', onChange: (value) => emitted.push(value) });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
-    root.querySelector('p').textContent = 'After';
-    root.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.value = 'After';
+    active.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
     assert.equal(fixture.textarea.value, 'After');
     assert.deepEqual(emitted, ['After']);
 
@@ -600,19 +774,12 @@ test('preserves source focus and restores the original textarea on destroy', () 
   }
 });
 
-test('replaces whole-editor and native cross-block selections through root beforeinput', () => {
+test('uses source mode for whole-editor and cross-block replacements', () => {
   const whole = editorFixture('First\n\nSecond');
   try {
-    const editor = mountMarkdownEditor(whole.textarea, { mode: 'toolbar' });
-    const root = whole.host.querySelector('[data-markdown-editor-root="true"]');
-    setEditorFixtureSelection(whole.document, root, 0, root, root.childNodes.length);
-    const wholeInput = new EditorFixtureEvent('beforeinput', {
-      bubbles: true,
-      inputType: 'insertText',
-      data: 'Replacement',
-    });
-    root.dispatchEvent(wholeInput);
-    assert.equal(wholeInput.defaultPrevented, true);
+    const editor = mountMarkdownEditor(whole.textarea, { mode: 'source' });
+    whole.textarea.setSelectionRange(0, whole.textarea.value.length);
+    editor.insertText('Replacement');
     assert.equal(whole.textarea.value, 'Replacement');
     editor.destroy();
   } finally {
@@ -621,77 +788,56 @@ test('replaces whole-editor and native cross-block selections through root befor
 
   const crossBlock = editorFixture('First\n\nSecond');
   try {
-    const editor = mountMarkdownEditor(crossBlock.textarea, { mode: 'toolbar' });
-    const root = crossBlock.host.querySelector('[data-markdown-editor-root="true"]');
-    const paragraphs = root.querySelectorAll('p');
-    setEditorFixtureSelection(crossBlock.document, paragraphs[0].firstChild, 2, paragraphs[1].firstChild, 3);
-    const nativeInput = new EditorFixtureEvent('beforeinput', {
-      bubbles: true,
-      inputType: 'insertText',
-      data: 'X',
-    });
-    root.dispatchEvent(nativeInput);
-    assert.equal(nativeInput.defaultPrevented, true);
+    const editor = mountMarkdownEditor(crossBlock.textarea, { mode: 'source' });
+    crossBlock.textarea.setSelectionRange(2, 10);
+    editor.insertText('X');
     assert.equal(crossBlock.textarea.value, 'FiXond');
-
-    const arrow = new EditorFixtureEvent('keydown', { bubbles: true, key: 'ArrowDown' });
-    root.dispatchEvent(arrow);
-    assert.equal(arrow.defaultPrevented, undefined);
     editor.destroy();
   } finally {
     crossBlock.restore();
   }
 });
 
-test('continues after a table and removes it from the following empty paragraph', () => {
+test('activates a table as complete Markdown source without dismantling it', () => {
   const fixture = editorFixture('| Name |\n| --- |\n| Row |');
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
-    const cell = root.querySelector('td');
-    setEditorFixtureSelection(fixture.document, cell.firstChild, 3);
-    const enter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
-    root.dispatchEvent(enter);
-    assert.equal(enter.defaultPrevented, true);
-    assert.deepEqual(root.children.map((element) => element.tagName), ['TABLE', 'P']);
-
-    const paragraph = root.querySelector('p');
-    setEditorFixtureSelection(fixture.document, paragraph, 0);
-    const backspace = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Backspace' });
-    root.dispatchEvent(backspace);
-    assert.equal(backspace.defaultPrevented, true);
-    assert.deepEqual(root.children.map((element) => element.tagName), ['P']);
-    assert.equal(fixture.textarea.value, '');
+    root.querySelector('table').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    assert.equal(active.value, '| Name |\n| --- |\n| Row |');
+    const table = fixture.host.querySelector('[data-markdown-command="table"]');
+    table.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    table.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(fixture.textarea.value, '| Name |\n| --- |\n| Row |');
     editor.destroy();
   } finally {
     fixture.restore();
   }
 });
 
-test('submits after Enter creates an empty trailing paragraph and Enter is pressed again', () => {
+test('submits after Enter creates an empty trailing line and Enter is pressed again', () => {
   const fixture = editorFixture('Finished work');
   let submits = 0;
   try {
     const editor = mountMarkdownEditor(fixture.textarea, {
-      mode: 'toolbar',
+      mode: 'blocks',
       onEmptyParagraphEnter: () => { submits += 1; },
     });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
-    const paragraph = root.querySelector('p');
-    setEditorFixtureSelection(fixture.document, paragraph.firstChild, paragraph.textContent.length);
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.setSelectionRange(active.value.length, active.value.length);
 
     const firstEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
-    root.dispatchEvent(firstEnter);
+    active.dispatchEvent(firstEnter);
     assert.equal(submits, 0);
-
-    const emptyParagraph = root.querySelectorAll('p')[1];
-    setEditorFixtureSelection(fixture.document, emptyParagraph, 0);
     const secondEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
-    root.dispatchEvent(secondEnter);
+    active.dispatchEvent(secondEnter);
 
     assert.equal(secondEnter.defaultPrevented, true);
     assert.equal(submits, 1);
-    assert.equal(fixture.textarea.value, 'Finished work\n\n');
+    assert.equal(fixture.textarea.value, 'Finished work\n');
     editor.destroy();
   } finally {
     fixture.restore();
@@ -760,30 +906,21 @@ test('does not submit textarea modes after cursor movement, IME, or a newline in
   }
 });
 
-test('does not submit toolbar mode after pointer movement or modified Enter', () => {
+test('does not submit toolbar mode for modified Enter', () => {
   const fixture = editorFixture('Finished work');
   let submits = 0;
   try {
     const editor = mountMarkdownEditor(fixture.textarea, {
-      mode: 'toolbar',
+      mode: 'blocks',
       onEmptyParagraphEnter: () => { submits += 1; },
     });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
-    const first = root.querySelector('p');
-    setEditorFixtureSelection(fixture.document, first.firstChild, first.textContent.length);
-    root.dispatchEvent(new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' }));
-    const empty = root.querySelectorAll('p')[1];
-
-    empty.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
-    setEditorFixtureSelection(fixture.document, empty, 0);
-    const afterPointer = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
-    root.dispatchEvent(afterPointer);
-    assert.equal(submits, 0);
-
-    const latestEmpty = root.querySelectorAll('p')[2];
-    setEditorFixtureSelection(fixture.document, latestEmpty, 0);
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.setSelectionRange(active.value.length, active.value.length);
     const shiftedEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter', shiftKey: true });
-    root.dispatchEvent(shiftedEnter);
+    active.dispatchEvent(shiftedEnter);
+    assert.equal(shiftedEnter.defaultPrevented, undefined);
     assert.equal(submits, 0);
     editor.destroy();
   } finally {
@@ -809,10 +946,10 @@ test('does not intercept consecutive Enter when no submit callback is configured
   }
 });
 
-test('delegates task checkbox changes while keeping checkbox and text in one list row', () => {
+test('delegates task checkbox changes and rerenders its preview row', () => {
   const fixture = editorFixture('- [ ] Task');
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
     const item = root.querySelector('li');
     const checkbox = root.querySelector('input');
@@ -822,7 +959,8 @@ test('delegates task checkbox changes while keeping checkbox and text in one lis
     checkbox.checked = true;
     checkbox.dispatchEvent(new EditorFixtureEvent('change', { bubbles: true }));
     assert.equal(fixture.textarea.value, '- [x] Task');
-    assert.equal(root.querySelector('input'), checkbox);
+    assert.notEqual(root.querySelector('input'), checkbox);
+    assert.equal(root.querySelector('input').checked, true);
     editor.destroy();
   } finally {
     fixture.restore();
@@ -832,17 +970,16 @@ test('delegates task checkbox changes while keeping checkbox and text in one lis
 test('keeps list-local multiline replacement inside the task list', () => {
   const fixture = editorFixture('- [x] Parent\n  - Nested child\n- [ ] Sibling');
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
-    const items = root.querySelectorAll('li');
-    const parentText = items[0].childNodes[1];
-    setEditorFixtureSelection(fixture.document, parentText, 0, parentText, 6);
-    const paste = new EditorFixtureEvent('beforeinput', {
+    root.querySelectorAll('li')[0].dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.setSelectionRange(0, active.value.length);
+    const paste = new EditorFixtureEvent('paste', {
       bubbles: true,
-      inputType: 'insertText',
-      data: 'Updated\n\nSecond',
+      clipboardData: { getData: () => '- [x] Updated\n- [x] Second' },
     });
-    root.dispatchEvent(paste);
+    active.dispatchEvent(paste);
 
     assert.equal(paste.defaultPrevented, true);
     assert.equal(
@@ -858,18 +995,19 @@ test('keeps list-local multiline replacement inside the task list', () => {
 test('preserves paragraph text around multiline paste in the middle', () => {
   const fixture = editorFixture('before after');
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
-    const paragraphText = root.querySelector('p').firstChild;
-    setEditorFixtureSelection(fixture.document, paragraphText, 7);
+    root.querySelector('p').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    const active = root.querySelector('.markdown-editor-active-source');
+    active.setSelectionRange(7, 7);
     const paste = new EditorFixtureEvent('paste', {
       bubbles: true,
       clipboardData: { getData: () => 'First\n\nSecond' },
     });
-    root.dispatchEvent(paste);
+    active.dispatchEvent(paste);
 
     assert.equal(paste.defaultPrevented, true);
-    assert.equal(fixture.textarea.value, 'before \n\nFirst\n\nSecond\n\nafter');
+    assert.equal(fixture.textarea.value, 'before First\n\nSecondafter');
     editor.destroy();
   } finally {
     fixture.restore();
@@ -879,7 +1017,7 @@ test('preserves paragraph text around multiline paste in the middle', () => {
 test('does not run editor keyboard transactions from the toolbar', () => {
   const fixture = editorFixture('Text');
   try {
-    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'blocks' });
     const root = fixture.host.querySelector('[data-markdown-editor-root="true"]');
     const text = root.querySelector('p').firstChild;
     setEditorFixtureSelection(fixture.document, text, 0, text, 4);
@@ -938,4 +1076,111 @@ test('simple mode inserts empty bold markers at the textarea caret', () => {
   } finally {
     fixture.restore();
   }
+});
+
+test('toolbar editor edits the whole document without normalizing whitespace on blur', () => {
+  const original = '同時請求數    每分鐘處理量\n12            264\n16            305\n\n\n最後一段  \n';
+  const fixture = editorFixture(original);
+  try {
+    const emitted = [];
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar', onChange: (value) => emitted.push(value) });
+    assert.equal(fixture.textarea.hidden, false, 'the original full-document textarea should be editable');
+    editor.focus();
+    fixture.textarea.value = `${original}新增一行`;
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('focusout', { bubbles: true }));
+    assert.equal(editor.getValue(), `${original}新增一行`);
+    assert.deepEqual(emitted, [`${original}新增一行`]);
+    assert.equal(fixture.host.querySelector('.markdown-editor-active-source'), null);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('toolbar formatting changes only selected text across paragraphs and toggles back', () => {
+  const fixture = editorFixture('Before  \n\n\nText\n\nAfter  ');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    editor.focus();
+    fixture.textarea.setSelectionRange(11, 15);
+    const button = fixture.host.querySelector('[data-markdown-command="bold"]');
+    button.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    button.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(editor.getValue(), 'Before  \n\n\n**Text**\n\nAfter  ');
+    button.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    button.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(editor.getValue(), 'Before  \n\n\nText\n\nAfter  ');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('toolbar editor grows with pasted or externally synchronized long notes', () => {
+  const fixture = editorFixture('Short');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    fixture.textarea.scrollHeight = 900;
+    fixture.textarea.value = 'row\n'.repeat(40);
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true }));
+    assert.ok(Number.parseFloat(fixture.textarea.style.height) >= 900);
+    assert.equal(fixture.textarea.style.overflowY, 'hidden');
+    fixture.textarea.scrollHeight = 1200;
+    fixture.textarea.value += 'more\n'.repeat(20);
+    editor.sync();
+    assert.ok(Number.parseFloat(fixture.textarea.style.height) >= 1200);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('toolbar shortcuts format text but leave Enter and IME to native textarea input', () => {
+  const fixture = editorFixture('Text');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    editor.focus();
+    fixture.textarea.setSelectionRange(0, 4);
+    const bold = new EditorFixtureEvent('keydown', { bubbles: true, key: 'b', ctrlKey: true });
+    fixture.textarea.dispatchEvent(bold);
+    assert.equal(editor.getValue(), '**Text**');
+    assert.equal(bold.defaultPrevented, true);
+    const enter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    fixture.textarea.dispatchEvent(enter);
+    assert.equal(enter.defaultPrevented, undefined);
+    const composing = new EditorFixtureEvent('keydown', { bubbles: true, key: 'b', ctrlKey: true, isComposing: true });
+    fixture.textarea.dispatchEvent(composing);
+    assert.equal(composing.defaultPrevented, undefined);
+    assert.equal(editor.getValue(), '**Text**');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('consecutive Enter inside fenced source never submits the note form', () => {
+  const fixture = editorFixture('```js\nconst value = 1;');
+  let submits = 0;
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar', onEmptyParagraphEnter: () => { submits += 1; } });
+    fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' }));
+    fixture.textarea.value += '\n';
+    fixture.textarea.setSelectionRange(fixture.textarea.value.length, fixture.textarea.value.length);
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('input', { bubbles: true, inputType: 'insertLineBreak' }));
+    const secondEnter = new EditorFixtureEvent('keydown', { bubbles: true, key: 'Enter' });
+    fixture.textarea.dispatchEvent(secondEnter);
+    assert.equal(submits, 0);
+    assert.equal(secondEnter.defaultPrevented, undefined);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('keyboard formatting after preview uses the new textarea selection', () => {
+  const fixture = editorFixture('One Two');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const preview = fixture.host.querySelector('[data-markdown-preview-toggle]');
+    fixture.textarea.setSelectionRange(0, 3);
+    preview.dispatchEvent(new EditorFixtureEvent('mousedown', { bubbles: true }));
+    preview.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    preview.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    fixture.textarea.setSelectionRange(4, 7);
+    fixture.host.querySelector('[data-markdown-command="bold"]').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
+    assert.equal(editor.getValue(), 'One **Two**');
+    editor.destroy();
+  } finally { fixture.restore(); }
 });

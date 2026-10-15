@@ -2,6 +2,7 @@ import {
   cloneBlocks,
   detectMarkdownShortcut,
   parseMarkdown,
+  renderMarkdown,
   serializeMarkdown,
   toggleTaskItem,
 } from './markdown.js';
@@ -10,8 +11,21 @@ import {
   readEditableBlocks,
   readEditorSelection,
   renderEditableBlocks,
+  renderPreviewBlocks,
+  replaceTextareaSource,
   restoreEditorSelection,
 } from './markdown-dom.js';
+import {
+  activeToolbarState,
+  formatSourceSelection,
+  readActiveBlockSource,
+  replaceActiveBlockSource,
+  serializeWithActiveBlockSource,
+  toggleBlockSource,
+  toggleInlineSource,
+  toggleTaskSource,
+} from './markdown-live-preview.js';
+import { autoGrow } from './autogrow.js';
 
 const DEFAULT_MODE = 'toolbar';
 
@@ -88,11 +102,7 @@ export function markdownShortcutToBlock(value) {
 
 export function serializeTaskCheckboxToggle(markdown, pathLabel) {
   if (!/^\d+(?:\.\d+)+$/.test(String(pathLabel ?? ''))) return String(markdown ?? '');
-  try {
-    return serializeMarkdown(toggleTaskItem(parseMarkdown(markdown), String(pathLabel).split('.').map(Number)));
-  } catch {
-    return String(markdown ?? '');
-  }
+  return toggleTaskSource(markdown, String(pathLabel).split('.').map(Number));
 }
 
 export const inlineText = (inlines = []) => inlines.map((inline) => {
@@ -235,6 +245,8 @@ function bindDoubleEnterSubmit(textarea, onEmptyParagraphEnter) {
     const collapsed = textarea.selectionStart === textarea.selectionEnd;
     if (!plainEnter || !collapsed) { disarm(); return; }
     const caret = textarea.selectionStart;
+    const fences = textarea.value.slice(0, caret).match(/^```[^`\n]*$/gm)?.length ?? 0;
+    if (fences % 2 === 1) { disarm(); return; }
     const atEmptyLine = caret > 0
       && textarea.value[caret - 1] === '\n'
       && (caret === textarea.value.length || textarea.value[caret] === '\n');
@@ -268,93 +280,222 @@ function bindDoubleEnterSubmit(textarea, onEmptyParagraphEnter) {
   };
 }
 
-function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter) {
+function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, options = {}) {
   const parent = textarea.parentNode;
   const marker = document.createComment('markdown-editor');
   const wrapper = document.createElement('div');
-  wrapper.className = 'markdown-editor is-simple';
-  wrapper.dataset.editorMode = 'simple';
+  wrapper.className = `markdown-editor is-simple${options.mode === 'source' ? ' is-source' : ''}`;
+  wrapper.dataset.editorMode = options.mode === 'source' ? 'source' : 'toolbar';
   parent.insertBefore(marker, textarea);
   parent.insertBefore(wrapper, textarea);
   wrapper.appendChild(textarea);
+  textarea.hidden = false;
+  textarea.classList.toggle('markdown-text-source', true);
+  textarea.wrap = 'soft';
 
   const toolbar = document.createElement('div');
   toolbar.className = 'markdown-editor-toolbar';
   toolbar.setAttribute('role', 'toolbar');
-  toolbar.setAttribute('aria-label', 'Markdown editor');
+  toolbar.setAttribute('aria-label', 'Markdown');
   const commands = [
-    ['bold', 'B', 'Bold'],
-    ['italic', 'I', 'Italic'],
-    ['link', '↗', 'Link'],
-    ['heading', 'H2', 'Heading'],
-    ['unordered-list', '•', 'List'],
-    ['ordered-list', '1.', 'Ordered list'],
-    ['todo', '☐', 'Todo'],
-    ['quote', '❞', 'Quote'],
-    ['code', '</>', 'Code'],
-    ['table', '▦', 'Table'],
-    ['rule', '—', 'Rule'],
+    ['bold', '粗體'],
+    ['heading', '標題'],
+    ['unordered-list', '清單'],
+    ['link', '連結'],
+    ['italic', '斜體'],
+    ['ordered-list', '編號清單'],
+    ['todo', '待辦清單'],
+    ['quote', '引用'],
+    ['code', '程式碼區塊'],
+    ['table', '表格'],
+    ['rule', '分隔線'],
   ];
-  for (const [command, label, title] of commands) {
+  const more = document.createElement('details');
+  more.className = 'markdown-editor-more';
+  const summary = document.createElement('summary');
+  summary.textContent = options.translate?.('more') ?? '更多';
+  const menu = document.createElement('div');
+  menu.className = 'markdown-editor-more-menu';
+  more.append(summary, menu);
+  for (const [index, [command, label]] of commands.entries()) {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.markdownCommand = command;
-    button.title = title;
-    button.setAttribute('aria-label', title);
-    button.textContent = label;
-    toolbar.appendChild(button);
+    button.textContent = options.translate?.(command) ?? label;
+    button.title = button.textContent;
+    button.setAttribute('aria-label', button.textContent);
+    button.setAttribute('aria-pressed', 'false');
+    (index < 4 ? toolbar : menu).appendChild(button);
   }
+  toolbar.appendChild(more);
+  const wrapButton = document.createElement('button');
+  wrapButton.type = 'button';
+  wrapButton.dataset.markdownWrap = 'true';
+  wrapButton.textContent = options.translate?.('wrap') ?? '自動換行';
+  wrapButton.title = options.translate?.('wrapHint') ?? '關閉後可橫向捲動，方便閱讀寬表格';
+  wrapButton.setAttribute('aria-pressed', 'true');
+  toolbar.appendChild(wrapButton);
+  const previewButton = document.createElement('button');
+  previewButton.type = 'button';
+  previewButton.className = 'markdown-editor-preview-toggle';
+  previewButton.dataset.markdownPreviewToggle = 'true';
+  previewButton.textContent = options.translate?.('preview') ?? '預覽';
+  previewButton.setAttribute('aria-pressed', 'false');
+  previewButton.hidden = options.preview === false;
+  toolbar.appendChild(previewButton);
   wrapper.insertBefore(toolbar, textarea);
+  const preview = document.createElement('div');
+  preview.className = 'markdown-text-preview markdown-preview';
+  preview.hidden = true;
+  wrapper.appendChild(preview);
+  const setPreview = (open) => {
+    preview.hidden = !open;
+    textarea.hidden = open;
+    wrapper.dataset.preview = String(open);
+    previewButton.textContent = open ? options.translate?.('edit') ?? '繼續編輯' : options.translate?.('preview') ?? '預覽';
+    previewButton.setAttribute('aria-pressed', String(open));
+    if (open) {
+      preview.dataset.wrap = textarea.wrap;
+      preview.innerHTML = renderMarkdown(textarea.value, { interactiveTasks: true });
+    }
+    else { fit(); textarea.focus(); }
+    more.open = false;
+  };
 
   let savedStart = null;
   let savedEnd = null;
+  let composing = false;
+  const fit = autoGrow(textarea, { min: options.min ?? 160, max: Infinity });
+  const updateToolbar = () => {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const lineStart = start === 0 ? 0 : textarea.value.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = textarea.value.indexOf('\n', end);
+    const state = activeToolbarState(textarea.value, start, end);
+    const blockState = activeToolbarState(textarea.value.slice(lineStart, lineEnd < 0 ? undefined : lineEnd), 0, 0);
+    const stateKeys = { heading: 'heading', 'unordered-list': 'unorderedList', 'ordered-list': 'orderedList', todo: 'task', quote: 'quote' };
+    commands.forEach(([command]) => {
+      const pressed = stateKeys[command] ? blockState[stateKeys[command]] : state[command];
+      toolbar.querySelector(`[data-markdown-command="${command}"]`)?.setAttribute('aria-pressed', String(Boolean(pressed)));
+    });
+  };
+  const onInput = () => {
+    updateToolbar();
+    if (!preview.hidden) preview.innerHTML = renderMarkdown(textarea.value, { interactiveTasks: true });
+    onChange?.(textarea.value);
+  };
   const commit = (value, selectionStart, selectionEnd) => {
-    textarea.value = value;
+    if (!replaceTextareaSource(textarea, value)) {
+      textarea.value = value;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     textarea.focus();
     textarea.setSelectionRange(selectionStart, selectionEnd);
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    onChange?.(value);
+    more.open = false;
+    updateToolbar();
+  };
+  const applyCommand = (command, start = textarea.selectionStart, end = textarea.selectionEnd) => {
+    if (options.mode === 'simple' && command === 'bold' && start === end) {
+      commit(`${textarea.value.slice(0, start)}** **${textarea.value.slice(end)}`, start + 2, start + 3);
+      return;
+    }
+    const mapped = { todo: 'task', code: 'code-block' }[command] ?? command;
+    const result = formatSourceSelection(textarea.value, start, end, mapped);
+    commit(result.source, result.selectionStart, result.selectionEnd);
   };
   const onMouseDown = (event) => {
-    const button = event.target.closest?.('[data-markdown-command]');
+    const button = event.target.closest?.('button');
     if (!button) return;
     savedStart = textarea.selectionStart;
     savedEnd = textarea.selectionEnd;
     event.preventDefault();
   };
   const onClick = (event) => {
+    if (event.target.closest?.('[data-markdown-preview-toggle]')) {
+      setPreview(preview.hidden);
+      savedStart = null;
+      savedEnd = null;
+      return;
+    }
+    if (event.target.closest?.('[data-markdown-wrap]')) {
+      textarea.wrap = textarea.wrap === 'off' ? 'soft' : 'off';
+      wrapButton.setAttribute('aria-pressed', String(textarea.wrap !== 'off'));
+      fit();
+      textarea.focus();
+      savedStart = null;
+      savedEnd = null;
+      return;
+    }
     const button = event.target.closest?.('[data-markdown-command]');
     if (!button) return;
     event.preventDefault();
     const start = savedStart ?? textarea.selectionStart;
     const end = savedEnd ?? textarea.selectionEnd;
-    if (button.dataset.markdownCommand === 'bold' && start === end) {
-      const value = `${textarea.value.slice(0, start)}** **${textarea.value.slice(end)}`;
-      commit(value, start + 2, start + 3);
-      savedStart = null;
-      savedEnd = null;
-      return;
-    }
-    const result = formatMarkdownSelection(textarea.value, start, end, button.dataset.markdownCommand);
-    commit(result.value, result.selectionStart, result.selectionEnd);
+    applyCommand(button.dataset.markdownCommand, start, end);
     savedStart = null;
     savedEnd = null;
   };
+  const onPreviewClick = (event) => {
+    if (event.target.closest?.('a') || event.target.closest?.('input')) return;
+    setPreview(false);
+  };
+  const onPreviewChange = (event) => {
+    const path = event.target.dataset?.markdownTaskPath;
+    if (!/^\d+(?:\.\d+)+$/.test(path ?? '')) return;
+    textarea.value = toggleTaskSource(textarea.value, path.split('.').map(Number));
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const onKeyDown = (event) => {
+    if (composing || event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Escape' && more.open) { more.open = false; return; }
+    const command = { b: 'bold', i: 'italic', k: 'link' }[event.key?.toLowerCase()];
+    if (!command || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+    event.preventDefault();
+    applyCommand(command);
+  };
+  const onComposition = (event) => { composing = event.type === 'compositionstart'; };
   toolbar.addEventListener('mousedown', onMouseDown);
   toolbar.addEventListener('click', onClick);
+  preview.addEventListener('click', onPreviewClick);
+  preview.addEventListener('change', onPreviewChange);
+  textarea.addEventListener('input', onInput);
+  textarea.addEventListener('keydown', onKeyDown);
+  textarea.addEventListener('select', updateToolbar);
+  textarea.addEventListener('keyup', updateToolbar);
+  textarea.addEventListener('mouseup', updateToolbar);
+  textarea.addEventListener('compositionstart', onComposition);
+  textarea.addEventListener('compositionend', onComposition);
   const removeDoubleEnterSubmit = bindDoubleEnterSubmit(textarea, onEmptyParagraphEnter);
+  updateToolbar();
 
   return {
     destroy() {
       toolbar.removeEventListener('mousedown', onMouseDown);
       toolbar.removeEventListener('click', onClick);
+      preview.removeEventListener('click', onPreviewClick);
+      preview.removeEventListener('change', onPreviewChange);
+      fit.destroy();
+      textarea.removeEventListener('input', onInput);
+      textarea.removeEventListener('keydown', onKeyDown);
+      textarea.removeEventListener('select', updateToolbar);
+      textarea.removeEventListener('keyup', updateToolbar);
+      textarea.removeEventListener('mouseup', updateToolbar);
+      textarea.removeEventListener('compositionstart', onComposition);
+      textarea.removeEventListener('compositionend', onComposition);
+      textarea.classList.toggle('markdown-text-source', false);
+      textarea.hidden = false;
       removeDoubleEnterSubmit();
       restoreTextareaFromEditor(marker, wrapper, textarea);
     },
-    focus() { textarea.focus(); },
-    sync() {},
+    focus() { if (preview.hidden) textarea.focus(); else setPreview(false); },
+    sync() {
+      fit();
+      updateToolbar();
+      if (!preview.hidden) preview.innerHTML = renderMarkdown(textarea.value, { interactiveTasks: true });
+    },
     insertText(text) {
       if (!text) return;
+      if (!preview.hidden) setPreview(false);
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       commit(`${textarea.value.slice(0, start)}${text}${textarea.value.slice(end)}`, start + text.length, start + text.length);
@@ -832,10 +973,395 @@ function deleteAtSelection(blocks, selection, direction) {
 }
 
 /**
- * Mount the native block editor while preserving the textarea as the public
- * compatibility source for forms, auto-grow listeners, and external callers.
+ * Edit the original textarea directly so forms and external callers always
+ * receive the unmodified source. The older block view remains opt-in.
  */
-export function mountMarkdownEditor(textarea, { mode, onChange, onEmptyParagraphEnter } = {}) {
+export function mountMarkdownEditor(textarea, options = {}) {
+  if (!textarea?.parentNode) throw new TypeError('mountMarkdownEditor requires a connected textarea');
+  if (options.mode === 'blocks') return mountActiveBlockMarkdownEditor(textarea, options);
+  return mountSimpleMarkdownEditor(textarea, options.onChange, options.onEmptyParagraphEnter, options);
+}
+
+function mountActiveBlockMarkdownEditor(textarea, { onChange, onEmptyParagraphEnter } = {}) {
+  if (!textarea?.parentNode) throw new TypeError('mountMarkdownEditor requires a connected textarea');
+  const parent = textarea.parentNode;
+  const marker = document.createComment('markdown-editor');
+  const wrapper = document.createElement('div');
+  const toolbar = document.createElement('div');
+  const content = document.createElement('div');
+  wrapper.className = 'markdown-editor';
+  wrapper.dataset.editorMode = 'toolbar';
+  toolbar.className = 'markdown-editor-toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Markdown editor');
+  content.className = 'markdown-editor-content markdown-editor-preview';
+  content.dataset.markdownEditorRoot = 'true';
+  const commands = [
+    ['bold', 'B', 'Bold'],
+    ['italic', 'I', 'Italic'],
+    ['link', '↗', 'Link'],
+    ['paragraph', 'P', 'Paragraph'],
+    ['heading', 'H2', 'Heading'],
+    ['unordered-list', '•', 'List'],
+    ['ordered-list', '1.', 'Ordered list'],
+    ['todo', '☐', 'Todo'],
+    ['quote', '❞', 'Quote'],
+    ['code', '</>', 'Code'],
+    ['table', '▦', 'Table'],
+    ['rule', '—', 'Rule'],
+  ];
+  commands.forEach(([command, label, title]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.markdownCommand = command;
+    button.title = title;
+    button.setAttribute('aria-label', title);
+    button.setAttribute('aria-pressed', 'false');
+    button.textContent = label;
+    toolbar.appendChild(button);
+  });
+  parent.insertBefore(marker, textarea);
+  parent.insertBefore(wrapper, textarea);
+  wrapper.append(textarea, toolbar, content);
+  textarea.hidden = true;
+
+  let blocks = blocksFromMarkdown(textarea.value);
+  let activePath = null;
+  let activeSource = '';
+  let activeSelection = { start: 0, end: 0 };
+  let composing = false;
+  let emitting = false;
+  let lastEmittedValue = textarea.value;
+
+  const activeTextarea = () => content.querySelector('.markdown-editor-active-source');
+  const updateToolbar = () => {
+    const state = activePath
+      ? activeToolbarState(activeSource, activeSelection.start, activeSelection.end)
+      : activeToolbarState('', 0, 0);
+    const stateKeys = {
+      bold: 'bold',
+      italic: 'italic',
+      link: 'link',
+      heading: 'heading',
+      'unordered-list': 'unorderedList',
+      'ordered-list': 'orderedList',
+      todo: 'task',
+      quote: 'quote',
+      code: 'codeBlock',
+      table: 'table',
+      rule: 'rule',
+    };
+    commands.forEach(([command]) => {
+      const button = toolbar.querySelector(`[data-markdown-command="${command}"]`);
+      const pressed = Boolean(state[stateKeys[command]]);
+      button?.setAttribute('aria-pressed', String(pressed));
+      if (button) button.ariaPressed = String(pressed);
+    });
+  };
+  const render = ({ focus = false } = {}) => {
+    renderPreviewBlocks(content, blocks);
+    if (!activePath) {
+      updateToolbar();
+      return;
+    }
+    const target = content.querySelector(`[data-block-path="${activePath.join('.')}"]`);
+    if (!target) {
+      activePath = null;
+      activeSource = '';
+      updateToolbar();
+      return;
+    }
+    const source = document.createElement('textarea');
+    source.className = 'markdown-editor-active-source';
+    source.dataset.blockPath = activePath.join('.');
+    source.value = activeSource;
+    source.setAttribute('aria-label', 'Edit Markdown block');
+    target.replaceWith(source);
+    source.setSelectionRange(activeSelection.start, activeSelection.end);
+    updateToolbar();
+    if (focus) requestAnimationFrame(() => {
+      source.focus();
+      source.setSelectionRange(activeSelection.start, activeSelection.end);
+    });
+  };
+  const emitValue = (value) => {
+    textarea.value = value;
+    lastEmittedValue = value;
+    emitting = true;
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    emitting = false;
+    onChange?.(value);
+  };
+  const rememberActiveSelection = () => {
+    const source = activeTextarea();
+    if (!source) return activeSelection;
+    activeSelection = {
+      start: source.selectionStart ?? 0,
+      end: source.selectionEnd ?? source.selectionStart ?? 0,
+    };
+    return activeSelection;
+  };
+  const processActiveInput = ({ parse = true } = {}) => {
+    const source = activeTextarea();
+    if (!source || !activePath) return;
+    activeSource = source.value.replace(/\r\n?/g, '\n');
+    rememberActiveSelection();
+    if (parse) {
+      const previousPath = activePath;
+      const replacement = replaceActiveBlockSource(blocks, previousPath, activeSource);
+      if (replacement.valid) {
+        blocks = replacement.blocks;
+        activePath = replacement.nextPath;
+        const keepsOneTopLevelBlock = previousPath.length === 1 && samePath(previousPath, activePath);
+        emitValue(keepsOneTopLevelBlock
+          ? serializeWithActiveBlockSource(blocks, activePath, activeSource)
+          : serializeMarkdown(blocks));
+      } else {
+        emitValue(serializeWithActiveBlockSource(blocks, activePath, activeSource));
+      }
+    } else {
+      emitValue(serializeWithActiveBlockSource(blocks, activePath, activeSource));
+    }
+    updateToolbar();
+  };
+  const commitActive = ({ deactivate = true } = {}) => {
+    if (!activePath) return;
+    processActiveInput({ parse: !composing });
+    blocks = blocksFromMarkdown(textarea.value);
+    if (deactivate) {
+      activePath = null;
+      activeSource = '';
+      activeSelection = { start: 0, end: 0 };
+    }
+  };
+  const activate = (path) => {
+    if (!path) return;
+    if (activePath && samePath(activePath, path)) {
+      activeTextarea()?.focus();
+      return;
+    }
+    if (activePath) commitActive();
+    activePath = [...path];
+    activeSource = readActiveBlockSource(blocks, activePath);
+    if (activeSource === null) {
+      activePath = null;
+      return;
+    }
+    activeSelection = { start: 0, end: activeSource.length };
+    render({ focus: true });
+  };
+  const applyInlineCommand = (command) => {
+    if (!activePath) activate([0]);
+    const source = activeTextarea();
+    if (!source) return;
+    const selection = rememberActiveSelection();
+    const currentState = activeToolbarState(activeSource, selection.start, selection.end);
+    let url;
+    if (command === 'link' && !currentState.link && typeof globalThis.prompt === 'function') {
+      url = globalThis.prompt('Link URL', 'https://example.com');
+      if (url === null) return;
+    }
+    const result = toggleInlineSource(activeSource, selection.start, selection.end, command, url);
+    activeSource = result.source;
+    activeSelection = { start: result.selectionStart, end: result.selectionEnd };
+    source.value = activeSource;
+    source.setSelectionRange(activeSelection.start, activeSelection.end);
+    processActiveInput();
+  };
+  const applyBlockCommand = (command) => {
+    if (!activePath) activate([0]);
+    const source = activeTextarea();
+    if (!source) return;
+    const mapped = {
+      heading: 'heading',
+      'unordered-list': 'unordered-list',
+      'ordered-list': 'ordered-list',
+      todo: 'task',
+      quote: 'quote',
+      code: 'code-block',
+      table: 'table',
+      rule: 'rule',
+    }[command];
+    const result = command === 'paragraph'
+      ? { source: paragraphSource(activeSource), selectionStart: 0, selectionEnd: paragraphSource(activeSource).length }
+      : toggleBlockSource(activeSource, mapped);
+    activeSource = result.source;
+    activeSelection = { start: result.selectionStart, end: result.selectionEnd };
+    source.value = activeSource;
+    source.setSelectionRange(activeSelection.start, activeSelection.end);
+    processActiveInput();
+  };
+  const onMouseDown = (event) => {
+    if (!event.target.closest?.('[data-markdown-command]')) return;
+    rememberActiveSelection();
+    event.preventDefault();
+  };
+  const onClick = (event) => {
+    const button = event.target.closest?.('[data-markdown-command]');
+    if (button && wrapper.contains(button)) {
+      event.preventDefault();
+      const command = button.dataset.markdownCommand;
+      if (['bold', 'italic', 'link'].includes(command)) applyInlineCommand(command);
+      else applyBlockCommand(command);
+      return;
+    }
+    if (event.target.closest?.('[data-markdown-editor-task="true"]')) return;
+    if (event.target.closest?.('a') && !event.metaKey && !event.ctrlKey) {
+      event.preventDefault();
+      return;
+    }
+    const block = event.target.closest?.('[data-block-path]');
+    if (block && content.contains(block)) {
+      activate(parsePath(block.dataset.blockPath));
+      return;
+    }
+    if (event.target === content && !activePath) activate([0]);
+  };
+  const onInput = (event) => {
+    if (!event.target.closest?.('.markdown-editor-active-source')) return;
+    processActiveInput({ parse: !composing && !event.isComposing });
+  };
+  const onComposition = (event) => {
+    if (!event.target.closest?.('.markdown-editor-active-source')) return;
+    composing = event.type === 'compositionstart';
+    if (!composing) processActiveInput();
+  };
+  const onKeyDown = (event) => {
+    if (!event.target.closest?.('.markdown-editor-active-source')) return;
+    if (composing || event.isComposing || event.keyCode === 229) return;
+    if ((event.metaKey || event.ctrlKey) && ['b', 'i', 'k'].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      applyInlineCommand(event.key.toLowerCase() === 'b' ? 'bold' : event.key.toLowerCase() === 'i' ? 'italic' : 'link');
+      return;
+    }
+    const plainEnter = event.key === 'Enter'
+      && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat;
+    if (plainEnter) {
+      event.preventDefault();
+      const source = activeTextarea();
+      const selection = rememberActiveSelection();
+      if (onEmptyParagraphEnter && selection.start === selection.end
+        && selection.end === activeSource.length
+        && (!activeSource || activeSource.endsWith('\n'))) {
+        onEmptyParagraphEnter();
+        return;
+      }
+      activeSource = `${activeSource.slice(0, selection.start)}\n${activeSource.slice(selection.end)}`;
+      activeSelection = { start: selection.start + 1, end: selection.start + 1 };
+      source.value = activeSource;
+      source.setSelectionRange(activeSelection.start, activeSelection.end);
+      processActiveInput();
+      return;
+    }
+  };
+  const onPaste = (event) => {
+    if (!event.target.closest?.('.markdown-editor-active-source') || composing || event.isComposing) return;
+    const pasted = event.clipboardData?.getData('text/plain')?.replace(/\r\n?/g, '\n');
+    if (pasted === undefined) return;
+    event.preventDefault();
+    const source = activeTextarea();
+    const selection = rememberActiveSelection();
+    activeSource = `${activeSource.slice(0, selection.start)}${pasted}${activeSource.slice(selection.end)}`;
+    activeSelection = { start: selection.start + pasted.length, end: selection.start + pasted.length };
+    source.value = activeSource;
+    source.setSelectionRange(activeSelection.start, activeSelection.end);
+    processActiveInput();
+  };
+  const onFocusOut = (event) => {
+    if (!event.target.closest?.('.markdown-editor-active-source')) return;
+    if (event.relatedTarget && wrapper.contains(event.relatedTarget)) return;
+    commitActive();
+    render();
+  };
+  const onTaskChange = (event) => {
+    const checkbox = event.target.closest?.('[data-markdown-editor-task="true"]');
+    if (!checkbox || !content.contains(checkbox)) return;
+    const path = parsePath(checkbox.dataset.markdownTaskPath);
+    if (!path) return;
+    try {
+      blocks = toggleTaskItem(blocks, path);
+      const value = activePath
+        ? serializeWithActiveBlockSource(blocks, activePath, activeSource)
+        : serializeMarkdown(blocks);
+      emitValue(value);
+      render();
+    } catch {
+      // Ignore stale task paths from an event queued before an external sync.
+    }
+  };
+  const onTextareaInput = () => {
+    if (emitting || textarea.value === lastEmittedValue) return;
+    blocks = blocksFromMarkdown(textarea.value);
+    lastEmittedValue = textarea.value;
+    activePath = null;
+    activeSource = '';
+    activeSelection = { start: 0, end: 0 };
+    render();
+  };
+
+  wrapper.addEventListener('mousedown', onMouseDown);
+  wrapper.addEventListener('click', onClick);
+  wrapper.addEventListener('input', onInput);
+  wrapper.addEventListener('compositionstart', onComposition);
+  wrapper.addEventListener('compositionend', onComposition);
+  wrapper.addEventListener('keydown', onKeyDown);
+  wrapper.addEventListener('paste', onPaste);
+  wrapper.addEventListener('focusout', onFocusOut);
+  wrapper.addEventListener('change', onTaskChange);
+  textarea.addEventListener('input', onTextareaInput);
+  render();
+
+  return {
+    destroy() {
+      wrapper.removeEventListener('mousedown', onMouseDown);
+      wrapper.removeEventListener('click', onClick);
+      wrapper.removeEventListener('input', onInput);
+      wrapper.removeEventListener('compositionstart', onComposition);
+      wrapper.removeEventListener('compositionend', onComposition);
+      wrapper.removeEventListener('keydown', onKeyDown);
+      wrapper.removeEventListener('paste', onPaste);
+      wrapper.removeEventListener('focusout', onFocusOut);
+      wrapper.removeEventListener('change', onTaskChange);
+      textarea.removeEventListener('input', onTextareaInput);
+      textarea.hidden = false;
+      restoreTextareaFromEditor(marker, wrapper, textarea);
+    },
+    focus() {
+      if (!activePath) activate([0]);
+      else activeTextarea()?.focus();
+    },
+    sync() { onTextareaInput(); },
+    insertText(text) {
+      if (!text) return;
+      if (!activePath) activate([0]);
+      const source = activeTextarea();
+      if (!source) return;
+      const selection = rememberActiveSelection();
+      activeSource = `${activeSource.slice(0, selection.start)}${text}${activeSource.slice(selection.end)}`;
+      activeSelection = { start: selection.start + text.length, end: selection.start + text.length };
+      source.value = activeSource;
+      source.setSelectionRange(activeSelection.start, activeSelection.end);
+      processActiveInput();
+    },
+    getValue() { return textarea.value; },
+    getSelectionContext() {
+      return { value: textarea.value, offset: activeTextarea()?.selectionStart ?? textarea.selectionStart ?? 0 };
+    },
+  };
+}
+
+function paragraphSource(source) {
+  return String(source)
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-+*]\s+\[[ xX]\]\s+/, '')
+    .replace(/^[-+*]\s+/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/^> ?/, '')
+    .replace(/^```[^\n]*\n([\s\S]*?)\n```$/, '$1')
+    .replace(/^\s*(?:---|___|\*\*\*)\s*$/, '');
+}
+
+function mountLegacyMarkdownEditor(textarea, { mode, onChange, onEmptyParagraphEnter } = {}) {
   if (!textarea?.parentNode) throw new TypeError('mountMarkdownEditor requires a connected textarea');
   if (mode === 'simple') return mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter);
   const editorMode = normalizeMarkdownEditorMode(mode);

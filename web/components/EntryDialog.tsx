@@ -97,11 +97,11 @@ export default function EntryDialog({ draft, onClose }: { draft: EntryDraft; onC
         </label>
       </div>
 
-      <label className="field" style={{ marginTop: 12 }}>
-        <span>工作紀錄</span>
-        <MarkdownBlockEditor value={form.notes} min={96} max={360} placeholder="這段時間做了什麼？"
+      <div className="field" style={{ marginTop: 12 }}>
+        <label htmlFor="entry-notes">工作紀錄</label>
+        <MarkdownBlockEditor id="entry-notes" value={form.notes} min={96} placeholder="這段時間做了什麼？"
           onChange={(v) => setForm({ ...form, notes: v })} />
-      </label>
+      </div>
 
       {FEATURES.workNoteImagesAndSharing && form.id && <>
         <AttachmentPicker target={{ kind: 'entry', id: form.id }} attachments={[]} />

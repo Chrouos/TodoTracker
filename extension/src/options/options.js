@@ -18,7 +18,6 @@ import { timelineSVG, stackedAreaSVG, heatmapSVG, lineSVG, donutSVG } from '../l
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
-import { autoGrow } from '../lib/autogrow.js';
 import { createToast } from '../lib/toast.js';
 import { compareTodoTasks, dueTodoAlerts, flattenTodoTree, taskMetrics, entriesForTask, dueLabel, leadLabel, stampLabel } from '../lib/tasks.js';
 import { renderMarkdown, shouldShowMarkdownToggle } from '../lib/markdown.js';
@@ -49,10 +48,7 @@ import {
   serializeTaskCheckboxToggle,
 } from '../lib/markdown-editor.js';
 
-const growNotes = autoGrow(document.getElementById('enNotes'), { min: 96, max: 360 });
-autoGrow(document.getElementById('tdNotes'), { min: 80, max: 320 });
-autoGrow(document.getElementById('pjNoteDraft'), { min: 72, max: 320 });
-autoGrow(document.getElementById('scNotes'), { min: 72, max: 280 });
+const growNotes = () => syncMarkdownEditor(document.getElementById('enNotes'));
 
 const $ = (id) => document.getElementById(id);
 const showToast = createToast($('appToast'));
@@ -63,20 +59,16 @@ const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
 const displayDate = (value) => formatDisplayDate(value, currentLocale);
 const displayClock = (value) => formatDisplayTime(value, currentLocale);
 
-function renderMarkdownPreview(markdown, className = '', { interactiveTasks = false, inputId = '' } = {}) {
-  return `<div class="${className} markdown-preview" data-markdown-preview${inputId ? ` data-markdown-preview-input="${inputId}"` : ''}>
+function renderMarkdownPreview(markdown, className = '', { interactiveTasks = false, inputId = '', alwaysExpanded = false } = {}) {
+  return `<div class="${className} markdown-preview" data-markdown-preview${alwaysExpanded ? ' data-markdown-preview-full' : ''}${inputId ? ` data-markdown-preview-input="${inputId}"` : ''}>
     <div data-markdown-content>${renderMarkdown(markdown, { interactiveTasks })}</div>
   </div>`;
 }
 
 const markdownEditors = new Map();
 
-function markdownEditorMode(mode) {
-  return mode === 'source' ? 'source' : 'simple';
-}
-
 function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
-  const editorMode = markdownEditorMode(mode);
+  const editorMode = normalizeMarkdownEditorMode(mode);
   markdownEditors.forEach((editor, textarea) => {
     if (!document.contains(textarea)) { editor.destroy(); markdownEditors.delete(textarea); }
   });
@@ -84,6 +76,9 @@ function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
     markdownEditors.get(textarea)?.destroy();
     markdownEditors.set(textarea, mountMarkdownEditor(textarea, {
       mode: editorMode,
+      min: textarea.id === 'mgTimerNotes' ? 300 : 160,
+      preview: textarea.id !== 'mgTimerNotes',
+      translate: (key) => translateText(`editor.${key}`),
       onEmptyParagraphEnter: textarea.id === 'enNotes'
         ? () => $('entryForm').requestSubmit($('entrySave'))
         : undefined,
@@ -113,7 +108,7 @@ function measureMarkdownPreview(preview, preserveExpanded = false, alwaysExpande
   const collapsedHeight = Number.parseFloat(
     getComputedStyle(preview).getPropertyValue('--markdown-preview-collapsed-height'),
   );
-  const isLong = !alwaysExpanded
+  const isLong = !alwaysExpanded && !preview.hasAttribute('data-markdown-preview-full')
     && shouldShowMarkdownToggle(content.textContent, content.scrollHeight, collapsedHeight);
   preview.classList.toggle('is-collapsible', isLong);
   let button = preview.querySelector('[data-markdown-toggle]');
@@ -183,8 +178,12 @@ document.addEventListener('change', (event) => {
   textarea.dispatchEvent(new Event('input', { bubbles: true }));
   const host = preview.parentElement;
   const className = [...preview.classList].filter((name) => name !== 'markdown-preview').join(' ');
-  preview.outerHTML = renderMarkdownPreview(textarea.value, className, { interactiveTasks: true, inputId: textarea.id });
-  if (host) initializeMarkdownPreviews(host);
+  preview.outerHTML = renderMarkdownPreview(textarea.value, className, {
+    interactiveTasks: true,
+    inputId: textarea.id,
+    alwaysExpanded: preview.hasAttribute('data-markdown-preview-full'),
+  });
+  if (host) initializeMarkdownPreviews(host, true);
 });
 let range = 'week';
 const customRange = { from: '', to: '' };
@@ -322,9 +321,11 @@ function startTimerTicker(timer) {
 
 function renderTimerNotesPreview() {
   const container = $('mgTimerNotesPreview');
+  container.classList.toggle('is-nowrap', $('mgTimerNotes').wrap === 'off');
   container.innerHTML = renderMarkdownPreview($('mgTimerNotes').value, 'timer-notes-markdown', {
     interactiveTasks: true,
     inputId: 'mgTimerNotes',
+    alwaysExpanded: true,
   });
   initializeMarkdownPreviews(container, false, true);
 }
@@ -347,7 +348,14 @@ function setTimerNotesPreviewOpen(open) {
   $('mgTimerNotesPreview').hidden = !open;
   syncTimerNotesMode();
   if (open) renderTimerNotesPreview();
+  else markdownEditors.get($('mgTimerNotes'))?.sync();
 }
+
+$('mgTimerNotesPreview').addEventListener('click', (event) => {
+  if (event.target.closest('a, input')) return;
+  setTimerNotesPreviewOpen(false);
+  markdownEditors.get($('mgTimerNotes'))?.focus();
+});
 
 function renderTimer() {
   const timer = S.timer;
@@ -1578,8 +1586,10 @@ function renderProjectNotes() {
   if (noteEditingId) {
     const ta = $('pjNoteList').querySelector(`[data-note-input="${noteEditingId}"]`);
     if (ta) {
-      autoGrow(ta, { min: 72, max: 400 });
-      markdownEditors.set(ta, mountMarkdownEditor(ta, { mode: markdownEditorMode(S.settings.notesEditor) }));
+      markdownEditors.set(ta, mountMarkdownEditor(ta, {
+        mode: normalizeMarkdownEditorMode(S.settings.notesEditor),
+        translate: (key) => translateText(`editor.${key}`),
+      }));
       markdownEditors.get(ta).focus();
     }
   }

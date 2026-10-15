@@ -25,11 +25,22 @@ export default function AutoTextarea({
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = 'auto';                 // 先收掉才量得到真實 scrollHeight
-    const want = Math.max(min, el.scrollHeight + 2);
-    el.style.height = `${Math.min(max, want)}px`;
-    el.style.overflowY = want > max ? 'auto' : 'hidden';
-  }, [value, min, max]);
+    const fit = () => {
+      el.style.height = 'auto';
+      const want = Math.max(min, el.scrollHeight + 2);
+      el.style.height = `${Math.min(max, want)}px`;
+      el.style.overflowY = want > max ? 'auto' : 'hidden';
+    };
+    fit();
+    let previousWidth = el.getBoundingClientRect().width;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry || entry.contentRect.width === previousWidth) return;
+      previousWidth = entry.contentRect.width;
+      fit();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value, min, max, rest.wrap, rest.hidden]);
 
   return (
     <textarea

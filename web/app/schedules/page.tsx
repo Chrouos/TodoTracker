@@ -134,10 +134,10 @@ export default function SchedulesPage() {
           </label>
         </div>
 
-        <label className="field" style={{ marginTop: 12 }}><span>備註</span>
-          <MarkdownBlockEditor value={form.notes} min={72} max={280}
+        <div className="field" style={{ marginTop: 12 }}><label htmlFor="schedule-notes">備註</label>
+          <MarkdownBlockEditor id="schedule-notes" value={form.notes} min={72}
             placeholder="會一併寫進產生的 Todo"
-            onChange={(v) => setForm({ ...form, notes: v })} /></label>
+            onChange={(v) => setForm({ ...form, notes: v })} /></div>
 
         <div className="actions">
           <button type="submit" className="btn-primary">{form.id ? '儲存變更' : '新增排程'}</button>

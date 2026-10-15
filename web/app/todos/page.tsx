@@ -114,10 +114,10 @@ export default function TodosPage() {
           </label>
         </div>
 
-        <label className="field" style={{ marginTop: 12 }}><span>備註</span>
-          <MarkdownBlockEditor value={form.notes} min={80} max={320}
+        <div className="field" style={{ marginTop: 12 }}><label htmlFor="todo-notes">備註</label>
+          <MarkdownBlockEditor id="todo-notes" value={form.notes} min={80}
             placeholder="細節、連結、驗收條件…"
-            onChange={(v) => setForm({ ...form, notes: v })} /></label>
+            onChange={(v) => setForm({ ...form, notes: v })} /></div>
 
         <div className="actions">
           <button type="submit" className="btn-primary">{form.id ? '儲存變更' : '新增 Todo'}</button>

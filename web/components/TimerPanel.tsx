@@ -126,8 +126,7 @@ export default function TimerPanel() {
             <MarkdownBlockEditor
               ref={notesRef}
               value={notes}
-              min={96}
-              max={360}
+              min={300}
               placeholder="隨時寫，停止計時時一起存進這筆"
               onChange={writeNotes}
             />

@@ -18,6 +18,33 @@ export type Block =
   | { type: 'table'; header: Inline[][]; alignments: TableAlignment[]; rows: Inline[][][] }
   | { type: 'horizontalRule' };
 export type MarkdownEditorMode = 'edit' | 'preview';
+export type ActiveBlockReplacement = { blocks: Block[]; valid: boolean; nextPath: TaskPath };
+export type InlineSourceCommand = 'bold' | 'italic' | 'inline-code' | 'link';
+export type BlockSourceCommand =
+  | 'heading'
+  | 'unordered-list'
+  | 'ordered-list'
+  | 'task'
+  | 'quote'
+  | 'code-block'
+  | 'table'
+  | 'rule';
+export type SourceToggleResult = { source: string; selectionStart: number; selectionEnd: number };
+export type SourceCommand = InlineSourceCommand | BlockSourceCommand | 'paragraph';
+export type ToolbarState = {
+  bold: boolean;
+  italic: boolean;
+  inlineCode: boolean;
+  link: boolean;
+  heading: boolean;
+  unorderedList: boolean;
+  orderedList: boolean;
+  task: boolean;
+  quote: boolean;
+  codeBlock: boolean;
+  table: boolean;
+  rule: boolean;
+};
 export type Shortcut =
   | { type: 'heading'; level: number }
   | { type: 'task'; checked: boolean }
@@ -30,6 +57,14 @@ export function parseMarkdown(markdown: string): Block[];
 export function serializeMarkdown(blocks: Block[]): string;
 export function renderMarkdown(markdown: string, options?: { interactiveTasks?: boolean }): string;
 export function renderBlocks(blocks: Block[], options?: { interactiveTasks?: boolean }): string;
+export function readActiveBlockSource(blocks: Block[], path: TaskPath): string | null;
+export function replaceActiveBlockSource(blocks: Block[], path: TaskPath, source: string): ActiveBlockReplacement;
+export function serializeWithActiveBlockSource(blocks: Block[], path: TaskPath, source: string): string;
+export function toggleInlineSource(source: string, start: number, end: number, command: InlineSourceCommand, url?: string): SourceToggleResult;
+export function formatSourceSelection(source: string, start: number, end: number, command: SourceCommand): SourceToggleResult;
+export function toggleTaskSource(source: string, path: TaskPath): string;
+export function toggleBlockSource(source: string, command: BlockSourceCommand): SourceToggleResult;
+export function activeToolbarState(source: string, start: number, end: number): ToolbarState;
 export function detectMarkdownShortcut(text: string): Shortcut | null;
 export function continueBlock(blocks: Block[], path: TaskPath): Block[];
 export function exitEmptyBlock(blocks: Block[], path: TaskPath): Block[];
