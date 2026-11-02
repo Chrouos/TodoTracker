@@ -26,7 +26,7 @@ import {
   priorityLabel, statusLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
-import { reportRangeBounds, trendDateBounds } from '../lib/report-range.js';
+import { comparisonBounds, deltaPercent, reportRangeBounds, trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
 import {
@@ -557,21 +557,44 @@ function bindReportChartCollapses() {
   });
 }
 
+function reportKpis(from, to) {
+  const rows = S.entries.filter((e) => entryOverlapsRange(e, from, to));
+  const seconds = rows.reduce((s, e) => s + durationInRange(e, from, to), 0);
+  const fromKey = fmtDate(from);
+  const toKey = to ? fmtDate(new Date(to.getTime() - 1)) : null;
+  const days = new Set(rows.flatMap((e) => splitEntryByDay(e)
+    .map((part) => fmtDate(part.startedAt))
+    .filter((date) => date >= fromKey && (!toKey || date <= toKey)))).size;
+  return { seconds, count: rows.length, average: rows.length ? seconds / rows.length : 0, days };
+}
+
+// 數字和單位分開，單位才能縮小變淡
+const kpiDurationHtml = (seconds) => esc(fmtHM(seconds)).replace(/\D+/g, (unit) => `<span class="kpi-unit">${unit}</span>`);
+
+function renderKpiDeltas(from, to) {
+  const bounds = comparisonBounds(range, { from, to }, new Date());
+  const current = bounds && reportKpis(bounds.current.from, bounds.current.to);
+  const previous = bounds && reportKpis(bounds.previous.from, bounds.previous.to);
+  [['kTimeDelta', 'seconds'], ['kCountDelta', 'count'], ['kAvgDelta', 'average'], ['kDaysDelta', 'days']].forEach(([id, key]) => {
+    const delta = bounds ? deltaPercent(current[key], previous[key]) : null;
+    // 工時多寡沒有好壞之分，所以只用箭頭、不用紅綠色
+    if (delta === null) $(id).textContent = '';
+    else if (delta === 0) $(id).textContent = translateText('report.noChange');
+    else $(id).textContent = `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)}% ${translateText('report.vsPrevious')}`;
+  });
+}
+
 function renderReport() {
   const rows = inRange();
   const from = rangeStart();
   const to = rangeEnd();
-  const sec = rows.reduce((s, e) => s + durationInRange(e, from, to), 0);
-  const fromKey = fmtDate(from);
-  const toKey = to ? fmtDate(new Date(to.getTime() - 1)) : null;
-  const dayKeys = new Set(rows.flatMap((e) => splitEntryByDay(e)
-    .map((part) => fmtDate(part.startedAt))
-    .filter((date) => date >= fromKey && (!toKey || date <= toKey))));
+  const kpis = reportKpis(from, to);
 
-  $('kTime').textContent = fmtHM(sec);
-  $('kCount').textContent = rows.length;
-  $('kAvg').textContent = rows.length ? fmtHM(sec / rows.length) : '—';
-  $('kDays').textContent = dayKeys.size;
+  $('kTime').innerHTML = kpiDurationHtml(kpis.seconds);
+  $('kCount').textContent = kpis.count;
+  if (kpis.count) $('kAvg').innerHTML = kpiDurationHtml(kpis.average); else $('kAvg').textContent = '—';
+  $('kDays').textContent = kpis.days;
+  renderKpiDeltas(from, to);
   renderDueAlerts();
   renderReportInsights(rows, from, to);
 

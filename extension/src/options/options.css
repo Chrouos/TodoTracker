@@ -613,6 +613,11 @@ section[hidden] { display: none; }
 }
 #p-report > .kpis .kpi { min-height: 92px; justify-content: center; padding: 18px 20px; }
 #p-report > .kpis .kpi .num { font-size: 30px; line-height: 1.1; letter-spacing: -.4px; }
+#p-report > .kpis .kpi:first-child .num { font-size: 36px; }
+#p-report > .kpis .kpi-unit { margin: 0 2px; color: var(--text-mute); font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.kpi-delta { color: var(--text-mute); line-height: 1.2; }
+.kpi-delta:empty { display: none; }
+@media (min-width: 851px) { #p-report > .kpis { grid-template-columns: 1.4fr 1fr 1fr 1fr; } }
 #p-report > h2.sec,
 #p-report > .report-panel > h2.sec {
     margin: 24px 0 10px;
