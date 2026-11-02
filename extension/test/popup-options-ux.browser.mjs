@@ -77,6 +77,7 @@ async function open(url, storage, viewport = { width: 380, height: 600 }) {
   });
   await context.exposeBinding('__set', (_, patch) => { Object.assign(storage, patch); });
   await context.exposeBinding('__remove', (_, key) => { delete storage[key]; });
+  await context.exposeBinding('__clear', () => { Object.keys(storage).forEach((key) => delete storage[key]); });
   await context.addInitScript(() => {
     const listeners = [];
     const event = { addListener() {}, removeListener() {} };
@@ -86,7 +87,7 @@ async function open(url, storage, viewport = { width: 380, height: 600 }) {
     };
     window.chrome = {
       storage: {
-        local: { get: (key) => window.__get(key), set: (patch) => window.__set(patch), remove: (key) => window.__remove(key), clear: async () => {} },
+        local: { get: (key) => window.__get(key), set: (patch) => window.__set(patch), remove: (key) => window.__remove(key), clear: () => window.__clear() },
         onChanged: { addListener: (listener) => listeners.push(listener), removeListener() {} },
       },
       i18n: { getUILanguage: () => 'zh-TW' },
@@ -103,6 +104,16 @@ async function open(url, storage, viewport = { width: 380, height: 600 }) {
   await page.waitForFunction(() => document.getElementById('initialLoading')?.hidden);
   return { context, page, errors };
 }
+
+// A toast lasts 1.5 seconds, so a slow step could finish after it has gone. Record every message instead.
+const recordToasts = (page) => page.evaluate(() => {
+  window.__toasts = [];
+  const toast = document.getElementById('appToast');
+  new MutationObserver(() => {
+    if (toast.textContent) window.__toasts.push(toast.textContent);
+  }).observe(toast, { childList: true });
+});
+const waitForToast = (page, text) => page.waitForFunction((expected) => window.__toasts.includes(expected), text);
 
 test('popup: Space on a focused button does that button\'s job, not the timer', async () => {
   const storage = seed();
@@ -292,9 +303,10 @@ test('popup: the start time of a running timer can be corrected', async () => {
   assert.equal(storage.timer.idleSince, null, 'idle before the new start no longer needs an answer');
 
   const before = storage.timer.startedAt;
+  await recordToasts(page);
   await input.fill(localInput(new Date(Date.now() + 3600000).toISOString()));
   await input.blur();
-  await page.locator('#appToast.is-visible').waitFor();
+  await waitForToast(page, '開始時間必須早於現在');
   assert.equal(storage.timer.startedAt, before);
   assert.equal(await input.inputValue(), localInput(before));
   await context.close();
@@ -364,6 +376,146 @@ test('options: the start time of a running timer can be corrected', async () => 
   await page.locator('#mgTimerStart').blur();
   await page.waitForFunction(() => document.getElementById('mgTimerClock').textContent.startsWith('00:0'));
   assert.ok(Math.abs(Date.now() - new Date(storage.timer.startedAt)) < 6.5 * 60000);
+  await context.close();
+});
+
+test('options: Esc only asks before closing an entry dialog with changes', async () => {
+  const storage = seed();
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  const answers = [false, true];
+  let asked = 0;
+  page.on('dialog', async (dialog) => {
+    asked += 1;
+    await (answers.shift() ? dialog.accept() : dialog.dismiss());
+  });
+  await page.locator('[data-tab="entries"]').click();
+  const isOpen = () => page.locator('#entryDlg').evaluate((dialog) => dialog.open);
+
+  await page.locator('#addEntry').click();
+  await page.locator('#enDesc').focus();
+  await page.keyboard.press('Escape');
+  assert.equal(await isOpen(), false, 'an untouched dialog closes straight away');
+  assert.equal(asked, 0);
+
+  await page.locator('#addEntry').click();
+  await page.locator('#enDesc').fill('half written');
+  await page.keyboard.press('Escape');
+  assert.equal(asked, 1);
+  assert.equal(await isOpen(), true, 'declining keeps the dialog and its text');
+  assert.equal(await page.locator('#enDesc').inputValue(), 'half written');
+
+  await page.keyboard.press('Escape');
+  assert.equal(asked, 2);
+  assert.equal(await isOpen(), false);
+  await context.close();
+});
+
+test('options: saving settings shows a toast instead of a browser dialog', async () => {
+  const storage = seed();
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  let asked = 0;
+  page.on('dialog', async (dialog) => { asked += 1; await dialog.accept(); });
+  await page.locator('[data-tab="settings"]').click();
+  await recordToasts(page);
+  await page.locator('#saveSettings').click();
+  await waitForToast(page, '設定已儲存');
+  assert.equal(asked, 0);
+  await context.close();
+});
+
+test('options: a Todo title hint asks what to do, not what is happening now', async () => {
+  const { context, page } = await open(OPTIONS, seed(), { width: 1280, height: 860 });
+  assert.equal(await page.locator('#tdTitle').getAttribute('placeholder'), '要做什麼？');
+  await context.close();
+});
+
+test('options: importing downloads the current data first', async () => {
+  const storage = seed();
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  const messages = [];
+  page.on('dialog', async (dialog) => { messages.push(dialog.message()); await dialog.accept(); });
+  await page.locator('[data-tab="settings"]').click();
+  await recordToasts(page);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#restoreFile').setInputFiles({
+      name: 'backup.json', mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ version: 1, projects: [], tags: [], tasks: [{ id: 'imported', title: 'Imported', status: 'todo' }], entries: [] })),
+    }),
+  ]);
+  assert.match(download.suggestedFilename(), /^todotracker-before-import-/);
+  const saved = JSON.parse(await readFile(await download.path(), 'utf8'));
+  assert.ok(saved.tasks.some((task) => task.id === 'parent'), 'the backup holds the data being replaced');
+  await waitForToast(page, '資料已匯入');
+  assert.deepEqual(storage.tasks.map((task) => task.id), ['imported']);
+  assert.equal(messages.length, 1, 'success is a toast, only the confirmation is a dialog');
+  await context.close();
+});
+
+test('options: an unusable backup file changes nothing and downloads nothing', async () => {
+  const storage = seed();
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  const messages = [];
+  let downloads = 0;
+  page.on('dialog', async (dialog) => { messages.push(dialog.message()); await dialog.accept(); });
+  page.on('download', () => { downloads += 1; });
+  await page.locator('[data-tab="settings"]').click();
+  await page.locator('#restoreFile').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{"version":2}') });
+  await page.waitForFunction(() => document.getElementById('restoreFile').value === '');
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /匯入失敗|失敗/);
+  assert.equal(downloads, 0);
+  assert.ok(storage.tasks.some((task) => task.id === 'parent'));
+  await context.close();
+});
+
+test('options: clearing all data downloads a backup, and declining keeps everything', async () => {
+  const storage = seed();
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  const answers = [false, true];
+  page.on('dialog', async (dialog) => { await (answers.shift() ? dialog.accept() : dialog.dismiss()); });
+  await page.locator('[data-tab="settings"]').click();
+  await page.locator('#wipe').click();
+  await page.waitForTimeout(100);
+  assert.ok(storage.tasks.length, 'declining keeps the data');
+
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#wipe').click()]);
+  assert.match(download.suggestedFilename(), /^todotracker-before-wipe-/);
+  await page.waitForFunction(() => !document.querySelector('[data-check]'));
+  assert.equal(storage.tasks, undefined);
+  await context.close();
+});
+
+test('options: reminds about old unbacked data until backed up or snoozed', async () => {
+  const storage = seed();
+  storage.entries[0].startedAt = ago(30 * 24 * 60);
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  await page.locator('#backupBanner').waitFor();
+  await page.locator('#backupBannerLater').click();
+  await page.waitForFunction(() => document.getElementById('backupBanner').hidden);
+  assert.ok(new Date(storage.backupState.snoozeUntil) > new Date());
+
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('initialLoading')?.hidden);
+  assert.equal(await page.locator('#backupBanner').isVisible(), false, 'a snooze survives reopening');
+
+  delete storage.backupState;
+  await page.reload();
+  await page.locator('#backupBanner').waitFor();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#backupBannerNow').click()]);
+  assert.match(download.suggestedFilename(), /^todotracker-backup-/);
+  await page.waitForFunction(() => document.getElementById('backupBanner').hidden);
+  assert.ok(storage.backupState.lastBackupAt);
+  await context.close();
+});
+
+test('options: [x] only marks delete and schedule toggles use words', async () => {
+  const storage = seed();
+  storage.schedules = [{ id: 's1', title: 'Standup', projectId: 'web', priority: 'normal', weekdays: [1], createTime: '09:00', enabled: true }];
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  const rowButtons = await page.locator('#schList button').evaluateAll((buttons) => buttons.map((button) => button.textContent.trim()));
+  assert.equal(rowButtons.filter((text) => text === '[x]').length, 1, rowButtons.join(' | '));
+  assert.ok(!rowButtons.includes('[ ]'));
   await context.close();
 });
 

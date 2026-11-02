@@ -28,6 +28,7 @@ import {
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trackerLevel } from '../lib/todo-tracker.js';
+import { backupReminder, backupSnoozeUntil } from '../lib/backup.js';
 import { comparisonBounds, deltaPercent, reportRangeBounds, shiftRangeAnchor, trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
@@ -207,7 +208,7 @@ async function load() {
     db.listProjects({ includeArchived: true }), db.listTags(),
     db.listTasks(), db.listEntries(), db.listSchedules(), db.getTimer(), db.getSettings(), db.listCalendarPlans(),
   ]);
-  S = { projects, tags, tasks, entries, schedules, timer, settings, calendarPlans };
+  S = { projects, tags, tasks, entries, schedules, timer, settings, calendarPlans, backup: await db.getBackupState() };
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
@@ -1558,7 +1559,7 @@ function renderProjectNotes() {
                  <button class="btn-sm btn-primary" style="height:26px" data-note-save="${n.id}">${translateText('common.save')}</button>`
               : `<span class="act">
                    <button class="btn-sm" data-note-edit="${n.id}">${translateText('project.edit')}</button>
-                   <button class="btn-sm btn-danger" data-note-del="${n.id}">[x]</button>
+                   <button class="btn-sm btn-danger" data-note-del="${n.id}" title="${esc(translateText('common.delete'))}" aria-label="${esc(translateText('common.delete'))}">[x]</button>
                  </span>`}
           </div>
           ${editing
@@ -2020,7 +2021,7 @@ function renderTodos() {
             ${done ? '' : `<button class="btn-sm" data-run="${t.id}" title="${translateText('todo.start')}">[&gt;]</button>`}
             <button class="btn-sm" data-add-subtask="${t.id}" title="${translateText('todo.addSubtask')}">＋${translateText('todo.addSubtask')}</button>
             <button class="btn-sm" data-edit-t="${t.id}">${translateText('project.edit')}</button>
-            <button class="btn-sm btn-danger" data-del-t="${t.id}">[x]</button>
+            <button class="btn-sm btn-danger" data-del-t="${t.id}" title="${esc(translateText('common.delete'))}" aria-label="${esc(translateText('common.delete'))}">[x]</button>
           </div>
         </div>`;
       }).join('')
@@ -2172,7 +2173,7 @@ function renderSchedules() {
         ].filter(Boolean).join(' · ');
         return `<div class="row-item${s.enabled ? '' : ' done'}">
           <button class="btn-sm btn-ghost" data-sc-toggle="${s.id}" style="width:34px"
-            title="${s.enabled ? translateText('common.disabled') : translateText('common.enabled')}">${s.enabled ? '[x]' : '[ ]'}</button>
+            title="${s.enabled ? translateText('common.disabled') : translateText('common.enabled')}">${translateText(s.enabled ? 'common.enabled' : 'common.disabled')}</button>
           <span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(s.title)}
@@ -2185,7 +2186,7 @@ function renderSchedules() {
           </div>
           <div class="act">
             <button class="btn-sm" data-sc-edit="${s.id}">${translateText('project.edit')}</button>
-            <button class="btn-sm btn-danger" data-sc-del="${s.id}">[x]</button>
+            <button class="btn-sm btn-danger" data-sc-del="${s.id}" title="${esc(translateText('common.delete'))}" aria-label="${esc(translateText('common.delete'))}">[x]</button>
           </div>
         </div>`;
       }).join('')
@@ -2282,7 +2283,7 @@ function renderTags() {
     ? S.tags.map((t) => `<div class="row-item">
         <span class="swatch" style="background:${t.color}"></span>
         <div class="main">${esc(t.name)}</div>
-        <div class="act"><button class="btn-sm btn-danger" data-del-t="${t.id}">[x]</button></div>
+        <div class="act"><button class="btn-sm btn-danger" data-del-t="${t.id}" title="${esc(translateText('common.delete'))}" aria-label="${esc(translateText('common.delete'))}">[x]</button></div>
       </div>`).join('')
     : `<div class="empty">${translateText('tag.noTags')}</div>`;
 }
@@ -2388,7 +2389,7 @@ function renderEntries() {
               <span class="num activity-duration">${fmtHM(db.durationSec(e))}</span>
               <div class="act">
                 <button class="btn-sm" data-edit-e="${e.id}">${translateText('entry.edit')}</button>
-                <button class="btn-sm btn-danger" data-del-e="${e.id}">[x]</button>
+                <button class="btn-sm btn-danger" data-del-e="${e.id}" title="${esc(translateText('common.delete'))}" aria-label="${esc(translateText('common.delete'))}">[x]</button>
               </div>
             </div>`;
           }).join('')}
@@ -2507,7 +2508,18 @@ function openEntryDialog(e) {
   syncMarkdownEditor($('enNotes'));
   $('entryDlg').showModal();
   growNotes();   // dialog 開啟後才量得到高度
+  entryDialogSnapshot = entryDialogValues();
 }
+
+let entryDialogSnapshot = '';
+const entryDialogValues = () => JSON.stringify(['enDesc', 'enProject', 'enTask', 'enStart', 'enEnd', 'enNotes'].map((id) => $(id).value));
+// Esc 很容易誤按，有改過才多問一次
+$('entryDlg').addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return;
+  if (entryDialogValues() === entryDialogSnapshot) return;
+  event.preventDefault();
+  if (confirm(translateText('dialog.discardConfirm'))) $('entryDlg').close('cancel');
+});
 
 $('entryCancel').addEventListener('click', () => $('entryDlg').close('cancel'));
 
@@ -2540,6 +2552,22 @@ function renderSettings() {
   $('stLanguage').value = normalizeLanguagePreference(S.settings.language);
   initializeMarkdownEditors(S.settings.notesEditor);
   renderShortcuts();
+  renderBackupState();
+}
+
+function renderBackupState() {
+  const { lastBackupAt = null, snoozeUntil = null } = S.backup || {};
+  $('stLastBackup').textContent = lastBackupAt
+    ? translateText('settings.lastBackup', { date: fmtDate(lastBackupAt) })
+    : translateText('settings.neverBackedUp');
+  const oldestEntryAt = S.entries.reduce((oldest, entry) => (!oldest || entry.startedAt < oldest ? entry.startedAt : oldest), null);
+  const reminder = backupReminder({ lastBackupAt, snoozeUntil, oldestEntryAt });
+  $('backupBanner').hidden = !reminder;
+  if (reminder) {
+    $('backupBannerText').textContent = reminder.days === null
+      ? translateText('backup.reminderNever')
+      : translateText('backup.reminder', { days: reminder.days });
+  }
 }
 
 async function renderShortcuts() {
@@ -2562,7 +2590,7 @@ $('saveSettings').addEventListener('click', async () => {
     language: normalizeLanguagePreference($('stLanguage').value),
   });
   await load();
-  alert(translate(currentLocale, 'settings.saved'));
+  showToast(translate(currentLocale, 'settings.saved'));
 });
 
 /* ---------------- 匯出 / 匯入 ---------------- */
@@ -2593,29 +2621,51 @@ function exportCsvOf(rows, tag) {
     '﻿' + [head.join(','), ...lines].join('\n'), 'text/csv;charset=utf-8');
 }
 
-$('backup').addEventListener('click', async () => {
+async function downloadBackup(tag = 'backup') {
   const data = await db.exportAll();
-  download(`todotracker-backup-${fmtDate(new Date().toISOString())}.json`,
+  download(`todotracker-${tag}-${fmtDate(new Date().toISOString())}.json`,
     JSON.stringify(data, null, 2), 'application/json');
+  await db.markBackedUp();
+  S.backup = await db.getBackupState();
+  renderBackupState();
+}
+
+// 匯入和清空都無法復原，有資料就先留一份
+async function backupBeforeOverwrite(tag) {
+  if (S.projects.length || S.tasks.length || S.entries.length) await downloadBackup(tag);
+}
+
+$('backup').addEventListener('click', () => downloadBackup());
+$('backupBannerNow').addEventListener('click', () => downloadBackup());
+$('backupBannerLater').addEventListener('click', async () => {
+  await db.snoozeBackupReminder(backupSnoozeUntil());
+  S.backup = await db.getBackupState();
+  renderBackupState();
 });
 
 $('restoreBtn').addEventListener('click', () => $('restoreFile').click());
 $('restoreFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
-  if (!confirm(translateText('settings.importConfirm'))) return;
   try {
-    await db.importAll(JSON.parse(await f.text()));
+    // 先確認檔案能用，才詢問與備份
+    const data = JSON.parse(await f.text());
+    db.assertBackup(data);
+    if (!confirm(`${translateText('settings.importConfirm')}\n${translateText('settings.autoBackupNote')}`)) return;
+    await backupBeforeOverwrite('before-import');
+    await db.importAll(data);
     await load();
-    alert(translateText('settings.imported'));
+    showToast(translateText('settings.imported'));
   } catch (err) {
     alert(`${translateText('settings.importFailed')}: ${err.message}`);
+  } finally {
+    e.target.value = '';   // 同一個檔案才能再選一次
   }
-  e.target.value = '';
 });
 
 $('wipe').addEventListener('click', async () => {
-  if (!confirm(translateText('settings.wipeConfirm'))) return;
+  if (!confirm(`${translateText('settings.wipeConfirm')}\n${translateText('settings.autoBackupNote')}`)) return;
+  await backupBeforeOverwrite('before-wipe');
   await chrome.storage.local.clear();
   await load();
 });

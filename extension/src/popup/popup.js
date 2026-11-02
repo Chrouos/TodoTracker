@@ -272,7 +272,7 @@ function renderRecent() {
             <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')} · ${formatDisplayTime(e.startedAt, currentLocale)}–${formatDisplayTime(e.endedAt, currentLocale)}${e.notes ? ` · ${translate(currentLocale, 'popup.hasNotes')}` : ''}</div>
           </div>
           <span class="dur">${fmtHM(db.durationSec(e))}</span>
-          <button class="btn-ghost btn-sm act" data-log="${e.id}" title="${e.notes ? translate(currentLocale, 'common.edit') : translate(currentLocale, 'popup.logEntry')}">${e.notes ? '[x]' : '[ ]'}</button>
+          <button class="btn-ghost btn-sm act" data-log="${e.id}" title="${e.notes ? translate(currentLocale, 'common.edit') : translate(currentLocale, 'popup.logEntry')}">${translate(currentLocale, 'popup.logButton')}</button>
           <button class="btn-ghost btn-sm act" data-resume="${e.id}" title="${translate(currentLocale, 'popup.resumeEntry')}">[&gt;]</button>
         </div>`;
       }).join('')
@@ -347,7 +347,7 @@ function renderTodo() {
           </div>
           <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="${translate(currentLocale, 'todo.addSubtask')}">${translate(currentLocale, 'popup.addSubtaskButton')}</button>
           ${done ? '' : `<button class="btn-ghost btn-sm act" data-start-task="${t.id}" title="${translate(currentLocale, 'todo.start')}">[&gt;]</button>`}
-          <button class="btn-ghost btn-sm act" data-del-task="${t.id}" title="${translate(currentLocale, 'common.delete')}">[-]</button>
+          <button class="btn-ghost btn-sm btn-danger act" data-del-task="${t.id}" title="${translate(currentLocale, 'common.delete')}">[x]</button>
         </div>`;
       }).join('')
     : `<div class="empty">${translate(currentLocale, 'todo.noTodos')}</div>`;

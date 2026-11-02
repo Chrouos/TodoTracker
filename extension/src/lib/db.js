@@ -22,6 +22,7 @@ const K = {
   settings: 'settings',
   schedules: 'schedules',
   calendarPlans: 'calendarPlans',
+  backupState: 'backupState',
 };
 
 import { wouldCycle } from './tree.js';
@@ -575,11 +576,21 @@ export async function exportAll() {
   return { version: 1, exportedAt: nowISO(), projects, tags, tasks, entries, schedules, settings, calendarPlans };
 }
 
-export async function importAll(data) {
+export function assertBackup(data) {
   if (!data || data.version !== 1) throw new Error('備份檔格式不符');
   for (const name of ['projects', 'tags', 'tasks', 'entries', 'schedules', 'calendarPlans']) {
     if (data[name] !== undefined && !Array.isArray(data[name])) throw new Error('備份檔格式不符');
   }
+}
+
+export const getBackupState = () => read(K.backupState, {});
+export const markBackedUp = () => write(K.backupState, { lastBackupAt: nowISO() });
+export async function snoozeBackupReminder(snoozeUntil) {
+  await write(K.backupState, { ...(await getBackupState()), snoozeUntil });
+}
+
+export async function importAll(data) {
+  assertBackup(data);
   const projectIds = new Set((data.projects || []).map((item) => item.id));
   const taskIds = new Set((data.tasks || []).map((item) => item.id));
   const planIds = new Set();

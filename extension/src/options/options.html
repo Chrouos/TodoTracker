@@ -22,6 +22,12 @@
     <button id="idleBannerDrop" type="button" class="btn-sm btn-danger" data-i18n="timer.discardTime">扣除閒置時間</button>
   </div>
 
+  <div id="backupBanner" class="idle-banner backup-banner" role="status" hidden>
+    <span id="backupBannerText" class="grow"></span>
+    <button id="backupBannerNow" type="button" class="btn-sm" data-i18n="backup.now">立即備份</button>
+    <button id="backupBannerLater" type="button" class="btn-sm" data-i18n="backup.later">稍後提醒</button>
+  </div>
+
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="report" data-i18n="nav.report">報表</button>
     <button class="tab" data-tab="timer" data-i18n="nav.timer">計時</button>
@@ -195,7 +201,7 @@
       <input type="hidden" id="tdId" />
       <div class="grid4 todo-form-main">
         <label class="field" style="grid-column: span 2"><span data-i18n="todo.todo">項目</span>
-          <input id="tdTitle" required placeholder="要做什麼？" data-i18n-placeholder="timer.description" /></label>
+          <input id="tdTitle" required placeholder="要做什麼？" data-i18n-placeholder="todo.titlePlaceholder" /></label>
         <label class="field"><span data-i18n="project.project">專案</span><select id="tdProject"></select></label>
         <label class="field"><span data-i18n="todo.status">狀態</span>
           <select id="tdStatus">
@@ -260,7 +266,7 @@
     <form id="schForm" class="card">
       <input type="hidden" id="scId" />
       <div class="grid4">
-        <label class="field" style="grid-column: span 2"><span data-i18n="timer.description">要做什麼</span>
+        <label class="field" style="grid-column: span 2"><span data-i18n="schedule.titleLabel">要做什麼</span>
           <input id="scTitle" required placeholder="例：填寫工作日誌" data-i18n-placeholder="schedule.exampleTitle" /></label>
         <label class="field"><span data-i18n="project.project">專案</span><select id="scProject"></select></label>
         <label class="field"><span data-i18n="common.enabled">啟用</span>
@@ -441,6 +447,7 @@
     <h2 class="sec" data-collapse="set-data"><span class="mark">[-]</span> <span data-i18n="settings.data">資料</span></h2>
     <div class="card" data-collapse-body="set-data">
       <p class="cap" data-i18n="settings.dataHint">資料只存在這台瀏覽器。換機器或重裝前記得備份。</p>
+      <p id="stLastBackup" class="cap"></p>
       <div class="actions">
         <button id="backup" data-i18n="settings.backup">↓ 匯出備份 JSON</button>
         <button id="restoreBtn" data-i18n="settings.restore">↑ 匯入備份</button>
