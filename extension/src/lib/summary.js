@@ -62,7 +62,7 @@ export function buildSummary({ dates, entries, projects, tasks = [], includeTodo
       out.push('');
       for (const e of g.list) {
         const task = tasks.find((t) => t.id === e.taskId);
-        const title = e.description || task?.title || '（無描述）';
+        const title = e.description || task?.title || translate(locale, 'common.noDescription');
         out.push(`- **${formatDisplayTime(e.startedAt, locale)}–${formatDisplayTime(e.endedAt, locale)}** ${title} · ${formatDuration(durationOfEntry(e), locale)}`);
         // 工作紀錄逐行變成子項目，保留原本的時間戳排列
         for (const line of String(e.notes || '').split('\n')) {

@@ -180,6 +180,7 @@ export function buildTodoTrackerData({
   now = new Date(),
   durationSec = null,
   completedLimit = 5,
+  untitled = '未命名 Todo',
 }) {
   const nowDate = new Date(now);
   const completedTodayCount = countCompletedToday(tasks, nowDate);
@@ -214,7 +215,7 @@ export function buildTodoTrackerData({
 
       return {
         id: task.id,
-        title: task.title || '未命名 Todo',
+        title: task.title || untitled,
         projectId: task.projectId || null,
         status: task.status || 'todo',
         notes: task.notes || '',

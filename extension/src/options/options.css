@@ -50,8 +50,7 @@ section[hidden] { display: none; }
 /* 新增 Todo 預設只留標題那一列；編輯、加子任務或按「更多欄位」才展開 */
 #todoForm.is-compact .task-parent-row,
 #todoForm.is-compact .todo-form-details,
-#todoForm.is-compact .todo-form-notes,
-#todoForm [hidden] { display: none; }
+#todoForm.is-compact .todo-form-notes { display: none; }
 .todo-form-toggle { margin-left: auto; border-color: transparent; background: transparent; color: var(--text-mute); }
 .todo-form-toggle:hover { color: var(--text-ink); }
 .grid4[style*="margin-top"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -479,7 +478,19 @@ section[hidden] { display: none; }
 }
 .project-hours { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .project-hours-label { color: var(--text-body); font-size: 11px; font-weight: 500; }
+/* 寬版已有表頭，每列不再重複；窄版沒有表頭時才顯示 */
+@media (min-width: 761px) { .project-hours-label { display: none; } }
 .project-hours .num { color: var(--text-ink); font-weight: 700; }
+/* 窄版四欄放不下：名稱獨佔一列，時數與操作排在下一列，表頭由每列標籤取代 */
+@media (max-width: 760px) {
+  .project-list-head { display: none; }
+  .project-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 72px; row-gap: var(--sm); }
+  .project-row > .project-info { grid-column: 1 / -1; }
+  .project-row > .project-hours:not(.project-hours-direct) { grid-column: 1; }
+  .project-row > .project-hours-direct { grid-column: 2; }
+  .project-row > .project-actions { grid-column: 3; }
+  .project-hours { align-items: flex-start; }
+}
 .project-actions { align-items: center; justify-content: flex-end; }
 .project-secondary-actions { display: flex; gap: var(--xs); }
 .project-icon-action {
@@ -577,13 +588,6 @@ section[hidden] { display: none; }
   margin-top: 8px;
   text-align: left;
   color: var(--text-ink);
-}
-#todoList .todo-card > .num:not(.sub)::before {
-  content: '總工時 ';
-  margin-right: 4px;
-  color: var(--text-mute);
-  font-size: 11px;
-  font-weight: 400;
 }
 #todoList .todo-card > .act {
   grid-column: 2;
@@ -954,6 +958,7 @@ section[hidden] { display: none; }
 .todo-tracker-range { color: var(--text-mute); font: 11px var(--font-mono); white-space: nowrap; }
 .todo-tracker-nav { display: flex; gap: 3px; margin-left: auto; }
 .todo-tracker-nav .btn-sm { padding: 3px 6px; font-size: 11px; }
+.todo-tracker-filter span { white-space: nowrap; }
 .todo-tracker-filter { display: inline-flex; align-items: center; gap: 5px; color: var(--text-mute); font-size: 11px; }
 .todo-tracker-filter select { height: 28px; padding: 0 24px 0 7px; border: 1px solid var(--hairline); border-radius: var(--r); background: var(--canvas); color: var(--text-body); font-size: 11px; }
 .todo-tracker-axis { color: var(--text-mute); font: 11px var(--font-mono); }
@@ -1372,7 +1377,6 @@ dialog .field { margin-bottom: var(--md); }
   color: var(--text-ink);
   text-align: right;
 }
-#todoList .todo-card.activity-row > .activity-duration::before { content: none; }
 #todoList .todo-card.activity-row > .act {
   grid-column: 5;
   grid-row: 1;
@@ -1409,6 +1413,7 @@ dialog .field { margin-bottom: var(--md); }
   }
 }
 .report-insights {
+  margin-bottom: 24px;
   margin-top: 16px;
   border: 1px solid var(--hairline);
   border-radius: 12px;

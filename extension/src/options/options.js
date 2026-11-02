@@ -1278,6 +1278,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     dates,
     now: new Date(),
     durationSec: db.durationSec,
+    untitled: translateText('report.dueAlertsNoTitle'),
   });
   const trackerDates = todoTrackerDatesThroughToday(initialData.dates);
   const data = trackerDates.length === initialData.dates.length
@@ -1288,6 +1289,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       dates: trackerDates,
       now: new Date(),
       durationSec: db.durationSec,
+      untitled: translateText('report.dueAlertsNoTitle'),
   }, currentLocale);
   todoTrackerState = data;
   todoTrackerSource = { entries };
@@ -2453,7 +2455,7 @@ function renderEntries() {
               <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
               <div class="main">
                 <div class="ellipsis">${esc(e.description || translateText('common.noDescription'))}
-                  ${task ? `<span class="badge">${esc(task.title)}</span>` : ''}
+                  ${task && task.title !== e.description ? `<span class="badge">${esc(task.title)}</span>` : ''}
                   ${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join(' ')}</div>
                 <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>
                 ${notes ? renderMarkdownPreview(notes, 'notes') : ''}

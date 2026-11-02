@@ -235,7 +235,7 @@ export function heatmapSVG(data, locale = 'zh-TW') {
   const headers = data.dates.map((date, index) =>
     `<text x="${x(index) + colW / 2}" y="16" text-anchor="middle" class="axis-label">${esc(date.slice(5))}</text>`).join('');
 
-  return `<svg class="project-heatmap-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${W}px" role="img" aria-label="${esc(translate(locale, 'chart.heatmap'))}">
+  return `<svg class="project-heatmap-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${W}px;max-width:${W}px" role="img" aria-label="${esc(translate(locale, 'chart.heatmap'))}">
     ${headers}${cells}
   </svg>`;
 }
