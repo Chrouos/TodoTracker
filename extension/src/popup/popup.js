@@ -7,7 +7,7 @@ import { createToast } from '../lib/toast.js';
 // popup 空間有限，上限拉到 260px，超過才捲
 const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 260 });
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
-import { fmtHMS, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
+import { fmtHMS, fmtDate, runningSecondsSince, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { dailyGoalProgress } from '../lib/report-metrics.js';
 import { filterTasks, normalizePriority, normalizeStatus, priorityLabel } from '../lib/todo-filter.js';
@@ -111,6 +111,7 @@ function startTicking() {
     if (!state.timer) return;
     const sec = (Date.now() - new Date(state.timer.startedAt).getTime()) / 1000;
     $('clock').textContent = fmtHMS(sec);
+    if (Math.floor(sec) % 60 === 0) renderStats(); // 今日與目標含計時中的時間，每分鐘更新
   };
   tick();
   ticker = setInterval(tick, 1000);
@@ -186,11 +187,12 @@ function renderStats() {
 
   const sum = (arr) => arr.reduce((s, e) => s + db.durationSec(e), 0);
 
-  $('stToday').textContent = fmtHM(sum(today));
-  $('stWeek').textContent = fmtHM(sum(week));
+  const todaySeconds = sum(today) + runningSecondsSince(state.timer, d0);
+  $('stToday').textContent = fmtHM(todaySeconds);
+  $('stWeek').textContent = fmtHM(sum(week) + runningSecondsSince(state.timer, w0));
   $('stCount').textContent = String(today.length);
 
-  const goal = dailyGoalProgress(sum(today), state.settings.dailyGoalHours);
+  const goal = dailyGoalProgress(todaySeconds, state.settings.dailyGoalHours);
   $('goalBar').hidden = !goal;
   if (goal) {
     $('goalBar').classList.toggle('is-reached', goal.reached);

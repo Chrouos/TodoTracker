@@ -231,7 +231,8 @@ assert.match(options, /data-report-entry-id/, 'Report should expose a direct tar
 assert.match(options, /data-report-task-id/, 'Report should expose a direct target for Todo items');
 assert.match(options, /translateText\('report\.attention'\)/, 'Report should show actionable attention items');
 assert.doesNotMatch(options, /report\.attentionHint/, 'Report attention should not show a redundant instruction hint');
-assert.match(options, /const attentionMarkup = statusItem\.kind === 'clear'/, 'Report should hide the attention section when there are no actionable items');
+assert.match(options, /const attentionMarkup = !attentionItems\.length \? ''/, 'Report should hide the attention section when there are no actionable items');
+assert.match(options, /attentionItems = actionItems\.filter\(\(item\) => !\['overdue', 'clear'\]/, 'Overdue Todos should only be listed in the due alerts');
 assert.match(options, /translateText\('report\.projectStatus'\)/, 'Report should show a scannable project status list');
 assert.match(options, /projectTrendDetail/, 'Report should have an expandable project detail panel');
 assert.match(options, /createReportChartSection/, 'Report charts should be wrapped in independent collapse sections');

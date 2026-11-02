@@ -248,71 +248,13 @@ export function durationOfEntry(e) {
   return Math.max(0, Math.round((new Date(e.endedAt) - new Date(e.startedAt)) / 1000));
 }
 
-/**
- * 時間軸資料：把每筆紀錄切成「當天的分鐘區間」。
- * 跨午夜的紀錄會被切成兩段，分別掛到兩天。
- * 重疊的區間會分配到不同 lane，畫的時候並排不互相蓋住。
- *
- * @returns {{days: {date:string, blocks:{s:number,e:number,lane:number,lanes:number,entry:object}[]}[], minMin:number, maxMin:number}}
- */
-export function timelineData(entries, dates) {
-  const byDay = new Map(dates.map((d) => [d, []]));
-
-  for (const e of entries) {
-    if (!e.endedAt) continue;
-    const end = new Date(e.endedAt);
-    let cursor = new Date(e.startedAt);
-    let guard = 0;
-    while (cursor < end && guard++ < 400) {
-      const dayKey = fmtDate(cursor);
-      const midnight = new Date(cursor);
-      midnight.setHours(24, 0, 0, 0);
-      const segEnd = end < midnight ? end : midnight;
-      if (byDay.has(dayKey)) {
-        const s = cursor.getHours() * 60 + cursor.getMinutes();
-        const raw = segEnd.getTime() === midnight.getTime()
-          ? 1440
-          : segEnd.getHours() * 60 + segEnd.getMinutes();
-        const clippedEnd = Math.max(raw, s + 1);
-        byDay.get(dayKey).push({
-          s,
-          e: clippedEnd,
-          entry: {
-            ...e,
-            startedAt: cursor.toISOString(),
-            endedAt: segEnd.toISOString(),
-            seconds: Math.round((segEnd.getTime() - cursor.getTime()) / 1000),
-          },
-        });
-      }
-      cursor = midnight;
-    }
-  }
-
-  let minMin = 1440;
-  let maxMin = 0;
-  const days = dates.map((date) => {
-    const blocks = (byDay.get(date) || []).sort((a, b) => a.s - b.s || a.e - b.e);
-    // lane 分配：跟前面還沒結束的區塊錯開
-    const laneEnd = [];
-    for (const b of blocks) {
-      let lane = laneEnd.findIndex((t) => t <= b.s);
-      if (lane === -1) { lane = laneEnd.length; laneEnd.push(0); }
-      laneEnd[lane] = b.e;
-      b.lane = lane;
-      if (b.s < minMin) minMin = b.s;
-      if (b.e > maxMin) maxMin = b.e;
-    }
-    const lanes = Math.max(1, laneEnd.length);
-    for (const b of blocks) b.lanes = lanes;
-    return { date, blocks };
-  });
-
-  if (maxMin === 0) { minMin = 9 * 60; maxMin = 18 * 60; } // 沒資料時給個預設視窗
-  return { days, minMin, maxMin };
+/** 計時中那一段從 from 之後累積的秒數；紀錄要停止後才會存進 entries */
+export function runningSecondsSince(timer, from, now = new Date()) {
+  if (!timer?.startedAt) return 0;
+  const start = Math.max(new Date(timer.startedAt).getTime(), new Date(from).getTime());
+  return Math.max(0, (new Date(now).getTime() - start) / 1000);
 }
 
-/** 從 datetime-local input 值轉 ISO，反之亦然 */
 export function toLocalInput(iso) {
   const d = new Date(iso);
   const p = (n) => String(n).padStart(2, '0');

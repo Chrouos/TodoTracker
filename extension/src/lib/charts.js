@@ -3,75 +3,10 @@
  * 沒有任何相依套件。視覺遵守 DESIGN.md：零陰影、hairline 格線、圓角 0。
  */
 
-import { formatDisplayTime, formatDuration, translate } from './i18n.js';
+import { formatDuration, translate } from './i18n.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-/**
- * 時間軸：像日曆週檢視。橫軸是日期，縱軸是一天內的時間。
- * @param {ReturnType<import('./time.js').timelineData>} tl
- * @param {(entry)=>{color:string,label:string}} meta
- */
-export function timelineSVG(tl, meta, locale = 'zh-TW') {
-  const { days, minMin, maxMin } = tl;
-
-  // 上下各留半小時，並對齊到整點
-  const from = Math.max(0, Math.floor((minMin - 30) / 60) * 60);
-  const to = Math.min(1440, Math.ceil((maxMin + 30) / 60) * 60);
-  const span = Math.max(60, to - from);
-
-  const PL = 46, PR = 8, PT = 24, PB = 8;
-  const colW = Math.max(48, Math.min(120, 640 / Math.max(1, days.length)));
-  const W = PL + PR + colW * days.length;
-  const pxPerHour = span / 60 <= 8 ? 46 : span / 60 <= 14 ? 34 : 26;
-  const ih = (span / 60) * pxPerHour;
-  const H = PT + ih + PB;
-
-  const y = (min) => PT + ((min - from) / span) * ih;
-
-  // 整點格線 + 時間標籤
-  let grid = '';
-  for (let m = from; m <= to; m += 60) {
-    grid += `<line x1="${PL}" x2="${W - PR}" y1="${y(m)}" y2="${y(m)}"
-      stroke="var(--hairline)" stroke-width="1"></line>
-      <text x="${PL - 8}" y="${y(m) + 4}" text-anchor="end"
-        style="font-size:11px;fill:var(--text-mute);font-variant-numeric:tabular-nums">${String(m / 60).padStart(2, '0')}:00</text>`;
-  }
-
-  let cols = '';
-  days.forEach((d, i) => {
-    const x0 = PL + i * colW;
-    cols += `<line x1="${x0}" x2="${x0}" y1="${PT}" y2="${PT + ih}"
-        stroke="var(--hairline)" stroke-width="1"></line>
-      <text x="${x0 + colW / 2}" y="${PT - 8}" text-anchor="middle"
-        style="font-size:11px;fill:var(--text-mute);font-variant-numeric:tabular-nums">${d.date.slice(5)}</text>`;
-
-    for (const b of d.blocks) {
-      const m = meta(b.entry);
-      const laneW = (colW - 4) / b.lanes;
-      const bx = x0 + 2 + b.lane * laneW;
-      const by = y(b.s);
-      const bh = Math.max(3, y(b.e) - y(b.s));
-      const showText = bh >= 16 && laneW >= 40;
-      cols += `<g>
-        <rect x="${bx}" y="${by}" width="${laneW - 2}" height="${bh}"
-          fill="${m.color}" fill-opacity="0.16" stroke="${m.color}" stroke-width="1"></rect>
-        ${showText ? `<text x="${bx + 4}" y="${by + 12}"
-          style="font-size:10px;fill:var(--text-ink)"
-          clip-path="inset(0 0 0 0)">${esc(m.label).slice(0, Math.floor(laneW / 6))}</text>` : ''}
-        <title>${esc(m.label)}
-${formatDisplayTime(b.entry.startedAt, locale)}–${formatDisplayTime(b.entry.endedAt, locale)}</title>
-      </g>`;
-    }
-  });
-
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:${W}px" role="img">
-    ${grid}
-    <line x1="${W - PR}" x2="${W - PR}" y1="${PT}" y2="${PT + ih}" stroke="var(--hairline)" stroke-width="1"></line>
-    ${cols}
-  </svg>`;
-}
 
 function trendEmpty(locale = 'zh-TW') {
   return `<div class="empty">${translate(locale, 'chart.empty')}</div>`;

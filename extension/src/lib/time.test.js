@@ -6,11 +6,11 @@ import {
   clipEntryToRange,
   currentWeekDateRange,
   dailyReviewData,
+  runningSecondsSince,
   durationInRange,
   entryOverlapsRange,
   localDateRange,
   rangeControlState,
-  timelineData,
 } from './time.js';
 
 test('range helpers include and clip overnight work by the selected local window', () => {
@@ -91,24 +91,13 @@ test('calendarReviewData places overnight work on both local calendar days', () 
   ]);
 });
 
-test('timelineData keeps each overnight block tooltip range scoped to its day', () => {
-  const start = new Date(2026, 7, 10, 23, 30);
-  const midnight = new Date(2026, 7, 11);
-  const end = new Date(2026, 7, 11, 1, 30);
-  const result = timelineData([{
-    id: 'overnight',
-    startedAt: start.toISOString(),
-    endedAt: end.toISOString(),
-  }], ['2026-08-10', '2026-08-11']);
-
-  assert.deepEqual(result.days.map((day) => day.blocks.map((block) => ({
-    id: block.entry.id,
-    startedAt: block.entry.startedAt,
-    endedAt: block.entry.endedAt,
-  }))), [
-    [{ id: 'overnight', startedAt: start.toISOString(), endedAt: midnight.toISOString() }],
-    [{ id: 'overnight', startedAt: midnight.toISOString(), endedAt: end.toISOString() }],
-  ]);
+test('runningSecondsSince only counts time after the boundary', () => {
+  const now = new Date(2026, 7, 11, 10, 0);
+  const today = new Date(2026, 7, 11);
+  assert.equal(runningSecondsSince({ startedAt: new Date(2026, 7, 11, 9, 0).toISOString() }, today, now), 3600);
+  assert.equal(runningSecondsSince({ startedAt: new Date(2026, 7, 10, 23, 0).toISOString() }, today, now), 36000);
+  assert.equal(runningSecondsSince(null, today, now), 0);
+  assert.equal(runningSecondsSince({ startedAt: new Date(2026, 7, 11, 11, 0).toISOString() }, today, now), 0);
 });
 
 test('rangeControlState switches between quick ranges and custom controls', () => {

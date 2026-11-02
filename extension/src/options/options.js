@@ -12,10 +12,10 @@ import {
 } from '../lib/i18n.js';
 import {
   fmtDate, fmtClock, startOfDay, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
-  dailyReviewData, calendarReviewData, timelineData, toLocalInput, fromLocalInput,
+  dailyReviewData, calendarReviewData, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
-import { timelineSVG, stackedAreaSVG, heatmapSVG, lineSVG, donutSVG } from '../lib/charts.js';
+import { stackedAreaSVG, heatmapSVG, lineSVG, donutSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
@@ -296,7 +296,15 @@ function applyCustomRange(source) {
   renderEntries();
 }
 
+// 分頁名稱固定，正在計時才加上標示
+function renderTimerTabState() {
+  const tab = document.querySelector('.tab[data-tab="timer"]');
+  tab.classList.toggle('is-running', Boolean(S.timer));
+  tab.title = S.timer ? translateText('timer.running') : '';
+}
+
 function renderAll() {
+  renderTimerTabState();
   calendarController?.update(S);
   renderTimer(); renderReport(); renderProjects(); renderTodos(); renderSchedules();
   renderTags(); renderEntries(); renderSettings();
@@ -645,29 +653,14 @@ function renderReport() {
   const trendDates = series.map((day) => day.date);
   renderProjectTrend(trendEntries, trendDates, trackerEntries);
 
-  // 時間軸：太多天會擠爆，最多顯示最近 14 天
+  // 太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
   const reviewDates = range === 'week' && !customBounds
     ? dailySeries([], lineFrom, lineTo, () => 0).map((d) => d.date)
     : tlDates;
-  $('reviewLabel').textContent = tlDates.length
-    ? `· ${tlDates[0]} ～ ${tlDates[tlDates.length - 1]}`
-    : '';
   $('reviewLabel').textContent = reviewDates.length
     ? `· ${reviewDates[0]} ～ ${reviewDates[reviewDates.length - 1]}`
     : '';
-  if ($('timeline')) { const tl = timelineData(
-    customBounds ? rows : S.entries.filter((e) => e.endedAt && !e.deletedAt),
-    tlDates,
-  );
-  $('timeline').innerHTML = timelineSVG(tl, (e) => {
-    const p = S.projects.find((x) => x.id === e.projectId);
-    return {
-      color: p ? p.color : '#9a9898',
-      label: e.description || (p ? p.name : translateText('todo.unclassified')),
-    };
-  });
-  }
   $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, reviewDates));
   initializeMarkdownPreviews($('dailyReview'));
   scrollReviewCalendarToLatest();
@@ -1074,14 +1067,16 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
     { label: translateText('todo.status.todo'), value: todoStatusCounts.todo, tone: 'muted' },
     { label: translateText('report.overdue'), value: quality.overdueTodoCount, tone: quality.overdueTodoCount ? 'danger' : 'muted' },
   ].map((item) => `<div class="report-status-metric report-status-metric-${item.tone}"><span>${esc(item.label)}</span><strong class="num">${esc(item.value)}</strong></div>`).join('');
-  const actionMarkup = actionItems.map((item) => `
+  // 逾期已經在上方的截止提醒列出，這裡只放資料品質問題
+  const attentionItems = actionItems.filter((item) => !['overdue', 'clear'].includes(item.kind));
+  const actionMarkup = attentionItems.map((item) => `
     <div class="report-action report-action-${item.tone}">
       <span class="report-action-label">${esc(translateText(actionLabels[item.kind]))}</span>
       <strong>${esc(actionValue(item))}</strong>
       <span class="report-action-hint">${item.kind === 'clear' ? translateText('report.canContinue') : translateText('report.organize')}</span>
       ${actionDetails(item) ? `<div class="report-action-details">${actionDetails(item)}</div>` : ''}
     </div>`).join('');
-  const attentionMarkup = statusItem.kind === 'clear' ? '' : `
+  const attentionMarkup = !attentionItems.length ? '' : `
   <section class="report-attention" aria-label="${esc(translateText('report.attention'))}">
     <div class="report-section-heading"><strong>${translateText('report.attention')}</strong></div>
     <div class="report-action-grid">${actionMarkup}</div>
@@ -1309,7 +1304,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   }
 
   if (!data.items.length) {
-    mount.innerHTML = `<div class="todo-tracker-empty"><strong>${translateText('report.todoTracker')}</strong><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><div>${translateText('report.noActualTodoTime')}</div></div>`;
+    mount.innerHTML = `<div class="todo-tracker-empty"><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><div>${translateText('report.noActualTodoTime')}</div></div>`;
     renderTodoTrackerDetail();
     if (restartTimer) startTodoTrackerRefresh();
     return;
@@ -1361,7 +1356,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   const rowMarkup = rows || `<div class="todo-tracker-filter-empty">${translateText('report.noMatchingTodo')}</div>`;
 
   mount.innerHTML = `<div class="todo-tracker" style="--todo-tracker-days:${visibleDates.length}">
-    <div class="todo-tracker-toolbar"><strong>${translateText('report.todoTracker')}</strong><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="${translateText('report.previousDay')}" aria-label="${translateText('report.previousDay')}">←1d</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="${translateText('report.previousWeek')}" aria-label="${translateText('report.previousWeek')}">←1w</button><button type="button" class="btn-sm" data-todo-tracker-today>${translateText('report.today')}</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="${translateText('report.nextWeek')}" aria-label="${translateText('report.nextWeek')}">1w→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="${translateText('report.nextDay')}" aria-label="${translateText('report.nextDay')}">1d→</button></span></div>
+    <div class="todo-tracker-toolbar"><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="${translateText('report.previousDay')}" aria-label="${translateText('report.previousDay')}">←1d</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="${translateText('report.previousWeek')}" aria-label="${translateText('report.previousWeek')}">←1w</button><button type="button" class="btn-sm" data-todo-tracker-today>${translateText('report.today')}</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="${translateText('report.nextWeek')}" aria-label="${translateText('report.nextWeek')}">1w→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="${translateText('report.nextDay')}" aria-label="${translateText('report.nextDay')}">1d→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rowMarkup}</div>
     <div class="todo-tracker-legend"><span>${translateText('report.trackerLegend')}</span><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>1h · 2h · 4h</span></div>
@@ -1398,7 +1393,7 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     .join('');
 
   $('byProject').innerHTML = `<div class="project-trend-wrap">
-    <div class="project-trend-toolbar"><span class="mute">${translateText('report.projectAll')}</span><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
+    <div class="project-trend-toolbar"><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
     <div id="projectTrend">${stackedAreaSVG(data, currentLocale)}</div>
     <div id="projectTrendTooltip" class="project-trend-tooltip"></div>
     <div class="trend-legend">${projectLinks || `<span class="mute">${translateText('report.noFocusableProject')}</span>`}</div>
@@ -2833,6 +2828,7 @@ function scheduleCalendarRefresh() {
       S = { ...S, projects, tasks, entries, calendarPlans, timer, settings };
       currentLocale = resolveLocale(settings.language, getBrowserLocale());
       calendarController.update(S);
+      renderTimerTabState();
       if (!$('p-timer').hidden && !timerNotesDirty && !$('managementTimer').contains(document.activeElement)) renderTimer();
     }).catch(() => showToast(translateText('calendar.error.save')));
   }, 60);
