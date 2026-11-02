@@ -27,6 +27,7 @@ import {
   priorityLabel, statusLabel, taskCountLabel,
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
+import { trackerLevel } from '../lib/todo-tracker.js';
 import { comparisonBounds, deltaPercent, reportRangeBounds, trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
@@ -512,7 +513,7 @@ function groupReportPanels() {
   const report = $('p-report');
   if (report.querySelector('.report-panel')) return;
   [
-    ['rep-donut', 'byProject', 'report-panel-donut'],
+    ['rep-trend', 'byProject', 'report-panel-donut'],
     ['rep-review', 'dailyReview', 'report-panel-review'],
   ].forEach(([collapseId, bodyId, className]) => {
     const heading = report.querySelector(`[data-collapse="${collapseId}"]`);
@@ -677,6 +678,14 @@ function scrollReviewCalendarToLatest() {
   const calendar = $('dailyReview').querySelector('.review-calendar');
   if (calendar) calendar.scrollLeft = calendar.scrollWidth;
 }
+
+// 區塊收起或在別的分頁時量不到寬度，等它真的顯示出來再捲一次
+let dailyReviewWasVisible = false;
+new ResizeObserver(([entry]) => {
+  const visible = entry.contentRect.width > 0;
+  if (visible && !dailyReviewWasVisible) scrollReviewCalendarToLatest();
+  dailyReviewWasVisible = visible;
+}).observe($('dailyReview'));
 
 function renderDailyReview(groups) {
   hideReviewCalendarTooltip();
@@ -844,7 +853,7 @@ let highlightProjectId = null;
 
 let projectTrendState = null;
 let projectTrendSource = null;
-let reportChartCollapsed = new Set(['trend', 'heatmap']);
+let reportChartCollapsed = new Set(['heatmap']);
 let todoTrackerState = null;
 let todoTrackerSource = null;
 let todoTrackerSelectedId = null;
@@ -1238,7 +1247,7 @@ function showTodoTrackerTooltip(target) {
   }
   todoTrackerHoveredTarget = target;
   target.classList.add('is-hovered');
-  tooltip.innerHTML = `<strong>${esc(target.dataset.todoTrackerTitle || '')}</strong><br>${esc(target.dataset.todoTrackerDate || '')} · ${translateText('report.hasWorkEntries')}`;
+  tooltip.innerHTML = `<strong>${esc(target.dataset.todoTrackerTitle || '')}</strong><br>${esc(target.dataset.todoTrackerDate || '')} · ${esc(target.dataset.todoTrackerDuration || translateText('report.hasWorkEntries'))}`;
   tooltip.hidden = false;
   tooltip.classList.add('is-visible');
 
@@ -1325,9 +1334,11 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       .map((date) => ({ date, day: visibleDateIndex.get(date) }))
       .filter(({ day }) => day >= 0);
     const workSegments = workDates.map(({ date, day }) => {
-      const dateTitle = `${item.title} · ${date} · ${translateText('report.hasWorkEntries')}`;
+      const seconds = item.dailySeconds[date] || 0;
+      const duration = seconds ? fmtHM(seconds) : '';
+      const dateTitle = `${item.title} · ${date} · ${duration || translateText('report.hasWorkEntries')}`;
       return `<button type="button" class="todo-tracker-work${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
-        data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-title="${esc(item.title)}" data-todo-tracker-date="${esc(date)}" aria-label="${esc(dateTitle)}"
+        data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-title="${esc(item.title)}" data-todo-tracker-date="${esc(date)}" data-todo-tracker-duration="${esc(duration)}" data-level="${trackerLevel(seconds)}" aria-label="${esc(dateTitle)}"
         style="--todo-day:${day};--todo-color:${color}">
       </button>`;
     }).join('');
@@ -1336,7 +1347,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
         <details class="todo-tracker-label-details" data-todo-tracker-collapse="${esc(item.id)}"${collapsed ? '' : ' open'}>
           <summary><strong>${esc(item.title)}</strong></summary>
           <span class="todo-tracker-label-meta"><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${esc(dateRange)}</span>
-          <span class="todo-tracker-label-days">${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })}</span>
+          <span class="todo-tracker-label-days">${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })} · ${fmtHM(item.trackedSeconds)}</span>
         </details>
       </div>
       <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
@@ -1351,6 +1362,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     <div class="todo-tracker-toolbar"><strong>${translateText('report.todoTracker')}</strong><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="${translateText('report.previousDay')}" aria-label="${translateText('report.previousDay')}">←1d</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="${translateText('report.previousWeek')}" aria-label="${translateText('report.previousWeek')}">←1w</button><button type="button" class="btn-sm" data-todo-tracker-today>${translateText('report.today')}</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="${translateText('report.nextWeek')}" aria-label="${translateText('report.nextWeek')}">1w→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="${translateText('report.nextDay')}" aria-label="${translateText('report.nextDay')}">1d→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rowMarkup}</div>
+    <div class="todo-tracker-legend"><span>${translateText('report.trackerLegend')}</span><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>1h · 2h · 4h</span></div>
   </div><div id="todoTrackerHoverTooltip" class="todo-tracker-tooltip" role="tooltip" hidden></div>
   `;
   mount.querySelectorAll('[data-todo-tracker-collapse]').forEach((details) => {
@@ -2063,15 +2075,15 @@ function renderTodos() {
         return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>` : ''}
         <div class="row-item todo-card task-item activity-row priority-${t.priority || 'normal'}${done ? ' done' : ''}" data-todo-id="${esc(t.id)}" style="--task-depth:${t.depth}">
           ${t.depth ? '<span class="task-branch" aria-hidden="true">↳</span>' : ''}
-          <button class="btn-sm btn-ghost activity-status" data-check="${t.id}"
-            title="${done ? translateText('todo.reopen') : translateText('todo.markDone')}" style="width:34px">${done ? '[x]' : '[ ]'}</button>
+          <button class="todo-check activity-status${done ? ' is-done' : ''}" data-check="${t.id}" role="checkbox" aria-checked="${done}"
+            title="${done ? translateText('todo.reopen') : translateText('todo.markDone')}" aria-label="${done ? translateText('todo.reopen') : translateText('todo.markDone')}"><span aria-hidden="true">${done ? '✓' : ''}</span></button>
           <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
               ${priority === 'urgent' || priority === 'high' ? `<span class="badge priority-${priority}">${priorityLabel(priority, currentLocale)}</span>` : ''}
               ${urgentDue ? `<span class="badge${m.isLate ? ' overdue' : ' due-today'}">${dl}</span>` : ''}
             </div>
-            <div class="sub num todo-meta">${meta}</div>
+            <div class="sub todo-meta">${meta}</div>
             ${t.notes ? renderMarkdownPreview(t.notes, 'notes') : ''}
             ${workEntries.length ? `<details class="todo-worklog"><summary>${translateText('todo.workLog', { count: workEntries.length, duration: fmtHM(m.worked) })}</summary>
               <div class="todo-worklog-list">${workEntries.map((entry) => `<div class="todo-worklog-row">
@@ -2582,6 +2594,7 @@ $('entryForm').addEventListener('submit', async (ev) => {
 function renderSettings() {
   $('stIdle').value = S.settings.idleThresholdMin;
   $('stRound').value = String(S.settings.roundToMin);
+  $('stGoal').value = S.settings.dailyGoalHours;
   $('stNotesEditor').value = normalizeMarkdownEditorMode(S.settings.notesEditor);
   $('stLanguage').value = normalizeLanguagePreference(S.settings.language);
   initializeMarkdownEditors(S.settings.notesEditor);
@@ -2590,6 +2603,7 @@ $('saveSettings').addEventListener('click', async () => {
   await db.saveSettings({
     idleThresholdMin: Math.max(1, Number($('stIdle').value) || 15),
     roundToMin: Number($('stRound').value) || 0,
+    dailyGoalHours: Math.max(0, Number($('stGoal').value) || 0),
     notesEditor: normalizeMarkdownEditorMode($('stNotesEditor').value),
     language: normalizeLanguagePreference($('stLanguage').value),
   });
@@ -2673,6 +2687,13 @@ function selectTab(name, preserveFocus = false) {
     if (hadFocusedTarget) { renderEntries(); renderTodos(); }
   }
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  // 窄寬度時分頁列會橫向捲動，把目前分頁捲到看得見的位置
+  const tabs = $('tabs');
+  const activeTab = tabs.querySelector('.tab.active');
+  if (activeTab) {
+    const offset = activeTab.getBoundingClientRect().left - tabs.getBoundingClientRect().left;
+    tabs.scrollLeft += offset - (tabs.clientWidth - activeTab.offsetWidth) / 2;
+  }
   ['report', 'timer', 'calendar', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));

@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS = {
   roundToMin: 0,         // 0 = 不進位；設 15 就是每筆進位到 15 分
   notesEditor: 'toolbar',
   language: 'auto',
+  dailyGoalHours: 8,     // popup 的今日目標；0 = 不顯示
 };
 
 const K = {

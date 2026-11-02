@@ -9,6 +9,7 @@ const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 2
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
 import { fmtHMS, fmtDate, startOfDay, startOfWeek } from '../lib/time.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
+import { dailyGoalProgress } from '../lib/report-metrics.js';
 import { filterTasks, normalizePriority, normalizeStatus, priorityLabel } from '../lib/todo-filter.js';
 import {
   applyTranslations,
@@ -82,6 +83,7 @@ function render() {
 }
 
 function renderPanel() {
+  renderDetailsToggle();
   const sourcePlan = (state.calendarPlans || []).find((plan) => plan.id === state.timer?.planId);
   $('popupPlanSource').hidden = !sourcePlan;
   $('popupPlanTitle').textContent = sourcePlan?.title || '';
@@ -187,6 +189,31 @@ function renderStats() {
   $('stToday').textContent = fmtHM(sum(today));
   $('stWeek').textContent = fmtHM(sum(week));
   $('stCount').textContent = String(today.length);
+
+  const goal = dailyGoalProgress(sum(today), state.settings.dailyGoalHours);
+  $('goalBar').hidden = !goal;
+  if (goal) {
+    $('goalBar').classList.toggle('is-reached', goal.reached);
+    $('goalLabel').textContent = translate(currentLocale, 'popup.goal', { goal: fmtHM(goal.goalSeconds) });
+    $('goalPercent').textContent = `${goal.percent}%`;
+    $('goalFill').style.width = `${goal.width}%`;
+    $('goalTrack').setAttribute('aria-valuenow', String(Math.min(100, goal.percent)));
+    $('goalTrack').setAttribute('aria-label', $('goalLabel').textContent);
+  }
+}
+
+// 計時中面板已經顯示專案與描述，欄位預設收起；按「編輯細節」才展開
+let runningDetailsOpen = false;
+function renderDetailsToggle() {
+  const running = Boolean(state.timer);
+  if (!running) runningDetailsOpen = false;
+  const summary = running && !runningDetailsOpen;
+  const toggle = $('toggleDetails');
+  $('timerFields').classList.toggle('is-summary', summary);
+  toggle.hidden = !running;
+  toggle.dataset.i18n = summary ? 'popup.editDetails' : 'popup.hideDetails';
+  toggle.textContent = translate(currentLocale, toggle.dataset.i18n);
+  toggle.setAttribute('aria-expanded', String(!summary));
 }
 
 function renderRecent() {
@@ -263,9 +290,9 @@ function renderTodo() {
         const p = state.projects.find((x) => x.id === t.projectId);
         const done = t.status === 'done';
         return `<div class="item ${done ? 'done' : ''}">
-          <button class="check" data-check="${t.id}">${done ? '[x]' : '[ ]'}</button>
+          <button class="check${done ? ' is-done' : ''}" data-check="${t.id}" role="checkbox" aria-checked="${done}" aria-label="${translate(currentLocale, done ? 'todo.reopen' : 'todo.markDone')}" title="${translate(currentLocale, done ? 'todo.reopen' : 'todo.markDone')}"><span aria-hidden="true">${done ? '✓' : ''}</span></button>
           <div class="main">
-            <div class="t1">${esc(t.title)} <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span></div>
+            <div class="t1">${esc(t.title)}${['urgent', 'high'].includes(normalizePriority(t.priority)) ? ` <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>` : ''}</div>
             <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
           <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="${translate(currentLocale, 'todo.addSubtask')}">${translate(currentLocale, 'popup.addSubtaskButton')}</button>
@@ -281,6 +308,11 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
 const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
 
 /* ---------------- 事件 ---------------- */
+
+$('toggleDetails').addEventListener('click', () => {
+  runningDetailsOpen = !runningDetailsOpen;
+  renderDetailsToggle();
+});
 
 $('toggle').addEventListener('click', async () => {
   if (state.timer) {

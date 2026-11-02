@@ -48,7 +48,8 @@
 
   <!-- ── 計時分頁 ── -->
   <main id="tab-track">
-    <div class="fields">
+    <div class="fields" id="timerFields">
+      <button id="toggleDetails" type="button" class="btn-ghost btn-sm" hidden data-i18n="popup.editDetails">[+] 編輯細節</button>
       <input id="desc" data-i18n-placeholder="popup.descriptionPlaceholder" placeholder="在做什麼？" autocomplete="off" />
       <div class="two">
         <select id="project" data-i18n-placeholder="popup.projectPlaceholder"></select>
@@ -74,6 +75,11 @@
       <div><span class="cap" data-i18n="report.today">今日</span><span id="stToday" class="num">0m</span></div>
       <div><span class="cap" data-i18n="report.week">本週</span><span id="stWeek" class="num">0m</span></div>
       <div><span class="cap" data-i18n="popup.todayEntries">今日筆數</span><span id="stCount" class="num">0</span></div>
+    </div>
+
+    <div id="goalBar" class="goal" hidden>
+      <div class="goal-head"><span id="goalLabel" class="cap"></span><span id="goalPercent" class="cap num"></span></div>
+      <div id="goalTrack" class="goal-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span id="goalFill"></span></div>
     </div>
 
     <div class="hr"></div>

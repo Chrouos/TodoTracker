@@ -56,7 +56,7 @@ assert.match(css, /\.todo-tracker-axis\s*>\s*div\s*\{[^}]*grid-template-columns:
 assert.match(css, /\.todo-tracker-work\s*\{[^}]*var\(--todo-day\)/s, 'Todo tracker cells should be positioned by day index');
 assert.match(css, /\.todo-tracker-work\s*\{[^}]*width:\s*calc\(100% \/ var\(--todo-tracker-days\)/s, 'Todo tracker cells should fill one date column');
 assert.match(css, /\.todo-tracker-lifecycle\s*\{[^}]*height:\s*100%/s, 'Todo lifecycle should fill the whole grid cell');
-assert.match(css, /\.todo-tracker-work\s*\{[^}]*background:\s*var\(--todo-color\)/s, 'Worked dates should use a solid project color');
+assert.match(css, /\.todo-tracker-work\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--todo-color\) var\(--todo-level/s, 'Worked dates should shade the project color by hours');
 assert.match(css, /\.todo-tracker-work\s*\{[^}]*height:\s*100%/s, 'Worked dates should fill the whole grid cell');
 assert.doesNotMatch(css, /\.todo-tracker-(?:lifecycle|work)\s*\{[^}]*\+ 3px/s, 'Tracker cells should not have inner horizontal padding');
 assert.doesNotMatch(css, /\.todo-tracker-work\s*\{[^}]*var\(--todo-width\)/s, 'Todo tracker cells should not use work duration width');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  dailyGoalProgress,
   overlapSeconds,
   buildReportQuality,
   buildProjectTaskMetrics,
@@ -144,4 +145,17 @@ test('buildProjectHealthRows sorts projects by attention before workload', () =>
     { projectId: 'slow', status: '進度偏低', tone: 'warning', remaining: 3 },
     { projectId: 'busy', status: '進行中', tone: 'muted', remaining: 1 },
   ]);
+});
+
+test('dailyGoalProgress reports progress and caps the bar width', () => {
+  assert.deepEqual(dailyGoalProgress(4 * 3600, 8), { goalSeconds: 8 * 3600, percent: 50, width: 50, reached: false });
+  const over = dailyGoalProgress(10 * 3600, 8);
+  assert.equal(over.percent, 125);
+  assert.equal(over.width, 100);
+  assert.equal(over.reached, true);
+});
+
+test('dailyGoalProgress is off when no goal is set', () => {
+  assert.equal(dailyGoalProgress(3600, 0), null);
+  assert.equal(dailyGoalProgress(3600, undefined), null);
 });

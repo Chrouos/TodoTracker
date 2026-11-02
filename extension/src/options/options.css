@@ -495,7 +495,7 @@ section[hidden] { display: none; }
 .todo-card > .swatch { display: none; }
 .task-project-heading { margin-top: var(--lg); padding: var(--sm) var(--md); border-left: 4px solid var(--ink); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-mute); }
 .task-item { position: relative; margin-left: 0 !important; padding-left: calc(var(--task-depth, 0) * 28px + var(--md)); background-image: linear-gradient(var(--hairline-strong), var(--hairline-strong)); background-size: 2px 100%; background-position: calc(var(--task-depth, 0) * 28px) 0; background-repeat: no-repeat; }
-.task-branch { position: absolute; left: calc(var(--task-depth, 0) * 28px - 17px); color: var(--text-mute); font-weight: 700; }
+.task-branch { position: absolute; left: -20px; top: 18px; color: var(--text-mute); font-weight: 700; }
 #todoList .todo-card {
   position: relative;
   display: grid;
@@ -528,7 +528,7 @@ section[hidden] { display: none; }
 .priority-badge.priority-high { color: #b45309; background: #fff7ed; border-color: #fdba74; }
 .priority-badge.priority-normal { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
 .priority-badge.priority-low { color: #15803d; background: #f0fdf4; border-color: #86efac; }
-.badge.due-today { color: #9a5f00; border-color: var(--warning); }
+.badge.due-today { color: var(--warning-text); border-color: var(--warning); }
 .todo-meta-item { white-space: nowrap; }
 #todoList .todo-card:hover,
 #todoList .todo-card:focus-within {
@@ -539,17 +539,35 @@ section[hidden] { display: none; }
 #todoList .todo-card .main { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
 #todoList .todo-card .main > .ellipsis { font-size: 15px; font-weight: 700; line-height: 1.45; }
 #todoList .todo-card .main > .sub:first-of-type { margin-top: 3px; }
-#todoList .todo-card .main > .sub.num { margin-top: 4px; color: var(--text-mute); }
+#todoList .todo-card .main > .sub.todo-meta { margin-top: 4px; color: var(--text-mute); }
 #todoList .todo-card .num:not(.sub) { min-width: 66px; text-align: right; font-weight: 600; }
 #todoList .todo-card .act { align-self: center; }
-#todoList .todo-card.done { opacity: .68; background: var(--canvas-alt, #fafafa); }
+#todoList .todo-card.done { opacity: .68; background: var(--surface-soft); }
 #todoList .todo-card.done:hover { opacity: 1; }
 
 /* Todo 內容採上下流式，避免長筆記被右側欄位壓縮 */
 #todoList .todo-card {
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: start;
+  /* 子任務每層明顯內縮 */
+  margin-left: calc(var(--task-depth, 0) * 28px) !important;
+  background-image: none;
 }
+.todo-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0;
+  border: 0; background: transparent;
+}
+.todo-check:hover { background: transparent; }
+.todo-check > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  border: 1.5px solid var(--hairline-strong); border-radius: var(--r);
+  background: var(--canvas); font-size: 13px; font-weight: 700; line-height: 1;
+}
+.todo-check:hover > span { border-color: var(--ink); }
+.todo-check:focus-visible { outline: 1px solid var(--ink); outline-offset: -2px; }
+.todo-check.is-done > span { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
 #todoList .todo-card > .main { grid-column: 2; grid-row: 1; }
 #todoList .todo-card > .num:not(.sub) {
   grid-column: 2;
@@ -581,7 +599,7 @@ section[hidden] { display: none; }
   #todoList .todo-card > .act { grid-column: 2; justify-content: flex-start; opacity: 1; }
   /* 分頁列放不下時在列內橫向捲動，不撐開整頁 */
   #tabs { overflow-x: auto; scrollbar-width: none; }
-  #tabs .tab { flex: none; white-space: nowrap; }
+  #tabs .tab { flex: none; margin-bottom: 0; white-space: nowrap; }
 }
 
 /* 圖表 */
@@ -612,9 +630,9 @@ section[hidden] { display: none; }
   overflow: hidden;
 }
 #p-report > .kpis .kpi { min-height: 92px; justify-content: center; padding: 18px 20px; }
-#p-report > .kpis .kpi .num { font-size: 30px; line-height: 1.1; letter-spacing: -.4px; }
+#p-report > .kpis .kpi .num { font-family: var(--font-mono); font-size: 30px; line-height: 1.1; letter-spacing: -.4px; }
 #p-report > .kpis .kpi:first-child .num { font-size: 36px; }
-#p-report > .kpis .kpi-unit { margin: 0 2px; color: var(--text-mute); font-size: 14px; font-weight: 500; letter-spacing: 0; }
+#p-report > .kpis .kpi-unit { margin: 0 2px; font-family: var(--font); color: var(--text-mute); font-size: 14px; font-weight: 500; letter-spacing: 0; }
 .kpi-delta { color: var(--text-mute); line-height: 1.2; }
 .kpi-delta:empty { display: none; }
 @media (min-width: 851px) { #p-report > .kpis { grid-template-columns: 1.4fr 1fr 1fr 1fr; } }
@@ -869,7 +887,7 @@ section[hidden] { display: none; }
 .project-trend-svg .axis-label,
 .project-heatmap-svg .axis-label,
 .project-heatmap-svg .heatmap-label,
-.project-heatmap-svg .heatmap-cell-text { fill: var(--text-mute); font: 11px var(--font-mono); }
+.project-heatmap-svg .heatmap-cell-text { fill: var(--text-ink); font: 11px var(--font-mono); }
 .project-trend-svg .trend-hover-zone { cursor: crosshair; }
 .project-trend-svg .trend-hover-zone.is-hovered { fill: var(--ink); fill-opacity: .06; }
 .project-trend-svg .trend-segment.is-dimmed,
@@ -947,6 +965,13 @@ section[hidden] { display: none; }
 }
 .todo-tracker-axis > div span { padding-bottom: 7px; }
 .todo-tracker-rows { max-height: none; overflow-y: visible; }
+[data-level="1"] { --todo-level: 35%; }
+[data-level="2"] { --todo-level: 55%; }
+[data-level="3"] { --todo-level: 78%; }
+[data-level="4"] { --todo-level: 100%; }
+.todo-tracker-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 8px; color: var(--text-mute); font-size: 11px; }
+.todo-tracker-legend span { margin: 0 4px; }
+.todo-tracker-legend i { width: 14px; height: 10px; background: color-mix(in srgb, var(--text-body) var(--todo-level), var(--canvas)); }
 .todo-tracker-row { min-height: 46px; border-top: 1px solid var(--hairline); }
 .todo-tracker-label {
   position: sticky;
@@ -1006,7 +1031,7 @@ section[hidden] { display: none; }
   overflow: visible;
   border: 0;
   border-radius: 0;
-  background: var(--todo-color);
+  background: color-mix(in srgb, var(--todo-color) var(--todo-level, 100%), var(--canvas));
   box-shadow: inset -1px 0 var(--hairline);
   color: var(--text-body);
   text-align: left;
@@ -1403,11 +1428,13 @@ dialog .field { margin-bottom: var(--md); }
 .report-status-warning { color: var(--warning); }
 .report-status-danger { color: var(--danger); }
 .report-status-overview { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.report-status-donut { flex: 0 0 128px; width: 128px; }
-.report-status-donut .todo-health-donut-svg { display: block; width: 128px; height: 128px; }
+.report-status-donut { flex: 0 0 160px; width: 160px; }
+.report-status-donut .todo-health-donut-svg { display: block; width: 160px; height: 160px; }
 .report-status-donut .todo-health-donut-segment { stroke-width: 16; }
-.report-status-donut .todo-health-donut-value { font-size: 20px; }
-.report-status-donut .todo-health-donut-label { font-size: 9px; }
+.todo-health-donut-value { fill: var(--text-ink); }
+.todo-health-donut-label { fill: var(--text-mute); }
+.report-status-donut .todo-health-donut-value { font-size: 26px; font-weight: 700; }
+.report-status-donut .todo-health-donut-label { font-size: 11px; }
 .report-status-copy { min-width: 0; }
 .report-status-detail { color: var(--text-mute); font-size: 12px; text-align: right; }
 .report-status-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; }
@@ -1529,8 +1556,8 @@ dialog .field { margin-bottom: var(--md); }
   visibility: visible;
   transform: translateY(0);
 }
-.report-project-track { flex: 1; height: 7px; overflow: hidden; border-radius: var(--r-full); background: var(--surface-card); }
-.report-project-track span { display: block; width: var(--bar-width); height: 100%; min-width: 2px; border-radius: inherit; background: var(--success); }
+.report-project-track { flex: 1; height: 7px; overflow: hidden; border-radius: var(--r-full); background: var(--surface-card); box-shadow: inset 0 0 0 1px var(--hairline); }
+.report-project-track span { display: block; width: var(--bar-width); height: 100%; border-radius: inherit; background: var(--success); }
 .report-project-count { min-width: 34px; color: var(--text-mute); font-size: 11px; text-align: right; }
 .report-project-work { color: var(--text-body); text-align: right; white-space: nowrap; }
 .report-empty { padding: 12px 0 2px; color: var(--text-mute); font-size: 12px; }

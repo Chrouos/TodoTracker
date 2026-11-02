@@ -9,11 +9,12 @@ header {
 /* ── 唯一的深色面板（對應 DESIGN.md 的 hero TUI mockup） ── */
 #panel {
   background: var(--surface-dark);
-  color: var(--canvas);
+  color: var(--on-dark);
   padding: var(--xl) var(--lg);
   display: flex; flex-direction: column; align-items: center; gap: var(--md);
 }
 #clock {
+  font-family: var(--font-mono);
   font-size: 38px; font-weight: 700; line-height: 1.2;
   letter-spacing: -0.5px;
 }
@@ -23,12 +24,12 @@ header {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 #panel .btn-primary {
-  background: var(--canvas); color: var(--ink); border-color: var(--canvas);
+  background: var(--on-dark); color: var(--surface-dark); border-color: var(--on-dark);
   width: 100%;
 }
-#panel .btn-primary:hover { background: var(--surface-card); border-color: var(--surface-card); }
+#panel .btn-primary:hover { background: #e8e4e4; border-color: #e8e4e4; }
 #panel .btn-primary[data-state="running"] {
-  background: var(--surface-dark-2); color: var(--canvas); border-color: var(--hairline-strong);
+  background: var(--surface-dark-2); color: var(--on-dark); border-color: var(--hairline-strong);
 }
 #panel .btn-primary[data-state="running"]:hover { background: #3c3737; }
 
@@ -129,17 +130,41 @@ main[hidden] { display: none; }
 }
 .item:last-child { border-bottom: 0; }
 .item .main { flex: 1; min-width: 0; }
-.item .t1 { color: var(--text-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item .t2 { color: var(--text-ash); font-size: 11px; }
-.item .dur { font-variant-numeric: tabular-nums; color: var(--text-body); }
-.item .act { opacity: 0; }
-.item:hover .act { opacity: 1; }
+.item .t1 { padding-block: 2px; color: var(--text-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .t2 { color: var(--text-ash); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .dur { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--text-body); text-align: right; white-space: nowrap; }
+/* 平常不佔寬度，時數才會靠右對齊；寬度 0 仍可用鍵盤聚焦 */
+.item .act { width: 0; min-width: 0; padding: 0; border: 0; overflow: hidden; opacity: 0; }
+.item:hover .act, .item:focus-within .act { width: auto; padding: 0 var(--xs); opacity: 1; }
+
+/* 計時中，面板已顯示專案與描述，欄位預設收起避免重複 */
+#toggleDetails { align-self: flex-end; }
+#toggleDetails[hidden] { display: none; }
+.fields.is-summary #desc, .fields.is-summary .two, .fields.is-summary #tagRow { display: none; }
+
+.goal { padding-bottom: var(--md); }
+.goal[hidden] { display: none; }
+.goal-head { display: flex; justify-content: space-between; gap: var(--sm); }
+.goal-head .cap { line-height: 1.6; }
+.goal-track { height: 6px; overflow: hidden; border-radius: var(--r-full); background: var(--surface-card); box-shadow: inset 0 0 0 1px var(--hairline); }
+.goal-track span { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
+.goal.is-reached .goal-track span { background: var(--success); }
 
 .check {
-  border: 0; background: transparent; padding: 0; height: auto;
-  color: var(--text-mute); font-size: 12px; width: 22px; flex: 0 0 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; padding: 0; height: 28px;
+  width: 28px; flex: 0 0 28px;
 }
-.check:hover { background: transparent; color: var(--ink); }
+.check:hover { background: transparent; }
+.check > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--hairline-strong); border-radius: var(--r);
+  font-size: 11px; font-weight: 700; line-height: 1;
+}
+.check:hover > span { border-color: var(--ink); }
+.check:focus-visible { outline: 1px solid var(--ink); }
+.check.is-done > span { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
 .done .t1 { color: var(--text-ash); text-decoration: line-through; }
 
 .footer-link {

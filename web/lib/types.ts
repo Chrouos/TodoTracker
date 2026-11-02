@@ -102,6 +102,8 @@ export type Settings = {
   idleThresholdMin: number;
   weekStartsOn: number;
   roundToMin: number;
+  /** extension popup 的今日目標（小時）；0 = 不顯示 */
+  dailyGoalHours?: number;
 };
 
 /** 週期排程：到點自動開一張 Todo。weekdays 用 0=週日 … 6=週六 */

@@ -29,9 +29,16 @@
   --danger-hover: #d70015;
   --warning: #ff9f0a;
   --success: #30d158;
+  --warning-text: #9a5f00;
+  --info: #4f8fd8;
+  /* 深色面板上的文字，淺色、深色模式都一樣 */
+  --on-dark: #fdfcfc;
 
   /* Type */
-  --font: "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+  --font: system-ui, -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei",
+          "Noto Sans TC", "Noto Sans CJK TC", sans-serif;
+  /* 等寬字只留給計時器、KPI 數字與 [+] 這類標記 */
+  --font-mono: "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", "Noto Sans Mono CJK TC", monospace;
 
   /* Spacing */
@@ -41,6 +48,39 @@
   /* Radius：只有兩個值在做事 */
   --r: 4px;
   --r-full: 9999px;
+}
+
+:root { color-scheme: light dark; }
+
+/* 跟著系統切換；只換 token，元件不用各寫一份 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f1eeee;
+    --ink-deep: #ffffff;
+    --canvas: #181616;
+    --surface-soft: #211e1e;
+    --surface-card: #2c2828;
+    --surface-dark: #0f0d0d;
+    --surface-dark-2: #2a2626;
+    --hairline: rgba(255, 255, 255, 0.14);
+    --hairline-strong: #8f8b8b;
+    --text-ink: #f1eeee;
+    --text-charcoal: #e4e0e0;
+    --text-body: #cfcbcb;
+    --text-mute: #a8a3a3;
+    --text-stone: #a3a3a8;
+    --text-ash: #85817f;
+    --accent: #4da3ff;
+    --accent-hover: #7bbcff;
+    --danger: #ff6b61;
+    --danger-hover: #ff8d85;
+    --warning: #ffb340;
+    --success: #3ddc6a;
+    --warning-text: #ffc266;
+    --info: #7db3ee;
+  }
+  /* 專案預設色接近黑色，深色底上要有邊才看得到 */
+  .swatch { box-shadow: 0 0 0 1px var(--hairline); }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -143,7 +183,7 @@ label.field > span { display: block; font-size: 12px; color: var(--text-mute); m
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- 標記 / badge ---------- */
-.mark { color: var(--text-mute); user-select: none; }
+.mark { color: var(--text-mute); font-family: var(--font-mono); user-select: none; }
 .badge {
   font-size: 11px; line-height: 1;
   padding: 3px var(--sm);
@@ -153,7 +193,7 @@ label.field > span { display: block; font-size: 12px; color: var(--text-mute); m
   border: 1px solid var(--hairline);
   white-space: nowrap;
 }
-.badge-dark { background: var(--surface-dark); color: var(--canvas); border-color: var(--surface-dark); }
+.badge-dark { background: var(--surface-dark); color: var(--on-dark); border-color: var(--surface-dark); }
 .badge.priority-urgent { color: var(--danger); border-color: var(--danger); }
 .badge.priority-high { color: var(--ink); border-color: var(--ink); }
 

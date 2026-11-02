@@ -160,9 +160,9 @@ assert.match(html, /id="reportInsights"/, 'Report should expose data quality and
 assert.match(html, /data-collapse="rep-insights"/, 'Workspace status should have its own collapsible heading');
 assert.match(html, /data-collapse-body="rep-insights"/, 'Workspace status should have a collapsible body');
 assert.match(html, /data-collapse="rep-insights"[^>]*data-collapse-default="closed"/, 'Workspace status should default to collapsed');
-assert.match(html, /data-collapse="rep-donut"[^>]*data-collapse-default="closed"/, 'Project analytics should default to collapsed');
+assert.doesNotMatch(html, /data-collapse="rep-trend"[^>]*data-collapse-default="closed"/, 'Project analytics should be open by default');
 assert.doesNotMatch(html, /data-collapse="rep-review"[^>]*data-collapse-default="closed"/, 'Daily review should remain open by default');
-assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-review"[\s\S]*data-collapse="rep-donut"/, 'Report panels should put the important sections first');
+assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-trend"[\s\S]*data-collapse="rep-review"/, 'Report panels should put the important sections first');
 assert.doesNotMatch(html, /data-collapse="rep-todo-tracker"|data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should not keep the obsolete nested collapse markup');
 assert.match(options, /const todoTrackerMount = report\.querySelector\('#todoTracker'\)/, 'Todo Tracker should preserve its mount when the project report rerenders');
 assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
@@ -189,8 +189,8 @@ assert.doesNotMatch(html, /id="todoHealth"|data-collapse="rep-health"/, 'Report 
 assert.doesNotMatch(options, /renderTodoHealth\(|todoHealthSelectedStatus/, 'Todo health should not render as a separate chart');
 assert.match(options, /report-status-metrics/, 'Workspace status should contain the compact Todo summary');
 assert.match(css, /\.report-status-metrics\s*\{/, 'Compact Todo summary should have a dedicated layout style');
-assert.match(css, /\.report-status-donut\s*\{[^}]*flex:\s*0\s+0\s+128px/s, 'Todo donut should be large enough to read');
-assert.match(css, /\.report-status-donut \.todo-health-donut-svg\s*\{[^}]*width:\s*128px[^}]*height:\s*128px/s, 'Todo donut SVG should use the larger size');
+assert.match(css, /\.report-status-donut\s*\{[^}]*flex:\s*0\s+0\s+160px/s, 'Todo donut should be large enough to read');
+assert.match(css, /\.report-status-donut \.todo-health-donut-svg\s*\{[^}]*width:\s*160px[^}]*height:\s*160px/s, 'Todo donut SVG should use the larger size');
 assert.match(css, /#p-report > h2\.sec,\s*#p-report > \.report-panel > h2\.sec\s*\{/, 'Report section headings should share one typography rule');
 assert.match(css, /\.project-heatmap-svg \.heatmap-cell rect\s*\{[^}]*fill-opacity:/s, 'Heatmap cells should use a readable translucent project color');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
@@ -238,7 +238,7 @@ assert.match(options, /createReportChartSection/, 'Report charts should be wrapp
 assert.match(options, /dataset\.reportChart = id/, 'Report chart sections should expose a collapse identity');
 assert.match(options, /wrapReportChartContent/, 'Report charts should be grouped after rendering');
 assert.match(options, /reportChartCollapsed/, 'Report chart collapse state should be tracked');
-assert.match(options, /let reportChartCollapsed = new Set\(\['trend', 'heatmap'\]\)/, 'Todo Tracker should be visible when the project report is opened');
+assert.match(options, /let reportChartCollapsed = new Set\(\['heatmap'\]\)/, 'Todo Tracker should be visible when the project report is opened');
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
 assert.match(css, /\.report-due-alerts\s*\{/, 'Report due alerts should have a dedicated compact style');

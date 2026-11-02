@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildTodoTrackerData, syncTodoTrackerCollapseState } from './todo-tracker.js';
+import { buildTodoTrackerData, syncTodoTrackerCollapseState, trackerLevel } from './todo-tracker.js';
 
 const local = (value) => new Date(value);
 const durationSec = (entry) => Math.max(0,
@@ -362,4 +362,27 @@ test('defaults new tracker rows to collapsed while preserving manual expansion',
   );
   assert.deepEqual([...afterOpening.collapsedIds], ['second', 'new']);
   assert.deepEqual([...afterOpening.knownIds], ['first', 'second', 'new']);
+});
+
+test('trackerLevel buckets daily work into four shades', () => {
+  assert.equal(trackerLevel(0), 0);
+  assert.equal(trackerLevel(1800), 1);
+  assert.equal(trackerLevel(3600), 2);
+  assert.equal(trackerLevel(7200), 3);
+  assert.equal(trackerLevel(14400), 4);
+});
+
+test('dailySeconds sums same-day entries and splits across midnight', () => {
+  const { items } = buildTodoTrackerData({
+    tasks: [{ id: 'task', title: 'Task', status: 'todo', openedAt: '2026-08-10T08:00:00' }],
+    entries: [
+      { id: 'a', taskId: 'task', startedAt: '2026-08-11T09:00:00', endedAt: '2026-08-11T10:00:00' },
+      { id: 'b', taskId: 'task', startedAt: '2026-08-11T13:00:00', endedAt: '2026-08-11T13:30:00' },
+      { id: 'c', taskId: 'task', startedAt: '2026-08-12T23:00:00', endedAt: '2026-08-13T01:00:00' },
+    ],
+    dates: ['2026-08-11', '2026-08-12', '2026-08-13'],
+    now: local('2026-08-14T12:00:00'),
+    durationSec,
+  });
+  assert.deepEqual(items[0].dailySeconds, { '2026-08-11': 5400, '2026-08-12': 3600, '2026-08-13': 3600 });
 });

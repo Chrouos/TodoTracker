@@ -40,6 +40,8 @@
 
 **100% 等寬字。沒有 sans-serif、沒有斜體。**
 
+> Extension 例外（2026-11）：等寬字下中文字距過鬆，`extension/src/styles/tokens.css` 的內文改用系統無襯線字，`--font-mono` 只留給計時器、KPI 數字與 `[+]` 標記。Web 仍是全等寬。
+
 ```css
 --font: "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono",
         Menlo, Consolas, "Liberation Mono", monospace;
@@ -111,6 +113,7 @@ xxs 1 · xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32 · section 96
 ## 套用到 TodoTracker 的決定
 
 - 計時器面板是**唯一**的 `surface-dark` 區塊 —— 對應 OpenCode 的 hero TUI mockup。
+- Extension 的深色模式跟隨系統 `prefers-color-scheme`，只覆寫 `tokens.css` 的 token；面板上的文字一律用 `--on-dark`。
 - 時間數字用等寬字 + `font-variant-numeric: tabular-nums`，跳秒時不會抖動。
 - 專案顏色只以 8px 方塊（radius 0）呈現，不做彩色底、不做漸層。
 - Todo 勾選框用 `[ ]` / `[x]` 純文字，不用 checkbox 元件。

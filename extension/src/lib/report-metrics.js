@@ -28,6 +28,14 @@ function validEntry(entry) {
   return { start, end };
 }
 
+/** 今日目標進度；目標是 0 代表使用者關掉了這個功能 */
+export function dailyGoalProgress(seconds, goalHours) {
+  const goalSeconds = Number(goalHours) * 3600;
+  if (!(goalSeconds > 0)) return null;
+  const ratio = Math.max(0, Number(seconds) || 0) / goalSeconds;
+  return { goalSeconds, percent: Math.round(ratio * 100), width: Math.min(100, ratio * 100), reached: ratio >= 1 };
+}
+
 export function overlapSeconds(entry, fromDate, toDate = fromDate) {
   const valid = validEntry(entry);
   if (!valid) return 0;

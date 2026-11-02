@@ -115,6 +115,14 @@
     </h2>
     <div id="reportInsights" data-collapse-body="rep-insights" class="report-insights" data-i18n-aria-label="report.insights" aria-label="Todo 健康狀態與專案狀況"></div>
 
+    <h2 class="sec" data-collapse="rep-trend"><span class="mark">[-]</span> <span data-i18n="report.projectTimeTrend">專案時間與每日趨勢</span></h2>
+    <div id="byProject" data-collapse-body="rep-trend">
+      <div id="projectTrend"></div>
+      <div id="projectHeatmap"></div>
+      <div id="todoTracker"></div>
+      <div id="todoTrackerDetail" hidden></div>
+    </div>
+
     <h2 class="sec" data-collapse="rep-review">
       <span class="mark">[-]</span> <span data-i18n="report.dailyReview">每日工作回顧</span> <span id="reviewLabel" class="mute"></span>
       <span class="review-mode" id="reviewMode">
@@ -125,13 +133,6 @@
     <div id="dailyReview" data-collapse-body="rep-review"></div>
     <div id="reviewCalendarHoverTooltip" class="review-calendar-tooltip" role="tooltip" hidden></div>
 
-    <h2 class="sec" data-collapse="rep-donut" data-collapse-default="closed"><span class="mark">[+]</span> <span data-i18n="report.projectTimeTrend">專案時間與每日趨勢</span></h2>
-    <div id="byProject" data-collapse-body="rep-donut">
-      <div id="projectTrend"></div>
-      <div id="projectHeatmap"></div>
-      <div id="todoTracker"></div>
-      <div id="todoTrackerDetail" hidden></div>
-    </div>
 
   </section>
 
@@ -392,6 +393,11 @@
             <option value="6">6</option><option value="15">15</option><option value="30">30</option>
           </select>
           <span class="hint" data-i18n="settings.roundHint">每筆紀錄長度往上湊到這個倍數。設 15 的話，8 分鐘會記成 15 分鐘。想要精確時數就留「不進位」。</span>
+        </label>
+        <label class="field">
+          <span data-i18n="settings.goalLabel">每日目標（小時）</span>
+          <input id="stGoal" type="number" min="0" max="24" step="0.5" />
+          <span class="hint" data-i18n="settings.goalHint">顯示在 popup 的今日進度；設 0 就不顯示。</span>
         </label>
         <label class="field">
           <span data-i18n="settings.editorLabel">筆記編輯方式</span>

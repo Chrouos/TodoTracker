@@ -120,6 +120,33 @@ function calendarDays(start, end) {
   return Math.floor((localDayStart(dateKey(end)) - localDayStart(dateKey(start))) / 864e5) + 1;
 }
 
+/** 每天的工時；跨午夜的紀錄依實際時間拆到各天 */
+function dailyWorkSeconds(entries) {
+  const daily = {};
+  for (const entry of entries) {
+    const start = entry.visibleStart;
+    const end = entry.visibleEnd;
+    if (dateKey(start) === dateKey(new Date(end.getTime() - 1))) {
+      daily[dateKey(start)] = (daily[dateKey(start)] || 0) + entry.seconds;
+      continue;
+    }
+    for (let cursor = localDayStart(dateKey(start)); cursor < end; cursor = new Date(cursor.getTime() + 864e5)) {
+      const seconds = overlapSeconds(start, end, cursor, new Date(cursor.getTime() + 864e5));
+      if (seconds) daily[dateKey(cursor)] = (daily[dateKey(cursor)] || 0) + seconds;
+    }
+  }
+  return daily;
+}
+
+/** 熱圖深淺：1 小時內、2 小時內、4 小時內、4 小時以上 */
+export function trackerLevel(seconds) {
+  if (!(seconds > 0)) return 0;
+  if (seconds < 3600) return 1;
+  if (seconds < 7200) return 2;
+  if (seconds < 14400) return 3;
+  return 4;
+}
+
 function workedDateKeys(entries) {
   const dates = new Set();
   for (const entry of entries) {
@@ -199,6 +226,7 @@ export function buildTodoTrackerData({
         lifecycleDays: calendarDays(openedAt, endedAt),
         workedDays: workedDateKeys(itemEntries).size,
         workedDates: [...workedDateKeys(itemEntries)].sort(),
+        dailySeconds: dailyWorkSeconds(itemEntries),
         trackedSeconds: itemEntries.reduce((sum, entry) => sum + entry.seconds, 0),
         entries: itemEntries,
         workSegments,
