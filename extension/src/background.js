@@ -141,7 +141,15 @@ chrome.idle.onStateChanged.addListener(async (state) => {
   if (state === 'idle' || state === 'locked') {
     if (!t.idleSince) await patchTimer({ idleSince: new Date().toISOString() });
   }
-  // 回到 active 時保留 idleSince，讓 popup 有機會問；使用者決定後才清掉
+  // 回到 active 時保留 idleSince，讓 popup 與管理頁有機會問；使用者決定後才清掉
+  if (state === 'active' && t.idleSince) {
+    const sec = (Date.now() - new Date(t.idleSince).getTime()) / 1000;
+    if (sec < 60) return;
+    const locale = await currentLocale();
+    notify(`ts-idle-${t.entryId}`, translate(locale, 'timer.idle'), translate(locale, 'timer.idlePrompt', {
+      minutes: Math.round(sec / 60),
+    }));
+  }
 });
 
 /* ============================================================

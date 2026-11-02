@@ -298,7 +298,30 @@ function renderTimerTabState() {
   const tab = document.querySelector('.tab[data-tab="timer"]');
   tab.classList.toggle('is-running', Boolean(S.timer));
   tab.title = S.timer ? translateText('timer.running') : '';
+  renderIdleBanner();
 }
+
+// 跟 popup 一樣，閒置滿一分鐘才問
+function idleSeconds() {
+  if (!S.timer?.idleSince) return 0;
+  const seconds = (Date.now() - new Date(S.timer.idleSince).getTime()) / 1000;
+  return seconds >= 60 ? seconds : 0;
+}
+
+function renderIdleBanner() {
+  const seconds = idleSeconds();
+  $('idleBanner').hidden = !seconds;
+  if (seconds) $('idleBannerText').textContent = translateText('timer.idlePrompt', { minutes: Math.round(seconds / 60) });
+}
+
+$('idleBannerKeep').addEventListener('click', async () => {
+  await db.resolveIdleTimer(0);
+  await load();
+});
+$('idleBannerDrop').addEventListener('click', async () => {
+  await db.resolveIdleTimer(idleSeconds());
+  await load();
+});
 
 function renderAll() {
   renderTimerTabState();
@@ -622,6 +645,7 @@ function renderReportKpis(from, to) {
 
 // 總時數含計時中的時間，開著報表時每分鐘更新
 setInterval(() => {
+  renderIdleBanner();
   if (S.timer && !$('p-report').hidden) renderReportKpis(rangeStart(), rangeEnd());
 }, 60000);
 
@@ -2392,7 +2416,16 @@ $('entryList').addEventListener('click', async (e) => {
   }
   const ed = e.target.dataset.editE, dl = e.target.dataset.delE;
   if (ed) openEntryDialog(S.entries.find((x) => x.id === ed));
-  else if (dl) { await db.deleteEntry(dl); await load(); }
+  else if (dl) {
+    await db.deleteEntry(dl);
+    await load();
+    showToast(translateText('toast.entryDeleted'), {
+      action: {
+        label: translateText('common.undo'),
+        onClick: async () => { await db.restoreEntry(dl); await load(); },
+      },
+    });
+  }
 });
 
 /* 一鍵複製 Markdown 總結 */
@@ -2690,25 +2723,54 @@ calendarController = createCalendarController({
     destroy: (textarea) => { markdownEditors.get(textarea)?.destroy(); markdownEditors.delete(textarea); },
   },
 });
-let calendarRefreshTimeout = null;
-let calendarRefreshPending = Promise.resolve();
-function scheduleCalendarRefresh() {
-  clearTimeout(calendarRefreshTimeout);
-  calendarRefreshTimeout = setTimeout(() => {
-    calendarRefreshPending = calendarRefreshPending.catch(() => {}).then(async () => {
-      const [projects, tasks, entries, calendarPlans, timer, settings] = await Promise.all([
-        db.listProjects({ includeArchived: true }), db.listTasks(), db.listEntries(), db.listCalendarPlans(), db.getTimer(), db.getSettings(),
+let dataRefreshTimeout = null;
+let dataRefreshPending = Promise.resolve();
+let listRefreshDeferred = false;
+
+// 清單重繪會蓋掉列內正在編輯的內容，等使用者離開欄位再畫
+function isEditingRenderedList() {
+  if (noteEditingId) return true;
+  const active = document.activeElement;
+  return Boolean(active?.matches('input, textarea, select, [contenteditable="true"]')
+    && active.closest('#byProject, #dailyReview, #projList, #pjNoteList, #projectWorkspace, #todoList, #schList, #tagList, #entryList'));
+}
+
+function renderDataLists() {
+  renderReport(); renderProjects(); renderTodos(); renderSchedules(); renderTags(); renderEntries();
+}
+
+// popup、web 或其他分頁改了資料時同步畫面；自己的寫入已由 load() 畫過，比對後不會重畫
+function scheduleDataRefresh() {
+  clearTimeout(dataRefreshTimeout);
+  dataRefreshTimeout = setTimeout(() => {
+    dataRefreshPending = dataRefreshPending.catch(() => {}).then(async () => {
+      const [projects, tags, tasks, entries, schedules, calendarPlans, timer, settings] = await Promise.all([
+        db.listProjects({ includeArchived: true }), db.listTags(), db.listTasks(), db.listEntries(), db.listSchedules(), db.listCalendarPlans(), db.getTimer(), db.getSettings(),
       ]);
-      S = { ...S, projects, tasks, entries, calendarPlans, timer, settings };
+      const next = { projects, tags, tasks, entries, schedules, calendarPlans, timer, settings };
+      const changed = (key) => JSON.stringify(next[key]) !== JSON.stringify(S[key]);
+      const settingsChanged = changed('settings');
+      const listsChanged = ['projects', 'tags', 'tasks', 'entries', 'schedules'].some(changed)
+        || timer?.entryId !== S.timer?.entryId || timer?.startedAt !== S.timer?.startedAt;
+      S = { ...S, ...next };
       currentLocale = resolveLocale(settings.language, getBrowserLocale());
+      if (settingsChanged) {
+        applyTranslations(document, currentLocale);
+        renderAll();
+        return;
+      }
       calendarController.update(S);
       renderTimerTabState();
       if (!$('p-timer').hidden && !timerNotesDirty && !$('managementTimer').contains(document.activeElement)) renderTimer();
+      if (!listsChanged && !listRefreshDeferred) return;
+      listRefreshDeferred = isEditingRenderedList();
+      if (!listRefreshDeferred) renderDataLists();
     }).catch(() => showToast(translateText('calendar.error.save')));
   }, 60);
 }
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && ['calendarPlans', 'projects', 'tasks', 'entries', 'timer', 'settings'].some(key => key in changes)) scheduleCalendarRefresh();
+  if (area === 'local' && ['calendarPlans', 'projects', 'tags', 'tasks', 'entries', 'schedules', 'timer', 'settings'].some(key => key in changes)) scheduleDataRefresh();
 });
-window.addEventListener('focus', scheduleCalendarRefresh);
+window.addEventListener('focus', scheduleDataRefresh);
+document.addEventListener('focusout', () => { if (listRefreshDeferred) scheduleDataRefresh(); });
 load();

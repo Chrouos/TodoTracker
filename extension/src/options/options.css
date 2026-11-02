@@ -346,6 +346,20 @@ section[hidden] { display: none; }
   transition: opacity 120ms ease;
 }
 .app-toast.is-visible { opacity: 1; }
+.app-toast.has-action { pointer-events: auto; }
+.app-toast-action {
+  height: auto; margin-left: var(--sm); padding: 0;
+  border: 0; background: transparent; color: inherit;
+  font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer;
+}
+.app-toast-action:hover { background: transparent; color: inherit; }
+.idle-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sm);
+  margin-bottom: var(--md); padding: var(--sm) var(--md);
+  border: 1px solid var(--warning); border-radius: 4px;
+  color: var(--warning-text); font-size: 13px;
+}
+.idle-banner .grow { flex: 1 1 240px; }
 .entry-todo-note { margin-top: var(--xs); }
 .entry-todo-note > summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
 .entry-todo-note[open] > summary { margin-bottom: var(--xs); }

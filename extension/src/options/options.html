@@ -16,6 +16,12 @@
     <p class="cap" data-i18n="app.subtitle">本機時間追蹤 · 資料存在這台瀏覽器</p>
   </header>
 
+  <div id="idleBanner" class="idle-banner" role="status" hidden>
+    <span id="idleBannerText" class="grow"></span>
+    <button id="idleBannerKeep" type="button" class="btn-sm" data-i18n="timer.keepTime">保留時間</button>
+    <button id="idleBannerDrop" type="button" class="btn-sm btn-danger" data-i18n="timer.discardTime">扣除閒置時間</button>
+  </div>
+
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="report" data-i18n="nav.report">報表</button>
     <button class="tab" data-tab="timer" data-i18n="nav.timer">計時</button>

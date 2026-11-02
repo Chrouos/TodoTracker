@@ -416,6 +416,11 @@ export async function deleteEntry(id) {
   await write(K.entries, all.map((e) => (e.id === id ? { ...e, deletedAt: nowISO() } : e)));
 }
 
+export async function restoreEntry(id) {
+  const all = await read(K.entries, []);
+  await write(K.entries, all.map((e) => (e.id === id ? { ...e, deletedAt: null } : e)));
+}
+
 /* ---------------- timer ---------------- */
 
 /** 回傳 { entryId, startedAt, projectId, taskId, description, tagIds } 或 null */

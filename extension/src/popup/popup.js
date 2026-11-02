@@ -33,6 +33,8 @@ let liveNotesEntryId = null;
 let currentLocale = 'zh-TW';
 /** 剛停止、還沒補工作紀錄的那筆 entry id */
 let pendingLogId = null;
+/** 補寫到一半的內容；popup 隨時可能被關掉，所以每次輸入都先存起來 */
+let logDraftText = null;
 let todoAdvancedOpen = false;
 
 /* ---------------- draft（計時前暫存的選擇，關掉 popup 也留著） ---------------- */
@@ -54,8 +56,33 @@ async function load() {
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
+  await restoreLogDraft();
   render();
   $('initialLoading').hidden = true;
+}
+
+/* ---------------- 補寫紀錄的草稿 ---------------- */
+async function restoreLogDraft() {
+  const { logDraft } = await chrome.storage.local.get('logDraft');
+  if (!logDraft) return;
+  pendingLogId = logDraft.entryId;
+  logDraftText = logDraft.text;
+  // state.entries 只有本週；更早的紀錄無法顯示，直接把內容存回去
+  if (!state.entries.some((e) => e.id === pendingLogId)) {
+    await commitLogDraft();
+    pendingLogId = null;
+  }
+}
+function clearLogDraft() {
+  logDraftText = null;
+  return chrome.storage.local.remove('logDraft');
+}
+async function commitLogDraft() {
+  if (logDraftText === null) return;
+  const notes = logDraftText;
+  await clearLogDraft();
+  const entry = (await db.listEntries()).find((x) => x.id === pendingLogId);
+  if (entry) await db.upsertEntry({ ...entry, notes });
 }
 
 /* ---------------- 目前正在編輯的那組欄位 ---------------- */
@@ -127,7 +154,7 @@ function renderLog() {
   $('logMeta').textContent =
     `${p ? p.name : translate(currentLocale, 'project.uncategorized')} · ${formatDisplayTime(e.startedAt, currentLocale)}–${formatDisplayTime(e.endedAt, currentLocale)} · ${fmtHM(db.durationSec(e))}`;
   if ($('logText') !== document.activeElement) {
-    $('logText').value = e.notes || '';
+    $('logText').value = logDraftText ?? (e.notes || '');
     growLog();
   }
 }
@@ -319,6 +346,7 @@ $('toggleDetails').addEventListener('click', () => {
 $('toggle').addEventListener('click', async () => {
   if (state.timer) {
     await flushPopupNotes();
+    await commitLogDraft();
     // 停止後把這筆掛起來等使用者補工作紀錄
     const entry = await db.stopTimer();
     pendingLogId = entry ? entry.id : null;
@@ -371,6 +399,10 @@ $('idleDrop').addEventListener('click', async () => {
 $('recent').addEventListener('click', async (e) => {
   const logId = e.target.closest('[data-log]')?.dataset.log;
   if (logId) {
+    if (logId !== pendingLogId && logDraftText !== null) {
+      await commitLogDraft();
+      await load();
+    }
     pendingLogId = logId;
     render();
     $('logText').focus();
@@ -430,10 +462,19 @@ $('stampBtn').addEventListener('click', () => {
 $('logSave').addEventListener('click', async () => {
   const e = state.entries.find((x) => x.id === pendingLogId);
   if (e) await db.upsertEntry({ ...e, notes: $('logText').value });
+  await clearLogDraft();
   pendingLogId = null;
   await load();
 });
-$('logSkip').addEventListener('click', () => { pendingLogId = null; render(); });
+$('logSkip').addEventListener('click', async () => {
+  await clearLogDraft();
+  pendingLogId = null;
+  render();
+});
+$('logText').addEventListener('input', (e) => {
+  logDraftText = e.target.value;
+  chrome.storage.local.set({ logDraft: { entryId: pendingLogId, text: logDraftText } });
+});
 // Ctrl/Cmd + Enter 直接存
 $('logText').addEventListener('keydown', (ev) => {
   if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') $('logSave').click();
@@ -456,6 +497,14 @@ $('newTodo').addEventListener('keydown', async (e) => {
 });
 $('todoMore').addEventListener('click', () => {
   todoAdvancedOpen = !todoAdvancedOpen;
+  // 收起後看不到的欄位不能繼續影響新增的 Todo
+  if (!todoAdvancedOpen) {
+    $('todoCreateProject').value = '';
+    $('todoParent').value = '';
+    $('todoPriority').value = 'normal';
+    $('todoDue').value = '';
+    $('todoDueTime').value = '';
+  }
   renderTodo();
 });
 $('todoFilter').addEventListener('change', renderTodo);
@@ -489,6 +538,7 @@ $('todoList').addEventListener('click', async (e) => {
     switchTab('track');
   } else if (delId) {
     const t = state.tasks.find((x) => x.id === delId);
+    if (!confirm(translate(currentLocale, 'todo.deleteConfirm'))) return;
     await db.deleteTask(delId);
     showToast(translate(currentLocale, 'toast.todoDeleted', { title: t?.title || '' }));
   } else return;
@@ -524,10 +574,10 @@ $('copyToday').addEventListener('click', async (ev) => {
   setTimeout(() => { btn.textContent = `[${translate(currentLocale, 'popup.copySummary')}]`; }, 1500);
 });
 
-/* 空白鍵快捷（不在輸入框、也不在收合標題上時）→ 開始/停止 */
+/* 空白鍵快捷（焦點不在可操作元素、也不在收合標題上時）→ 開始/停止 */
 document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+  if (e.target.closest?.('button, a, summary, input, textarea, select')) return;
   if (e.target.closest?.('[data-collapse]')) return; // 交給 collapse.js 處理
   e.preventDefault();
   $('toggle').click();

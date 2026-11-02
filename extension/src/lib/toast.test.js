@@ -35,3 +35,33 @@ test('shows the latest toast and cancels the previous hide timer', () => {
   assert.equal(classes.has('is-visible'), false);
   assert.equal(element.textContent, '');
 });
+
+test('toast action runs its callback once and hides the toast', () => {
+  const classes = new Set();
+  const appended = [];
+  const element = {
+    textContent: '',
+    classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name) },
+    append: (node) => appended.push(node),
+  };
+  const button = { addEventListener: (type, callback) => { button[type] = callback; } };
+  const delays = [];
+  let undone = 0;
+  const showToast = createToast(element, {
+    setTimer: (callback, delay) => { delays.push(delay); return {}; },
+    clearTimer: () => {},
+    doc: { createElement: () => button },
+  });
+
+  showToast('已刪除紀錄', { action: { label: '復原', onClick: () => { undone += 1; } } });
+  assert.equal(button.textContent, '復原');
+  assert.deepEqual(appended, [button]);
+  assert.equal(classes.has('has-action'), true);
+  assert.deepEqual(delays, [6000]);
+
+  button.click();
+  assert.equal(undone, 1);
+  assert.equal(classes.has('is-visible'), false);
+  assert.equal(classes.has('has-action'), false);
+  assert.equal(element.textContent, '');
+});
