@@ -244,6 +244,12 @@ assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable i
 assert.match(css, /\.report-due-alerts\s*\{/, 'Report due alerts should have a dedicated compact style');
 assert.match(css, /\.report-due-alerts\s*\{[^}]*border:\s*0;[^}]*border-left:\s*3px\s+solid/s, 'Due alerts should use a single accent edge instead of a nested frame');
 assert.match(css, /\.report-due-alert\s*\{[^}]*border:\s*0;[^}]*border-top:\s*1px\s+solid/s, 'Due alert rows should use separators instead of individual boxes');
+assert.match(options, /class="report-due-alerts-title"/, 'Due alerts should have a distinct title block');
+assert.match(options, /class="report-due-alerts-summary(?:\s|\")/, 'Due alerts should expose a compact summary');
+assert.match(options, /class="report-due-alert-date(?:\s|\")/, 'Due alert dates should have a dedicated metadata element');
+assert.match(css, /\.report-due-alerts\s*\{[^}]*background:\s*var\(--surface-soft\)/s, 'Due alerts should sit in a soft visual container');
+assert.match(css, /\.report-due-alert-badge\s*\{/, 'Due alerts should have a dedicated status badge style');
+assert.match(css, /\.report-due-alert\s*\{[^}]*height:\s*auto;[^}]*min-height:\s*56px;[^}]*line-height:\s*1\.4/s, 'Due alert rows should grow with their two-line content');
 assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
 assert.match(options, /data-report-project-tooltip/, 'Project progress bars should expose Todo summary tooltips');
 assert.match(options, /class="report-project-color"/, 'Project status rows should expose a project color marker');

@@ -833,15 +833,15 @@ function renderDueAlerts() {
     const due = `${task.dueDate}${task.dueTime ? ` ${task.dueTime}` : ''}`;
     return `<button type="button" class="report-due-alert report-due-alert-${task.alertKind}" data-report-task-id="${esc(task.id)}">
       <span class="report-due-alert-main"><strong>${esc(title)}</strong>${projectLabel ? `<span class="sub">${esc(projectLabel)}</span>` : ''}</span>
-      <span class="report-due-alert-meta"><span>${esc(due)}</span><span class="badge">${esc(dueLabel(task, false, currentLocale))}</span></span>
+      <span class="report-due-alert-meta"><span class="badge report-due-alert-badge">${esc(dueLabel(task, false, currentLocale))}</span><span class="report-due-alert-date">${esc(due)}</span></span>
     </button>`;
   }).join('');
   const more = all.length > visible.length
     ? `<span class="cap">${translateText('report.dueAlertsMore', { count: all.length - visible.length })}</span>`
     : '';
   mount.innerHTML = `<section class="report-due-alerts">
-    <div class="report-due-alerts-head"><div><strong>${translateText('report.dueAlerts')}</strong><span class="cap">${translateText('report.dueAlertsHint')}</span></div>
-      <span class="cap">${counts}</span></div>
+    <div class="report-due-alerts-head"><div class="report-due-alerts-title"><span class="report-due-alerts-mark" aria-hidden="true">!</span><div><strong>${translateText('report.dueAlerts')}</strong><span class="cap">${translateText('report.dueAlertsHint')}</span></div></div>
+      <span class="report-due-alerts-summary cap">${counts}</span></div>
     <div class="report-due-alert-list">${rows}</div>
     ${more}
   </section>`;
