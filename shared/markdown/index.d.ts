@@ -16,6 +16,7 @@ export type Block =
   | { type: 'list'; ordered: boolean; items: ListItem[] }
   | { type: 'taskList'; items: TaskItem[] }
   | { type: 'table'; header: Inline[][]; alignments: TableAlignment[]; rows: Inline[][][] }
+  | { type: 'mathBlock'; value: string; source: string }
   | { type: 'horizontalRule' };
 export type MarkdownEditorMode = 'edit' | 'preview';
 export type ActiveBlockReplacement = { blocks: Block[]; valid: boolean; nextPath: TaskPath };

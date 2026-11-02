@@ -82,6 +82,11 @@ export function inlineValueFromDom(node) {
 
 function renderBlock(ownerDocument, block, path) {
   switch (block.type) {
+    case 'mathBlock': {
+      const element = blockElement(ownerDocument, 'p', path);
+      element.textContent = block.source;
+      return element;
+    }
     case 'paragraph': {
       const element = blockElement(ownerDocument, 'p', path);
       appendInlines(ownerDocument, element, block.inlines);

@@ -1,3 +1,23 @@
+function parseMathBlock(lines, start) {
+  const line = lines[start];
+  const match = line.match(/^ {0,3}(\$\$|\\\[)/);
+  if (!match) return null;
+  const opening = match[1];
+  const closing = opening === '$$' ? '$$' : '\\]';
+  const first = line.slice(match[0].length);
+  const content = [first];
+  for (let index = start; index < lines.length; index += 1) {
+    if (index > start) content.push(lines[index]);
+    const last = content[content.length - 1];
+    const end = last.indexOf(closing);
+    if (end !== -1 && !last.slice(end + closing.length).trim()) {
+      content[content.length - 1] = last.slice(0, end);
+      return { block: { type: 'mathBlock', value: content.join('\n').trim(), source: lines.slice(start, index + 1).join('\n') }, next: index + 1 };
+    }
+  }
+  return null;
+}
+
 export function parseMarkdown(markdown) {
   const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
   const blocks = [];
@@ -9,6 +29,8 @@ export function parseMarkdown(markdown) {
       continue;
     }
 
+    const math = parseMathBlock(lines, index);
+    if (math) { blocks.push(math.block); index = math.next; continue; }
     const fence = lines[index].match(/^```([^`]*)\s*$/);
     if (fence) {
       const language = fence[1].trim();
@@ -73,7 +95,7 @@ export function parseMarkdown(markdown) {
 }
 
 function startsBlock(lines, index) {
-  return /^```([^`]*)\s*$/.test(lines[index])
+  return Boolean(parseMathBlock(lines, index)) || /^```([^`]*)\s*$/.test(lines[index])
     || /^(#{1,6})[ \t]+/.test(lines[index])
     || isTableStart(lines, index)
     || isHorizontalRule(lines[index])

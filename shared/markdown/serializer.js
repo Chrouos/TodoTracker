@@ -6,6 +6,8 @@ export function serializeMarkdown(blocks) {
 
 function serializeBlock(block) {
   switch (block.type) {
+    case 'mathBlock':
+      return block.source;
     case 'heading':
       return `${'#'.repeat(block.level ?? 1)} ${serializeInlines(block.inlines)}`;
     case 'paragraph':

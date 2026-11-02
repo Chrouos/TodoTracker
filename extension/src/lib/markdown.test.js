@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   detectMarkdownShortcut,
   markdownToHTML,
+  parseMarkdown,
+  serializeMarkdown,
   renderBlocks,
   renderMarkdown,
   shouldShowMarkdownToggle,
@@ -154,4 +156,18 @@ test('renders nested quote, list, and task paths with accessible escaped context
   assert.match(html, /aria-label="Toggle task Ship &lt;now&gt; &amp; &quot;later&quot; \(0\.0\.0\.0\.0\.0\)"/);
   const next = toggleTaskItem(blocks, [0, 0, 0, 0, 0, 0]);
   assert.equal(next[0].blocks[0].items[0].children[0].blocks[0].items[0].checked, true);
+});
+
+
+test('renders display math and preserves both delimiters', () => {
+  for (const source of ['$$\\frac{1}{2}$$', '\\[\n\\frac{1}{2}\n\\]']) {
+    assert.equal(serializeMarkdown(parseMarkdown(source)), source);
+    assert.match(renderMarkdown(source), /class="katex-display"/);
+    assert.match(renderMarkdown(source), /mfrac/);
+  }
+});
+
+test('keeps incomplete math and fenced code literal', () => {
+  assert.doesNotMatch(renderMarkdown('$$\nunfinished'), /katex-display/);
+  assert.doesNotMatch(renderMarkdown('```\n$$x$$\n```'), /katex-display/);
 });

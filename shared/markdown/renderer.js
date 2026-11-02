@@ -1,3 +1,4 @@
+import katex from './katex.mjs';
 import { isSafeUrl, parseMarkdown } from './parser.js';
 
 export function renderMarkdown(markdown, options) {
@@ -10,6 +11,8 @@ export function renderBlocks(blocks, options = {}) {
 
 function renderBlock(block, options, taskPath) {
   switch (block.type) {
+    case 'mathBlock':
+      return katex.renderToString(block.value, { displayMode: true, throwOnError: false, trust: false });
     case 'heading': {
       const level = Math.min(6, Math.max(1, block.level ?? 1));
       return `<h${level}>${renderInlines(block.inlines)}</h${level}>`;

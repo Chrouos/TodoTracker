@@ -166,3 +166,12 @@ test('round-trips a non-canonical Markdown source to an equivalent AST', () => {
 
   assert.deepEqual(parseMarkdown(serializeMarkdown(blocks)), blocks);
 });
+
+test('renders display math and preserves both delimiters through serialization', () => {
+  for (const source of ['$$\n\\frac{1}{2}\n$$', '\\[\n\\frac{1}{2}\n\\]']) {
+    const blocks = parseMarkdown(source);
+    assert.equal(serializeMarkdown(blocks), source);
+    assert.match(renderMarkdown(source), /class="katex-display"/);
+    assert.match(renderMarkdown(source), /mfrac/);
+  }
+});

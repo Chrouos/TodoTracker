@@ -1,3 +1,25 @@
+import katex from './katex.mjs';
+
+function parseMathBlock(lines, start) {
+  const line = lines[start];
+  const match = line.match(/^ {0,3}(\$\$|\\\[)/);
+  if (!match) return null;
+  const opening = match[1];
+  const closing = opening === '$$' ? '$$' : '\\]';
+  const first = line.slice(match[0].length);
+  const content = [first];
+  for (let index = start; index < lines.length; index += 1) {
+    if (index > start) content.push(lines[index]);
+    const last = content[content.length - 1];
+    const end = last.indexOf(closing);
+    if (end !== -1 && !last.slice(end + closing.length).trim()) {
+      content[content.length - 1] = last.slice(0, end);
+      return { block: { type: 'mathBlock', value: content.join('\n').trim(), source: lines.slice(start, index + 1).join('\n') }, next: index + 1 };
+    }
+  }
+  return null;
+}
+
 // Keep this Extension-local module aligned with shared/markdown. The unpacked
 // MV3 extension cannot import modules outside its package root.
 
@@ -10,6 +32,8 @@ export function parseMarkdown(markdown) {
   let index = 0;
   while (index < lines.length) {
     if (!lines[index].trim()) { index += 1; continue; }
+    const math = parseMathBlock(lines, index);
+    if (math) { blocks.push(math.block); index = math.next; continue; }
     const fence = lines[index].match(/^```([^`]*)\s*$/);
     if (fence) {
       const value = [];
@@ -134,6 +158,7 @@ export function cloneBlocks(blocks) {
 }
 
 function renderBlock(block, options, path) {
+  if (block.type === 'mathBlock') return katex.renderToString(block.value, { displayMode: true, throwOnError: false, trust: false });
   if (block.type === 'heading') return `<h${Math.min(6, Math.max(1, block.level ?? 1))}>${renderInlines(block.inlines)}</h${Math.min(6, Math.max(1, block.level ?? 1))}>`;
   if (block.type === 'paragraph') return `<p>${renderInlines(block.inlines)}</p>`;
   if (block.type === 'quote') return `<blockquote>${(block.blocks ?? []).map((child, index) => renderBlock(child, options, [...path, index])).join('')}</blockquote>`;
@@ -183,6 +208,7 @@ function inlineText(inlines = []) {
 }
 
 function serializeBlock(block) {
+  if (block.type === 'mathBlock') return block.source;
   if (block.type === 'heading') return `${'#'.repeat(block.level ?? 1)} ${serializeInlines(block.inlines)}`;
   if (block.type === 'paragraph') return serializeInlines(block.inlines);
   if (block.type === 'quote') return serializeMarkdown(block.blocks ?? []).split('\n').map((line) => line ? `> ${line}` : '>').join('\n');
@@ -202,7 +228,7 @@ function serializeBlock(block) {
 function serializeTableCell(inlines) { return serializeInlines(inlines).replace(/\|/g, '\\|'); }
 function isSafeUrl(url) { return /^https:\/\/[^\s]+$/i.test(url); }
 function isHorizontalRule(line) { return /^ {0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line); }
-function startsBlock(lines, index) { return /^```([^`]*)\s*$/.test(lines[index]) || /^(#{1,6})[ \t]+/.test(lines[index]) || isTableStart(lines, index) || isHorizontalRule(lines[index]) || lines[index].startsWith('>') || Boolean(matchListItem(lines[index])); }
+function startsBlock(lines, index) { return Boolean(parseMathBlock(lines, index)) || /^```([^`]*)\s*$/.test(lines[index]) || /^(#{1,6})[ \t]+/.test(lines[index]) || isTableStart(lines, index) || isHorizontalRule(lines[index]) || lines[index].startsWith('>') || Boolean(matchListItem(lines[index])); }
 function matchListItem(line) { if (typeof line !== 'string') return null; const match = line.match(/^( *)([-+*]|\d+[.)])\s+(.*)$/); return !match || match[1].length % 2 ? null : { indent: match[1].length, ordered: /^\d/.test(match[2]), content: match[3] }; }
 function parseTaskMarker(content) { const match = content.match(/^\[([ xX])\]\s+(.*)$/); return match ? { checked: match[1].toLowerCase() === 'x', content: match[2] } : null; }
 function parseList(lines, start, indent) {
