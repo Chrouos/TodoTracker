@@ -68,3 +68,7 @@ app/globals.css DESIGN.md 的 CSS 變數
 
 只需要換掉 `lib/bridge.ts`（改打 Supabase）跟擴充的 `src/lib/db.js`。
 頁面與元件完全不用動 —— 兩邊的欄位命名早就跟 `supabase/schema.sql` 對齊了。
+
+## 日曆資料相容
+
+日曆規劃介面位於 extension 管理頁。web 的共用 snapshot 包含 `calendarPlans`，計時器與工作紀錄可帶 `planId`；編輯或停止計時時保留安排來源，計時面板也可解除來源連結。舊版 extension 沒有日曆資料時使用空陣列。這次沒有新增 web 日曆頁面，也沒有新增雲端同步。

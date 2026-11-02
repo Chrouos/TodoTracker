@@ -1,4 +1,5 @@
 import * as db from '../lib/db.js';
+import { createCalendarController } from './calendar.js';
 import {
   applyTranslations,
   formatDisplayDate,
@@ -145,7 +146,8 @@ document.addEventListener('click', (event) => {
 });
 
 let currentLocale = 'zh-TW';
-let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], timer: null, settings: db.DEFAULT_SETTINGS };
+let S = { projects: [], tags: [], tasks: [], entries: [], schedules: [], calendarPlans: [], timer: null, settings: db.DEFAULT_SETTINGS };
+let calendarController = null;
 function renderEntryTasks(selectedTaskId = '') {
   const projectId = $('enProject').value;
   const tasks = sortTasksForManualEntry(tasksForProject(S.tasks, projectId), S.entries);
@@ -193,17 +195,20 @@ let reviewMode = 'calendar';
 let reviewGroups = [];
 let timerTicker = null;
 let timerNotesSaveTimer = null;
+let timerNotesWrite = Promise.resolve();
+let timerNotesDirty = false;
+let renderedTimerEntryId = null;
 let timerCompleteChoice = false;
 let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
 let timerNotesPreviewOpen = false;
 let reviewCalendarSelectedTarget = null;
 
 async function load() {
-  const [projects, tags, tasks, entries, schedules, timer, settings] = await Promise.all([
+  const [projects, tags, tasks, entries, schedules, timer, settings, calendarPlans] = await Promise.all([
     db.listProjects({ includeArchived: true }), db.listTags(),
-    db.listTasks(), db.listEntries(), db.listSchedules(), db.getTimer(), db.getSettings(),
+    db.listTasks(), db.listEntries(), db.listSchedules(), db.getTimer(), db.getSettings(), db.listCalendarPlans(),
   ]);
-  S = { projects, tags, tasks, entries, schedules, timer, settings };
+  S = { projects, tags, tasks, entries, schedules, timer, settings, calendarPlans };
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
@@ -291,6 +296,7 @@ function applyCustomRange(source) {
 }
 
 function renderAll() {
+  calendarController?.update(S);
   renderTimer(); renderReport(); renderProjects(); renderTodos(); renderSchedules();
   renderTags(); renderEntries(); renderSettings();
 }
@@ -365,6 +371,9 @@ function renderTimer() {
   const task = $('mgTimerTask');
   const projectId = current.projectId || '';
   const taskId = current.taskId || '';
+  const sourcePlan = S.calendarPlans.find((plan) => plan.id === timer?.planId);
+  $('mgTimerPlanSource').hidden = !sourcePlan;
+  $('mgTimerPlanTitle').textContent = sourcePlan?.title || '';
 
   syncTimerNotesMode();
   panel.classList.toggle('is-running', Boolean(timer));
@@ -372,7 +381,10 @@ function renderTimer() {
   $('mgTimerToggle').textContent = timer ? translateText('timer.stopAndSave') : translateText('timer.startAndSave');
   $('mgTimerIdleNotice').hidden = Boolean(timer);
   $('mgTimerDescription').value = current.description || '';
-  if (!isMarkdownEditorFocused($('mgTimerNotes'))) $('mgTimerNotes').value = current.notes || '';
+  if (!timerNotesDirty && (!isMarkdownEditorFocused($('mgTimerNotes')) || renderedTimerEntryId !== (timer?.entryId || null))) {
+    $('mgTimerNotes').value = current.notes || '';
+    renderedTimerEntryId = timer?.entryId || null;
+  }
   syncMarkdownEditor($('mgTimerNotes'));
 
   project.innerHTML = `<option value="">${esc(translateText('common.uncategorizedOption'))}</option>` +
@@ -414,14 +426,19 @@ async function patchManagementTimer(patch) {
   }
 }
 
-async function flushManagementTimerNotes() {
+async function flushManagementTimerNotes(expectedEntryId = renderedTimerEntryId) {
   clearTimeout(timerNotesSaveTimer);
   const notes = $('mgTimerNotes').value;
-  if (!S.timer) {
+  await timerNotesWrite;
+  if (!expectedEntryId) {
     timerDraft.notes = notes;
     return;
   }
-  S.timer = await db.patchTimer({ notes });
+  if (!timerNotesDirty) return;
+  timerNotesWrite = db.saveTimerNotes({ notes, entryId: expectedEntryId });
+  S.timer = await timerNotesWrite;
+  if ($('mgTimerNotes').value === notes) timerNotesDirty = false;
+  if (!timerNotesDirty && S.timer?.entryId !== renderedTimerEntryId) renderTimer();
   $('mgTimerSaved').textContent = translateText('timer.saved');
   setTimeout(() => { $('mgTimerSaved').textContent = ''; }, 1200);
 }
@@ -453,18 +470,24 @@ $('mgTimerTags').addEventListener('click', async (event) => {
   renderTimer();
 });
 $('mgTimerNotes').addEventListener('input', () => {
+  timerNotesDirty = true;
   if (!S.timer) {
     timerDraft.notes = $('mgTimerNotes').value;
     return;
   }
   $('mgTimerSaved').textContent = translateText('timer.saving');
   clearTimeout(timerNotesSaveTimer);
-  timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(), 500);
+  const entryId = renderedTimerEntryId;
+  timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(entryId), 500);
 });
 $('mgTimerNotesEditToggle').addEventListener('click', () => setTimerNotesPreviewOpen(false));
 $('mgTimerNotesPreviewToggle').addEventListener('click', () => setTimerNotesPreviewOpen(true));
 $('mgTimerComplete').addEventListener('change', (event) => {
   timerCompleteChoice = event.target.checked;
+});
+$('mgTimerPlanUnlink').addEventListener('click', async () => {
+  await db.patchTimer({ planId: null }, { expectedEntryId: S.timer?.entryId });
+  await load();
 });
 $('mgTimerToggle').addEventListener('click', async () => {
   if (S.timer) {
@@ -2650,9 +2673,12 @@ function selectTab(name, preserveFocus = false) {
     if (hadFocusedTarget) { renderEntries(); renderTodos(); }
   }
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-  ['report', 'timer', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
+  ['report', 'timer', 'calendar', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
+  document.body.classList.toggle('calendar-active', name === 'calendar');
+  calendarController?.setActive(name === 'calendar');
+  if (name === 'timer') renderTimer();
 }
 
 function focusReportEntry(id) {
@@ -2739,4 +2765,57 @@ initCollapse();
 syncRangeControls();
 resetTodoForm();
 resetSchForm();
+calendarController = createCalendarController({
+  root: $('p-calendar'), getSnapshot: () => S, getLocale: () => currentLocale,
+  actions: {
+    savePlan: (input) => db.upsertCalendarPlan(input),
+    deletePlan: (id) => db.deleteCalendarPlan(id),
+    startPlan: async (id) => {
+      const plan = (await db.listCalendarPlans()).find((item) => item.id === id);
+      if (!plan) throw new Error(translateText('calendar.deleted'));
+      const timer = await db.getTimer();
+      if (timer?.planId === id) { await load(); selectTab('timer'); return; }
+      await flushManagementTimerNotes();
+      const task = S.tasks.find((item) => item.id === plan.taskId);
+      const taskId = task && (task.projectId || null) === plan.projectId ? task.id : null;
+      await db.startTimer({ projectId: plan.projectId, taskId, description: plan.title, notes: '', tagIds: [], planId: id });
+      timerCompleteChoice = false;
+      timerNotesDirty = false;
+      await load();
+      selectTab('timer');
+    },
+    openEntry: (id) => { const entry = S.entries.find((item) => item.id === id); if (entry) openEntryDialog(entry); else selectTab('timer'); },
+    openTask: (id) => focusReportTodo(id),
+    refresh: () => load(),
+  },
+  editors: {
+    mount: (textarea) => {
+      const editor = mountMarkdownEditor(textarea, { mode: normalizeMarkdownEditorMode(S.settings.notesEditor), min: 160, preview: true, translate: (key) => translateText(`editor.${key}`) });
+      markdownEditors.set(textarea, editor);
+      return editor;
+    },
+    sync: (textarea) => syncMarkdownEditor(textarea),
+    destroy: (textarea) => { markdownEditors.get(textarea)?.destroy(); markdownEditors.delete(textarea); },
+  },
+});
+let calendarRefreshTimeout = null;
+let calendarRefreshPending = Promise.resolve();
+function scheduleCalendarRefresh() {
+  clearTimeout(calendarRefreshTimeout);
+  calendarRefreshTimeout = setTimeout(() => {
+    calendarRefreshPending = calendarRefreshPending.catch(() => {}).then(async () => {
+      const [projects, tasks, entries, calendarPlans, timer, settings] = await Promise.all([
+        db.listProjects({ includeArchived: true }), db.listTasks(), db.listEntries(), db.listCalendarPlans(), db.getTimer(), db.getSettings(),
+      ]);
+      S = { ...S, projects, tasks, entries, calendarPlans, timer, settings };
+      currentLocale = resolveLocale(settings.language, getBrowserLocale());
+      calendarController.update(S);
+      if (!$('p-timer').hidden && !timerNotesDirty && !$('managementTimer').contains(document.activeElement)) renderTimer();
+    }).catch(() => showToast(translateText('calendar.error.save')));
+  }, 60);
+}
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && ['calendarPlans', 'projects', 'tasks', 'entries', 'timer', 'settings'].some(key => key in changes)) scheduleCalendarRefresh();
+});
+window.addEventListener('focus', scheduleCalendarRefresh);
 load();

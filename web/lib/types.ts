@@ -66,6 +66,7 @@ export type Task = {
 };
 
 export type Entry = {
+  planId?: string | null;
   id: string;
   clientEntryId: string;
   projectId: string | null;
@@ -84,6 +85,7 @@ export type Entry = {
 };
 
 export type Timer = {
+  planId?: string | null;
   entryId: string;
   clientEntryId: string;
   startedAt: string;
@@ -121,7 +123,21 @@ export type Schedule = {
   updatedAt: string;
 };
 
+export type CalendarPlan = {
+  id: string;
+  title: string;
+  projectId: string | null;
+  taskId: string | null;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+} & (
+  | { allDay: false; startedAt: string; endedAt: string }
+  | { allDay: true; startDate: string; endDate: string }
+);
+
 export type Snapshot = {
+  calendarPlans: CalendarPlan[];
   projects: Project[];
   tags: Tag[];
   tasks: Task[];
@@ -132,6 +148,7 @@ export type Snapshot = {
 };
 
 export const EMPTY_SNAPSHOT: Snapshot = {
+  calendarPlans: [],
   projects: [], tags: [], tasks: [], entries: [], schedules: [],
   settings: { idleThresholdMin: 15, weekStartsOn: 1, roundToMin: 0 },
   timer: null,

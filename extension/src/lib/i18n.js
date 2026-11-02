@@ -1,3 +1,4 @@
+import { CALENDAR_MESSAGES } from './calendar-i18n.js';
 export const SUPPORTED_LOCALES = Object.freeze(['zh-TW', 'en', 'ja']);
 
 export const LANGUAGE_OPTIONS = Object.freeze([
@@ -1166,9 +1167,9 @@ const OPTIONS_JA = {
 };
 
 export const MESSAGES = Object.freeze({
-  'zh-TW': Object.freeze({ ...ZH_TW, ...OPTIONS_ZH_TW }),
-  en: Object.freeze({ ...EN, ...OPTIONS_EN }),
-  ja: Object.freeze({ ...JA, ...OPTIONS_JA }),
+  'zh-TW': Object.freeze({ ...ZH_TW, ...OPTIONS_ZH_TW, ...CALENDAR_MESSAGES['zh-TW'] }),
+  en: Object.freeze({ ...EN, ...OPTIONS_EN, ...CALENDAR_MESSAGES.en }),
+  ja: Object.freeze({ ...JA, ...OPTIONS_JA, ...CALENDAR_MESSAGES.ja }),
 });
 
 const LOCALE_VALUES = new Set(SUPPORTED_LOCALES);

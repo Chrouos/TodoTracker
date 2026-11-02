@@ -165,7 +165,8 @@ const RPC = {
       db.getSettings(),
       db.getTimer(),
     ]);
-    return { projects, tags, tasks, entries, schedules, settings, timer };
+    const calendarPlans = await db.listCalendarPlans();
+    return { projects, tags, tasks, entries, schedules, settings, timer, calendarPlans };
   },
 
   upsertProject: (p) => db.upsertProject(p),
@@ -179,12 +180,16 @@ const RPC = {
   deleteTask: ({ id }) => db.deleteTask(id),
   upsertSchedule: (s) => db.upsertSchedule(s),
   deleteSchedule: ({ id }) => db.deleteSchedule(id),
+  upsertCalendarPlan: (p) => db.upsertCalendarPlan(p),
+  deleteCalendarPlan: ({ id }) => db.deleteCalendarPlan(id),
   runSchedulesNow: () => db.runDueSchedules(),
   upsertEntry: (e) => db.upsertEntry(e),
   deleteEntry: ({ id }) => db.deleteEntry(id),
 
   startTimer: (p) => db.startTimer(p || {}),
-  patchTimer: (p) => db.patchTimer(p),
+  patchTimer: ({ expectedEntryId, noteOwnerEntryId, ...patch }) => noteOwnerEntryId !== undefined
+    ? db.saveTimerNotes({ entryId: noteOwnerEntryId, notes: patch.notes })
+    : db.patchTimer(patch, { expectedEntryId }),
   stopTimer: (p) => db.stopTimer(p?.endedAt ?? null, p?.discardSeconds ?? 0),
 
   saveSettings: (s) => db.saveSettings(s),

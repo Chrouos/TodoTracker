@@ -5,6 +5,7 @@
   <title>TodoTracker</title>
   <link rel="stylesheet" href="../styles/tokens.css" />
   <link rel="stylesheet" href="options.css" />
+  <link rel="stylesheet" href="calendar.css" />
 </head>
 <body>
 <div id="initialLoading" class="initial-loading" data-i18n="app.loading">載入中…</div>
@@ -17,6 +18,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="report" data-i18n="nav.report">報表</button>
     <button class="tab" data-tab="timer" data-i18n="timer.running">計時</button>
+    <button class="tab" data-tab="calendar" data-i18n="nav.calendar">日曆</button>
     <button class="tab" data-tab="projects" data-i18n="nav.projects">專案</button>
     <button class="tab" data-tab="todos" data-i18n="nav.todos">Todo</button>
     <button class="tab" data-tab="entries" data-i18n="nav.entries">紀錄</button>
@@ -24,6 +26,8 @@
     <button class="tab" data-tab="tags" data-i18n="nav.tags">標籤</button>
     <button class="tab" data-tab="settings" data-i18n="nav.settings">設定</button>
   </nav>
+
+  <section id="p-calendar" hidden></section>
 
   <section id="p-timer" hidden>
     <div id="managementTimer" class="card timer-panel" aria-live="polite">
@@ -35,6 +39,7 @@
         </div>
         <button id="mgTimerToggle" type="button" class="btn-primary" data-i18n="timer.startAndSave">開始計時</button>
       </div>
+      <div id="mgTimerPlanSource" class="cal-source" hidden><span data-i18n="calendar.source">來源安排</span><strong id="mgTimerPlanTitle"></strong><button id="mgTimerPlanUnlink" type="button" class="btn-sm" data-i18n="calendar.unlink">解除連結</button></div>
       <div id="mgTimerIdleNotice" class="timer-idle-notice" role="status">
         <span data-i18n="timer.idleNotice">目前沒有正在計時；現在輸入的紀錄會先保留，按「開始計時」後才會開始計算時間。</span>
       </div>

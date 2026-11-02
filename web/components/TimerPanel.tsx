@@ -12,6 +12,7 @@ type Draft = { projectId: string; taskId: string; description: string };
 export default function TimerPanel() {
   const { data, act } = useStore();
   const { timer, projects, tasks } = data;
+  const sourcePlan = data.calendarPlans.find((plan) => plan.id === timer?.planId);
   const [draft, setDraft] = useState<Draft>({ projectId: '', taskId: '', description: '' });
   const [elapsed, setElapsed] = useState(0);
 
@@ -21,21 +22,47 @@ export default function TimerPanel() {
   const notesRef = useRef<MarkdownEditorHandle | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
+  const notesOwner = useRef<string | null>(null);
+  const pendingNotes = useRef<{ entryId: string; notes: string } | null>(null);
+  const notesWrite = useRef<Promise<unknown>>(Promise.resolve());
+  const persistNotes = (value: { entryId: string; notes: string }) => {
+    const write = notesWrite.current.catch(() => {}).then(() => act('patchTimer', {
+      notes: value.notes, expectedEntryId: value.entryId, noteOwnerEntryId: value.entryId,
+    }));
+    notesWrite.current = write;
+    return write;
+  };
 
   // 換一筆計時（或從別的介面改動）時才吃遠端的值，避免打字被蓋掉
   useEffect(() => {
-    if (!dirty.current) setNotes(timer?.notes ?? '');
+    const entryId = timer?.entryId || null;
+    if (notesOwner.current !== entryId) {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      const previousDraft = pendingNotes.current;
+      pendingNotes.current = null;
+      dirty.current = false;
+      notesOwner.current = entryId;
+      if (previousDraft) void persistNotes(previousDraft);
+      setNotes(timer?.notes ?? '');
+    } else if (!dirty.current) setNotes(timer?.notes ?? '');
   }, [timer?.entryId, timer?.notes]);
 
   const writeNotes = (v: string) => {
+    const entryId = notesOwner.current;
+    if (!entryId) return;
+    const pending = { entryId, notes: v };
+    pendingNotes.current = pending;
     setNotes(v);
     dirty.current = true;
     setSavedFlag('…');
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await act('patchTimer', { notes: v });
-      dirty.current = false;
-      setSavedFlag('已存');
+      const saved = await persistNotes(pending);
+      if (pendingNotes.current === pending && saved !== null) {
+        pendingNotes.current = null;
+        dirty.current = false;
+        setSavedFlag('已存');
+      }
       setTimeout(() => setSavedFlag(''), 1200);
     }, 500);
   };
@@ -73,7 +100,10 @@ export default function TimerPanel() {
     if (timer) {
       // 還沒送出去的字先落地，再停止
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (dirty.current) await act('patchTimer', { notes });
+      const pending = pendingNotes.current;
+      if (pending) await persistNotes(pending);
+      await notesWrite.current;
+      pendingNotes.current = null;
       dirty.current = false;
       await act('stopTimer');
       setNotes('');
@@ -96,6 +126,7 @@ export default function TimerPanel() {
   return (
     <section className="timer-panel">
       <div className="clock">{fmtHMS(elapsed)}</div>
+      {sourcePlan && <div className="cap">來源安排 · {sourcePlan.title} <button className="btn-sm" onClick={() => act('patchTimer', { planId: null, expectedEntryId: timer?.entryId })}>解除連結</button></div>}
 
       <div className="fields">
         <input

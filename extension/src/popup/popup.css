@@ -146,3 +146,7 @@ main[hidden] { display: none; }
   display: block; text-align: center; padding: var(--md) 0 0;
   font-size: 12px; color: var(--text-mute);
 }
+/* Calendar source for the shared running timer. */
+.popup-plan-source { margin: 10px 16px; font-size: 11px; color: var(--text-mute); }
+.popup-plan-source[hidden] { display: none; }
+.popup-plan-source button { margin-left: 6px; font-size: 10px; height: 25px; }

@@ -46,7 +46,36 @@ src/
 
 **MV3 service worker 閒置約 30 秒就被殺掉。** 所以計時器不在記憶體累加秒數，只把 `startedAt` 時間戳存進 `chrome.storage.local`，經過時間一律現算。SW 被殺再醒來也不會掉秒。
 
-**`db.js` 是唯一的 I/O 邊界。** 之後要接 Supabase 只需要換掉這個檔的實作，popup 和 options 一行都不用改。欄位命名已經跟 `supabase/schema.sql` 對齊（`clientEntryId` 就是給離線佇列做冪等 upsert 用的）。
+```bash
+node --test src/lib/*.test.js test/*.test.mjs
+```
+
+長筆記捲動位置的瀏覽器回歸測試需安裝 Google Chrome、Playwright 與 `web/` 的開發依賴，從專案根目錄執行：
+
+```bash
+node --test extension/test/autogrow-scroll.browser.mjs
+```
+
+若 Playwright 安裝在其他目錄，可用 `PLAYWRIGHT_MODULE` 環境變數指定其模組路徑。測試涵蓋擴充功能與網頁版的整頁、視窗內與文字框內捲動，以及刪除內容後的高度調整。
+
+## 日曆規劃與實際工作
+
+管理頁的「日曆」提供月、週、日與清單檢視，預設顯示本週。週／日檢視把「計畫」與「實際」分成兩欄；專案顏色沿用專案設定，計畫使用外框，實際計時使用實色。
+
+- 安排可以獨立存在，也能連結 Todo；同一 Todo 可安排多天、多個時段。
+- 點空白時段或框選新增安排，拖曳計畫調整時間、拖上下邊緣調整長度，每次以 15 分鐘為單位。表單可輸入到分鐘，並提供相同的時間調整功能。
+- 支援全天及跨日安排。全天的結束日期包含所選當天，不計入預計工時；跨日定時安排以表單修改。月檢視可拖曳整筆安排移動日期。
+- 點安排的「開始計時」會使用共用計時器；可在管理頁、popup 或 web 停止。分次計時的紀錄保留安排來源，安排詳情可查看合計實際時間。
+- 刪除安排會解除來源連結，保留實際計時紀錄。Todo 截止日獨立標示，不算計畫時數。
+- JSON 備份包含 `calendarPlans`，可匯入舊版 version 1 備份；要保留新日曆資料，還原時請使用含日曆功能的版本或更新版本。
+
+現有「排程」繼續負責定期建立 Todo，日曆第一版沒有重複事件、安排通知或外部行事曆同步。
+
+日曆瀏覽器驗證使用固定測試資料與模擬 storage，不會改動使用者紀錄。需有 Playwright 與 Google Chrome，執行：
+
+```bash
+node --test extension/test/calendar.browser.mjs
+```
 
 ## 資料
 

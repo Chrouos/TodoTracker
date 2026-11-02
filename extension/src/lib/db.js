@@ -20,12 +20,14 @@ const K = {
   timer: 'timer',
   settings: 'settings',
   schedules: 'schedules',
+  calendarPlans: 'calendarPlans',
 };
 
 import { wouldCycle } from './tree.js';
 import { removeProjectData } from './relations.js';
 import { promoteTodoTasksWithEntries } from './tasks.js';
 import { normalizePriority } from './todo-filter.js';
+import { normalizeCalendarPlan, CalendarValidationError } from './calendar.js';
 
 export const uid = () => crypto.randomUUID();
 export const nowISO = () => new Date().toISOString();
@@ -95,6 +97,15 @@ export async function deleteProject(id) {
   await write(K.projects, next.projects);
   await write(K.tasks, next.tasks);
   await write(K.entries, next.entries);
+  const deletedTasks = new Set(tasks.filter((task) => task.projectId === id).map((task) => task.id));
+  await write(K.calendarPlans, (await listCalendarPlans()).map((plan) => ({
+    ...plan, projectId: plan.projectId === id ? null : plan.projectId,
+    taskId: deletedTasks.has(plan.taskId) ? null : plan.taskId,
+  })));
+  const timer = await getTimer();
+  if (timer && (timer.projectId === id || deletedTasks.has(timer.taskId))) {
+    await write(K.timer, { ...timer, projectId: timer.projectId === id ? null : timer.projectId, taskId: deletedTasks.has(timer.taskId) ? null : timer.taskId });
+  }
 }
 
 /* ---------------- 專案目標／筆記（append 式，每則帶時間戳） ---------------- */
@@ -207,6 +218,41 @@ export async function deleteTask(id) {
   await write(K.tasks, (await read(K.tasks, [])).filter((t) => t.id !== id));
   const entries = await read(K.entries, []);
   await write(K.entries, entries.map((e) => (e.taskId === id ? { ...e, taskId: null } : e)));
+  await write(K.calendarPlans, (await listCalendarPlans()).map((plan) => plan.taskId === id ? { ...plan, taskId: null } : plan));
+  const timer = await getTimer();
+  if (timer?.taskId === id) await write(K.timer, { ...timer, taskId: null });
+}
+
+/* ---------------- calendar plans ---------------- */
+
+export async function listCalendarPlans() {
+  return (await read(K.calendarPlans, [])).sort((a, b) =>
+    (a.startDate || a.startedAt).localeCompare(b.startDate || b.startedAt) || a.id.localeCompare(b.id));
+}
+
+export async function upsertCalendarPlan(input) {
+  const all = await listCalendarPlans();
+  const previous = all.find((plan) => plan.id === input.id);
+  const row = normalizeCalendarPlan(input, { previous, id: input.id || uid(), now: nowISO() });
+  const projects = await read(K.projects, []), tasks = await read(K.tasks, []);
+  if (!projects.some((project) => project.id === row.projectId)) row.projectId = null;
+  const task = tasks.find((item) => item.id === row.taskId);
+  if (!task) row.taskId = null;
+  else if ((task.projectId || null) !== row.projectId
+    && (!previous || previous.taskId !== row.taskId || previous.projectId !== row.projectId)) {
+    throw new CalendarValidationError('project', 'taskId');
+  }
+  await write(K.calendarPlans, [...all.filter((plan) => plan.id !== row.id), row]);
+  return row;
+}
+
+export async function deleteCalendarPlan(id) {
+  const [plans, entries, timer] = await Promise.all([listCalendarPlans(), read(K.entries, []), getTimer()]);
+  await chrome.storage.local.set({
+    [K.calendarPlans]: plans.filter((plan) => plan.id !== id),
+    [K.entries]: entries.map((entry) => entry.planId === id ? { ...entry, planId: null } : entry),
+    ...(timer?.planId === id ? { [K.timer]: { ...timer, planId: null } } : {}),
+  });
 }
 
 /* ---------------- schedules（週期排程） ----------------
@@ -342,6 +388,7 @@ export async function upsertEntry(e) {
     clientEntryId: e.clientEntryId || e.id || uid(),
     projectId: e.projectId || null,
     taskId: e.taskId || null,
+    planId: e.planId === undefined ? (all[i]?.planId || null) : e.planId,
     description: e.description || '',   // 一句話：在做什麼
     notes: e.notes || '',               // 工作紀錄：做完之後補的內容
     tagIds: e.tagIds || [],
@@ -377,6 +424,7 @@ export async function getTimer() {
 
 export async function startTimer({
   projectId = null, taskId = null, description = '', notes = '', tagIds = [],
+  planId = null,
 } = {}) {
   await stopTimer(); // 一次只允許一個計時中，跟 DB 的 one_running_per_user 對齊
   const timer = {
@@ -384,6 +432,7 @@ export async function startTimer({
     clientEntryId: uid(),
     startedAt: nowISO(),
     projectId, taskId, description, notes, tagIds,
+    planId: (await listCalendarPlans()).some((plan) => plan.id === planId) ? planId : null,
     idleSince: null,
   };
   await write(K.timer, timer);
@@ -391,12 +440,29 @@ export async function startTimer({
 }
 
 /** 更新計時中的欄位（切專案、改描述不必重開計時） */
-export async function patchTimer(patch) {
+export async function patchTimer(patch, { expectedEntryId } = {}) {
   const t = await getTimer();
   if (!t) return null;
-  const next = { ...t, ...patch };
+  if (expectedEntryId !== undefined && expectedEntryId !== t.entryId) return t;
+  const allowed = ['projectId', 'taskId', 'description', 'notes', 'tagIds', 'startedAt', 'idleSince', 'planId'];
+  const next = { ...t, ...Object.fromEntries(Object.entries(patch).filter(([key, value]) => allowed.includes(key) && value !== undefined)) };
+  if (next.planId && (next.projectId !== t.projectId || next.taskId !== t.taskId)) {
+    const plan = (await listCalendarPlans()).find((item) => item.id === next.planId);
+    if (!plan || (next.projectId || null) !== plan.projectId || (next.taskId || null) !== plan.taskId) next.planId = null;
+  }
   await write(K.timer, next);
   return next;
+}
+
+/** A notes draft belongs to one timer, even after another interface stops it. */
+export async function saveTimerNotes({ entryId, notes }) {
+  if (typeof entryId !== 'string' || !entryId || typeof notes !== 'string') throw new Error('Invalid timer note owner');
+  const timer = await patchTimer({ notes }, { expectedEntryId: entryId });
+  if (timer?.entryId !== entryId) {
+    const entry = (await listEntries()).find((item) => item.id === entryId && item.endedAt);
+    if (entry) await upsertEntry({ ...entry, notes });
+  }
+  return getTimer();
 }
 
 /**
@@ -450,6 +516,7 @@ export async function stopTimer(endedAt = null, discardSeconds = 0, { completeTa
     clientEntryId: t.clientEntryId,
     projectId: t.projectId,
     taskId: t.taskId,
+    planId: t.planId || null,
     description: t.description,
     notes: t.notes || '',   // 計時中隨手寫的內容跟著落地
     tagIds: t.tagIds,
@@ -489,16 +556,36 @@ export async function exportAll() {
     read(K.projects, []), read(K.tags, []), read(K.tasks, []),
     read(K.entries, []), read(K.schedules, []), getSettings(),
   ]);
-  return { version: 1, exportedAt: nowISO(), projects, tags, tasks, entries, schedules, settings };
+  const calendarPlans = await listCalendarPlans();
+  return { version: 1, exportedAt: nowISO(), projects, tags, tasks, entries, schedules, settings, calendarPlans };
 }
 
 export async function importAll(data) {
   if (!data || data.version !== 1) throw new Error('備份檔格式不符');
+  for (const name of ['projects', 'tags', 'tasks', 'entries', 'schedules', 'calendarPlans']) {
+    if (data[name] !== undefined && !Array.isArray(data[name])) throw new Error('備份檔格式不符');
+  }
+  const projectIds = new Set((data.projects || []).map((item) => item.id));
+  const taskIds = new Set((data.tasks || []).map((item) => item.id));
+  const planIds = new Set();
+  const calendarPlans = (data.calendarPlans || []).map((input) => {
+    if (typeof input?.id !== 'string' || !input.id || planIds.has(input.id)) throw new Error('備份檔格式不符');
+    planIds.add(input.id);
+    return normalizeCalendarPlan(input, { previous: input, id: input.id, now: input.updatedAt || nowISO() });
+  });
+  const clean = (item, planLink = false) => ({
+    ...item, projectId: projectIds.has(item.projectId) ? item.projectId : null,
+    taskId: taskIds.has(item.taskId) ? item.taskId : null,
+    ...(planLink ? { planId: planIds.has(item.planId) ? item.planId : null } : {}),
+  });
+  const timer = await getTimer();
   await chrome.storage.local.set({
     [K.projects]: data.projects || [],
     [K.tags]: data.tags || [],
     [K.tasks]: data.tasks || [],
-    [K.entries]: data.entries || [],
+    [K.entries]: (data.entries || []).map((entry) => clean(entry, true)),
+    [K.calendarPlans]: calendarPlans.map((plan) => clean(plan)),
+    ...(timer ? { [K.timer]: clean(timer, true) } : {}),
     [K.schedules]: data.schedules || [],
     [K.settings]: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   });

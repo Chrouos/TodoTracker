@@ -27,6 +27,8 @@ let state = {
   entries: [], draft: { projectId: null, taskId: null, description: '', tagIds: [] },
 };
 let ticker = null;
+let liveWrite = Promise.resolve();
+let liveNotesEntryId = null;
 let currentLocale = 'zh-TW';
 /** 剛停止、還沒補工作紀錄的那筆 entry id */
 let pendingLogId = null;
@@ -39,14 +41,15 @@ const setDraft = (d) => chrome.storage.local.set({ draft: d });
 
 /* ---------------- 載入 ---------------- */
 async function load() {
-  const [projects, tags, tasks, timer, settings, entries, draft] = await Promise.all([
+  const [projects, tags, tasks, timer, settings, entries, draft, calendarPlans] = await Promise.all([
     db.listProjects(), db.listTags(), db.listTasks({ includeDone: true }),
     db.getTimer(), db.getSettings(),
     // 用週日當起點多抓一天，避免 weekStartsOn=0 時本週資料被切掉
     db.listEntries({ from: startOfWeek(new Date(), 0).toISOString() }),
     getDraft(),
+    db.listCalendarPlans(),
   ]);
-  state = { projects, tags, tasks, timer, settings, entries, draft };
+  state = { projects, tags, tasks, timer, settings, entries, draft, calendarPlans };
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
@@ -79,6 +82,9 @@ function render() {
 }
 
 function renderPanel() {
+  const sourcePlan = (state.calendarPlans || []).find((plan) => plan.id === state.timer?.planId);
+  $('popupPlanSource').hidden = !sourcePlan;
+  $('popupPlanTitle').textContent = sourcePlan?.title || '';
   const btn = $('toggle');
   const c = current();
   const p = state.projects.find((x) => x.id === c.projectId);
@@ -139,8 +145,9 @@ function renderFields() {
 
   // 即時工作紀錄只在計時中出現
   $('liveLog').hidden = !state.timer;
-  if (state.timer && $('liveText') !== document.activeElement) {
+  if (state.timer && ($('liveText') !== document.activeElement || liveNotesEntryId !== state.timer.entryId)) {
     $('liveText').value = state.timer.notes || '';
+    liveNotesEntryId = state.timer.entryId;
     growLive();
   }
 
@@ -277,6 +284,7 @@ const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
 
 $('toggle').addEventListener('click', async () => {
   if (state.timer) {
+    await flushPopupNotes();
     // 停止後把這筆掛起來等使用者補工作紀錄
     const entry = await db.stopTimer();
     pendingLogId = entry ? entry.id : null;
@@ -290,6 +298,10 @@ $('toggle').addEventListener('click', async () => {
       description: d.description || '', tagIds: d.tagIds || [],
     });
   }
+  await load();
+});
+$('popupPlanUnlink').addEventListener('click', async () => {
+  await db.patchTimer({ planId: null }, { expectedEntryId: state.timer?.entryId });
   await load();
 });
 
@@ -333,6 +345,7 @@ $('recent').addEventListener('click', async (e) => {
   const id = e.target.closest('[data-resume]')?.dataset.resume;
   if (!id) return;
   const src = state.entries.find((x) => x.id === id);
+  await flushPopupNotes();
   await db.startTimer({
     projectId: src.projectId, taskId: src.taskId,
     description: src.description, tagIds: src.tagIds || [],
@@ -342,13 +355,25 @@ $('recent').addEventListener('click', async (e) => {
 
 /* 計時中的即時紀錄：打字後 500ms 自動存進 timer，停止時一起落地 */
 let liveSaveTimer = null;
+async function flushPopupNotes() {
+  clearTimeout(liveSaveTimer);
+  const entryId = liveNotesEntryId;
+  const notes = $('liveText').value;
+  await liveWrite;
+  if (entryId) {
+    state.timer = await db.saveTimerNotes({ notes, entryId });
+  }
+}
 $('liveText').addEventListener('input', (e) => {
   if (!state.timer) return;
   const value = e.target.value;
+  const entryId = liveNotesEntryId;
   $('liveSaved').textContent = '…';
   clearTimeout(liveSaveTimer);
   liveSaveTimer = setTimeout(async () => {
-    state.timer = await db.patchTimer({ notes: value });
+    liveWrite = db.saveTimerNotes({ notes: value, entryId });
+    state.timer = await liveWrite;
+    if (state.timer?.entryId !== liveNotesEntryId && $('liveText').value === value) render();
   $('liveSaved').textContent = translate(currentLocale, 'popup.saved');
     setTimeout(() => { $('liveSaved').textContent = ''; }, 1200);
   }, 500);
@@ -425,6 +450,7 @@ $('todoList').addEventListener('click', async (e) => {
     return;
   } else if (startId) {
     const t = state.tasks.find((x) => x.id === startId);
+    await flushPopupNotes();
     await db.startTimer({ projectId: t.projectId, taskId: t.id, description: t.title });
     switchTab('track');
   } else if (delId) {
