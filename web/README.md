@@ -22,9 +22,13 @@ npm run dev
 ## 前置條件
 
 1. `extension/` 已在 `chrome://extensions` 載入且**啟用**
-2. 擴充 ID 是 `lpjffffopipgkkodjjljkhnfdpppbgml`
-   （由 manifest 的固定 `key` 決定，重新載入不會變）
-3. 網址必須是 `localhost` 或 `127.0.0.1` —— 擴充的 `externally_connectable` 只信任這兩個來源
+2. Chrome Web Store 商品 ID 是 `ifgemlmkijpnmeiniemmpmchpibicgon`
+3. 本機載入未封裝 extension 時，manifest 的開發用 `key` 會產生 ID
+   `lpjffffopipgkkodjjljkhnfdpppbgml`；請在 `web/.env.local` 設定：
+   ```
+   NEXT_PUBLIC_EXTENSION_ID=lpjffffopipgkkodjjljkhnfdpppbgml
+   ```
+4. 網址必須是 `localhost` 或 `127.0.0.1` —— 擴充的 `externally_connectable` 只信任這兩個來源
 
 要換 ID 的話建 `.env.local`：
 

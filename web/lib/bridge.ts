@@ -3,11 +3,11 @@
  *
  * 沒有後端。資料真正的家是擴充的 chrome.storage.local，
  * 網頁只是另一個前端，透過 chrome.runtime.sendMessage 讀寫。
- * 擴充的 manifest 用固定 key 鎖住 extension id，所以這裡可以寫死。
+ * Web Store 上架包使用商品 ID；本機未封裝 extension 可用 NEXT_PUBLIC_EXTENSION_ID 覆寫。
  */
 
 export const EXTENSION_ID =
-  process.env.NEXT_PUBLIC_EXTENSION_ID || 'lpjffffopipgkkodjjljkhnfdpppbgml';
+  process.env.NEXT_PUBLIC_EXTENSION_ID || 'ifgemlmkijpnmeiniemmpmchpibicgon';
 
 type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
 
