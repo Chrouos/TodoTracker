@@ -35,8 +35,9 @@
   --on-dark: #fdfcfc;
 
   /* Type */
-  --font: system-ui, -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei",
-          "Noto Sans TC", "Noto Sans CJK TC", sans-serif;
+  /* 不用 system-ui：Windows 上它的中文會落到細而有鋸齒的微軟正黑體 */
+  --font: "Noto Sans TC", "Noto Sans CJK TC", "Source Han Sans TC", "PingFang TC",
+          "Microsoft JhengHei UI", "Microsoft JhengHei", system-ui, sans-serif;
   /* 等寬字只留給計時器、KPI 數字與 [+] 這類標記 */
   --font-mono: "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", "Noto Sans Mono CJK TC", monospace;
@@ -51,6 +52,11 @@
 }
 
 :root { color-scheme: light dark; }
+
+/* 日文介面要用日文字形，否則漢字會變成繁中寫法 */
+:root:lang(ja) {
+  --font: "Noto Sans JP", "Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+}
 
 /* 跟著系統切換；只換 token，元件不用各寫一份 */
 @media (prefers-color-scheme: dark) {

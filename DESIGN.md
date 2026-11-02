@@ -40,7 +40,7 @@
 
 **100% 等寬字。沒有 sans-serif、沒有斜體。**
 
-> Extension 例外（2026-11）：等寬字下中文字距過鬆，`extension/src/styles/tokens.css` 的內文改用系統無襯線字，`--font-mono` 只留給計時器、KPI 數字與 `[+]` 標記。Web 仍是全等寬。
+> Extension 例外（2026-11）：等寬字下中文字距過鬆，`extension/src/styles/tokens.css` 的內文改用 Noto Sans TC（缺字型時退回 PingFang、微軟正黑體；日文介面用日文字型），`--font-mono` 只留給計時器、KPI 數字與 `[+]` 標記。Web 仍是全等寬。
 
 ```css
 --font: "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono",
