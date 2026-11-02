@@ -47,6 +47,13 @@ section[hidden] { display: none; }
 .card { border: 1px solid var(--hairline); padding: var(--lg); margin-bottom: var(--lg); }
 .grid4 { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--md); }
 .todo-form-main { grid-template-columns: 2fr 1fr 1.5fr 1fr; }
+/* 新增 Todo 預設只留標題那一列；編輯、加子任務或按「更多欄位」才展開 */
+#todoForm.is-compact .task-parent-row,
+#todoForm.is-compact .todo-form-details,
+#todoForm.is-compact .todo-form-notes,
+#todoForm [hidden] { display: none; }
+.todo-form-toggle { margin-left: auto; border-color: transparent; background: transparent; color: var(--text-mute); }
+.todo-form-toggle:hover { color: var(--text-ink); }
 .grid4[style*="margin-top"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .grid4[style*="margin-top"] > .hint { display: none; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
@@ -521,19 +528,8 @@ section[hidden] { display: none; }
 .priority-badge.priority-high { color: #b45309; background: #fff7ed; border-color: #fdba74; }
 .priority-badge.priority-normal { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
 .priority-badge.priority-low { color: #15803d; background: #f0fdf4; border-color: #86efac; }
-#todoList .todo-card.priority-normal .main > .ellipsis::after {
-  content: '一般';
-  display: inline-block;
-  margin-left: 6px;
-  padding: 3px var(--sm);
-  border: 1px solid #cbd5e1;
-  border-radius: var(--r);
-  color: #475569;
-  background: #f1f5f9;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
-}
+.badge.due-today { color: #9a5f00; border-color: var(--warning); }
+.todo-meta-item { white-space: nowrap; }
 #todoList .todo-card:hover,
 #todoList .todo-card:focus-within {
   border-color: var(--text-mute);
@@ -583,6 +579,9 @@ section[hidden] { display: none; }
   #todoList .todo-card { grid-template-columns: 34px minmax(0, 1fr); }
   #todoList .todo-card > .num:not(.sub) { grid-column: 2; text-align: left; margin-top: 4px; }
   #todoList .todo-card > .act { grid-column: 2; justify-content: flex-start; opacity: 1; }
+  /* 分頁列放不下時在列內橫向捲動，不撐開整頁 */
+  #tabs { overflow-x: auto; scrollbar-width: none; }
+  #tabs .tab { flex: none; white-space: nowrap; }
 }
 
 /* 圖表 */
@@ -733,8 +732,17 @@ section[hidden] { display: none; }
   overflow-y: auto;
   max-height: min(72vh, 640px);
 }
-.review-calendar-corner { border-bottom: 1px solid var(--hairline); }
+/* 橫向捲動時時間軸固定在左、日期固定在上；z-index 要高過 hover 中的紀錄 (10) */
+.review-calendar-corner {
+  position: sticky; top: 0; left: 0; z-index: 13;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+}
 .review-calendar-day-head {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: var(--canvas);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -745,7 +753,6 @@ section[hidden] { display: none; }
   border-bottom: 1px solid var(--hairline);
 }
 .review-calendar-day-head strong { font-size: 14px; }
-.review-calendar-day-head span { color: var(--text-mute); font-size: 12px; }
 .review-calendar-axis,
 .review-calendar-day-body {
   position: relative;
@@ -760,6 +767,7 @@ section[hidden] { display: none; }
   );
 }
 .review-calendar-day-body { border-left: 1px solid var(--hairline); }
+.review-calendar-axis { position: sticky; left: 0; z-index: 11; background-color: var(--canvas); }
 .review-calendar-axis-label {
   position: absolute;
   right: 8px;
@@ -768,6 +776,7 @@ section[hidden] { display: none; }
   font-size: 11px;
 }
 .review-calendar-axis-label:first-child { transform: none; }
+.review-calendar-axis-label:last-child { transform: translateY(-100%); }
 .review-calendar-entry {
   position: absolute;
   top: calc(var(--entry-top) * 1%);

@@ -168,7 +168,7 @@
 
   <!-- ── Todo ── -->
   <section id="p-todos" hidden>
-    <form id="todoForm" class="card">
+    <form id="todoForm" class="card is-compact">
       <input type="hidden" id="tdId" />
       <div class="grid4 todo-form-main">
         <label class="field" style="grid-column: span 2"><span data-i18n="todo.todo">項目</span>
@@ -188,7 +188,7 @@
           <span class="hint" data-i18n="todo.parentHint">選擇後會成為這個 Todo 的子任務。</span>
         </label>
       </div>
-      <div class="grid4" style="margin-top:12px">
+      <div class="grid4 todo-form-details" style="margin-top:12px">
         <label class="field"><span data-i18n="todo.priority">優先級</span>
           <select id="tdPriority">
             <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
@@ -218,11 +218,12 @@
           <span class="hint" data-i18n="todo.workedHint">由綁在這個 todo 上的計時紀錄累加。</span>
         </label>
       </div>
-      <div class="field" style="margin-top:12px"><label for="tdNotes" data-i18n="entry.notes">備註</label>
+      <div class="field todo-form-notes" style="margin-top:12px"><label for="tdNotes" data-i18n="entry.notes">備註</label>
         <textarea id="tdNotes" data-markdown-editor-input data-i18n-placeholder="todo.notesPlaceholder" placeholder="細節、連結、驗收條件…"></textarea></div>
       <div class="actions">
         <button type="submit" class="btn-primary" data-i18n="todo.save">儲存 Todo</button>
         <button type="button" id="tdCancel" hidden data-i18n="todo.cancelEdit">取消編輯</button>
+        <button type="button" id="tdMore" class="todo-form-toggle" aria-expanded="false" data-i18n="todo.moreFields">更多欄位</button>
       </div>
     </form>
 

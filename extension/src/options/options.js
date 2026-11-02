@@ -545,10 +545,14 @@ function wrapReportChartContent() {
 function bindReportChartCollapses() {
   document.querySelectorAll('#byProject [data-report-chart]').forEach((details) => {
     const id = details.dataset.reportChart;
+    const mark = details.querySelector('.report-chart-title .mark');
+    const paintMark = () => { if (mark) mark.textContent = details.open ? '[-]' : '[+]'; };
     details.open = !reportChartCollapsed.has(id);
+    paintMark();
     details.addEventListener('toggle', () => {
       if (details.open) reportChartCollapsed.delete(id);
       else reportChartCollapsed.add(id);
+      paintMark();
     });
   });
 }
@@ -619,6 +623,13 @@ function renderReport() {
   }
   $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, reviewDates));
   initializeMarkdownPreviews($('dailyReview'));
+  scrollReviewCalendarToLatest();
+}
+
+// 天數多時日曆會橫向捲動；最新的日子在最右邊，開啟時直接捲過去
+function scrollReviewCalendarToLatest() {
+  const calendar = $('dailyReview').querySelector('.review-calendar');
+  if (calendar) calendar.scrollLeft = calendar.scrollWidth;
 }
 
 function renderDailyReview(groups) {
@@ -673,11 +684,6 @@ function repositionReviewCalendarTooltip() {
 }
 
 function renderReviewCalendar(groups) {
-  const weekdays = [
-    translateText('schedule.days.sun'), translateText('schedule.days.mon'), translateText('schedule.days.tue'),
-    translateText('schedule.days.wed'), translateText('schedule.days.thu'), translateText('schedule.days.fri'),
-    translateText('schedule.days.sat'),
-  ];
   const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
   const dates = groups.map((group) => group.date);
   const calendar = calendarReviewData(groups.flatMap((group) => group.entries), dates);
@@ -687,10 +693,8 @@ function renderReviewCalendar(groups) {
     const top = ((minute - calendar.axis.from) / span) * 100;
     labels.push(`<span class="review-calendar-axis-label num" style="top:${top}%">${String(Math.floor(minute / 60)).padStart(2, '0')}:00</span>`);
   }
-  const dayHeaders = calendar.days.map((day) => {
-    const date = new Date(`${day.date}T00:00:00`);
-    return `<div class="review-calendar-day-head"><strong>${esc(displayDate(day.date))}</strong><span>${esc(weekdays[date.getDay()])}</span></div>`;
-  }).join('');
+  // displayDate 已含星期，不再另外顯示
+  const dayHeaders = calendar.days.map((day) => `<div class="review-calendar-day-head"><strong>${esc(displayDate(day.date))}</strong></div>`).join('');
   const dayBodies = calendar.days.map((day) => {
     const entries = day.entries.map((item) => {
       const entry = item.entry;
@@ -1996,12 +2000,19 @@ function renderTodos() {
           parent = parent.parentId ? S.tasks.find((item) => item.id === parent.parentId) : null;
         }
 
-        // 三個時間排成一行，缺的用 — 佔位
-        const dates = [
+        // 標題旁只留需要注意的：緊急／高優先、逾期或今天到期；其他都放灰字 meta 列
+        const priority = normalizePriority(t.priority);
+        const urgentDue = dl && !done && m.dueDelta !== null && m.dueDelta <= 0;
+        const meta = [
+          t.status === 'doing' ? translateText('todo.status.doing') : '',
+          t.scheduleId ? `<span title="${translateText('todo.generatedBySchedule')}">${translateText('todo.schedule')}</span>` : '',
+          dl && !urgentDue ? dl : '',
           `${translateText('todo.openedAt')} ${stampLabel(t.openedAt, currentLocale)}`,
-          `${translateText('todo.dueDate')} ${t.dueDate ? t.dueDate + (t.dueTime ? ` ${t.dueTime}` : '') : '—'}`,
-          `${translateText('todo.completedAt')} ${stampLabel(t.completedAt, currentLocale)}`,
-        ].join(' · ');
+          t.dueDate ? `${translateText('todo.dueDate')} ${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ''}` : '',
+          t.completedAt ? `${translateText('todo.completedAt')} ${stampLabel(t.completedAt, currentLocale)}` : '',
+          m.leadMs !== null ? translateText('summary.lead', { duration: leadLabel(m.leadMs, currentLocale) }) : '',
+          t.reopenCount ? translateText('todo.reopened', { count: t.reopenCount }) : '',
+        ].filter(Boolean).map((item) => `<span class="todo-meta-item">${item}</span>`).join(' · ');
 
         return `${showProject ? `<div class="task-project-heading"><span class="swatch" style="background:${p ? p.color : '#9a9898'}"></span>${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>` : ''}
         <div class="row-item todo-card task-item activity-row priority-${t.priority || 'normal'}${done ? ' done' : ''}" data-todo-id="${esc(t.id)}" style="--task-depth:${t.depth}">
@@ -2011,15 +2022,10 @@ function renderTodos() {
           <span class="swatch activity-swatch" style="background:${p ? p.color : '#9a9898'}"></span>
           <div class="main">
             <div class="ellipsis">${esc(t.title)}
-              <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>
-              ${t.scheduleId ? `<span class="badge" title="${translateText('todo.generatedBySchedule')}">${translateText('todo.schedule')}</span>` : ''}
-              ${t.status === 'doing' ? `<span class="badge">${translateText('todo.status.doing')}</span>` : ''}
-              ${dl ? `<span class="badge${m.isLate ? ' overdue' : ''}">${dl}</span>` : ''}
-              ${m.leadMs !== null ? `<span class="badge">${translateText('summary.lead', { duration: leadLabel(m.leadMs, currentLocale) })}</span>` : ''}
-              ${t.reopenCount ? `<span class="badge">${translateText('todo.reopened', { count: t.reopenCount })}</span>` : ''}
+              ${priority === 'urgent' || priority === 'high' ? `<span class="badge priority-${priority}">${priorityLabel(priority, currentLocale)}</span>` : ''}
+              ${urgentDue ? `<span class="badge${m.isLate ? ' overdue' : ' due-today'}">${dl}</span>` : ''}
             </div>
-            <div class="sub">${p ? esc(pathOf(S.projects, p.id).join(' / ')) : translateText('todo.unclassified')}</div>
-            <div class="sub num">${dates}</div>
+            <div class="sub num todo-meta">${meta}</div>
             ${t.notes ? renderMarkdownPreview(t.notes, 'notes') : ''}
             ${workEntries.length ? `<details class="todo-worklog"><summary>${translateText('todo.workLog', { count: workEntries.length, duration: fmtHM(m.worked) })}</summary>
               <div class="todo-worklog-list">${workEntries.map((entry) => `<div class="todo-worklog-row">
@@ -2050,6 +2056,15 @@ function resetTodoForm() {
   $('tdDone').value = '—';
   $('tdWorked').value = '—';
   $('tdCancel').hidden = true;
+  setTodoFormExpanded(false);
+}
+
+function setTodoFormExpanded(expanded) {
+  $('todoForm').classList.toggle('is-compact', !expanded);
+  $('tdMore').setAttribute('aria-expanded', String(expanded));
+  $('tdMore').dataset.i18n = expanded ? 'todo.fewerFields' : 'todo.moreFields'; // 切換語言時才會翻對
+  $('tdMore').textContent = translateText($('tdMore').dataset.i18n);
+  if (expanded) $('tdNotes').dispatchEvent(new Event('input')); // 隱藏時量不到高度，展開後重算
 }
 
 $('todoForm').addEventListener('submit', async (e) => {
@@ -2074,6 +2089,7 @@ $('todoForm').addEventListener('submit', async (e) => {
 });
 
 $('tdCancel').addEventListener('click', resetTodoForm);
+$('tdMore').addEventListener('click', () => setTodoFormExpanded($('todoForm').classList.contains('is-compact')));
 $('tdProject').addEventListener('change', renderTodos);
 $('tdFilter').addEventListener('change', () => { clearFocusedReportTarget(); renderTodos(); });
 $('tdStatusFilter').addEventListener('change', () => { clearFocusedReportTarget(); renderTodos(); });
@@ -2101,6 +2117,7 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdParent').value = parent.id;
     $('tdPriority').value = parent.priority || 'normal';
     $('tdCancel').hidden = false;
+    setTodoFormExpanded(true);
     $('tdTitle').focus();
     return;
   } else if (ed) {
@@ -2117,8 +2134,9 @@ $('todoList').addEventListener('click', async (e) => {
     $('tdDone').value = stampLabel(t.completedAt, currentLocale);
     const m = taskMetrics(t, S.entries);
     $('tdWorked').value = m.worked ? fmtHM(m.worked) : '—';
-    $('tdCancel').hidden = false; $('tdTitle').focus();
-    $('tdNotes').dispatchEvent(new Event('input')); // 讓備註重算高度
+    $('tdCancel').hidden = false;
+    setTodoFormExpanded(true); // 會順便讓備註重算高度
+    $('tdTitle').focus();
     return;
   } else if (del) {
     const t = S.tasks.find((x) => x.id === del);
@@ -2690,6 +2708,7 @@ document.getElementById('reviewMode').addEventListener('click', (event) => {
   reviewMode = mode;
   $('dailyReview').innerHTML = renderDailyReview(reviewGroups);
   initializeMarkdownPreviews($('dailyReview'));
+  scrollReviewCalendarToLatest();
 });
 document.getElementById('reviewMode').addEventListener('keydown', (event) => event.stopPropagation());
 groupReportPanels();
