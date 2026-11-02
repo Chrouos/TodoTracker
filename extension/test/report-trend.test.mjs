@@ -3,7 +3,7 @@ import {
   buildProjectTrendData,
   buildProjectDetailData,
 } from '../src/lib/project-trend.js';
-import { donutSVG, heatmapSVG, lineSVG, stackedAreaSVG } from '../src/lib/charts.js';
+import { donutSVG, lineSVG, stackedAreaSVG } from '../src/lib/charts.js';
 
 const projects = [
   { id: 'project-a', parentId: null, name: '專案 A', color: '#61b5dc' },
@@ -54,7 +54,6 @@ assert.deepEqual(detail.projectSeries.map(({ id, seconds }) => ({ id, seconds })
 ]);
 
 const stacked = stackedAreaSVG(data);
-const heatmap = heatmapSVG(data);
 const line = lineSVG({ dates: data.dates, values: data.dailyTotals });
 const donut = donutSVG([
   { label: '已完成', value: 3, color: '#22c55e' },
@@ -69,12 +68,6 @@ const polygons = [...stacked.matchAll(/<polygon[^>]+points="([^"]+)"/g)]
   .map((match) => match[1].split(' ').map((point) => point.split(',').map(Number)));
 assert.deepEqual(polygons[1].slice(-2), [[742, 226], [48, 71.5]],
   'stacked area polygons should reverse both x and y coordinates for the lower edge');
-assert.match(heatmap, /role="img"/);
-assert.match(heatmap, /data-trend-date="2026-08-11"/);
-assert.match(heatmap, /data-project-id="project-a"/);
-assert.match(heatmap, /專案 A/);
-assert.match(heatmap, />3h 00m</, 'Heatmap cell labels should use a compact duration format');
-assert.doesNotMatch(heatmap, /class="heatmap-cell-text"[^>]*>[^<]*(?:小時|分)/, 'Heatmap cell labels should not overflow with the full duration format');
 assert.match(line, /class="workspace-process-svg"/);
 assert.match(line, /<polyline[^>]+stroke="var\(--ink\)"/);
 assert.match(line, /data-process-date="2026-08-10"/);
@@ -91,7 +84,6 @@ const empty = buildProjectTrendData({
   entries: [], projects, dates: [], durationSec: () => 0,
 });
 assert.match(stackedAreaSVG(empty), /沒有可顯示的資料/);
-assert.match(heatmapSVG(empty), /沒有可顯示的資料/);
 assert.match(lineSVG({ dates: [], values: [] }), /沒有可顯示的資料/);
 
 const overnight = buildProjectTrendData({

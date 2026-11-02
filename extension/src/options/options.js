@@ -12,10 +12,10 @@ import {
 } from '../lib/i18n.js';
 import {
   fmtDate, fmtClock, startOfDay, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
-  dailyReviewData, calendarReviewData, toLocalInput, fromLocalInput,
+  dailyReviewData, runningSecondsSince, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
-import { stackedAreaSVG, heatmapSVG, lineSVG, donutSVG } from '../lib/charts.js';
+import { stackedAreaSVG, lineSVG, donutSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
@@ -192,8 +192,6 @@ let range = 'week';
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;
 const customReturnRange = { report: 'week', entries: 'all' };
-let reviewMode = 'calendar';
-let reviewGroups = [];
 let timerTicker = null;
 let timerNotesSaveTimer = null;
 let timerNotesWrite = Promise.resolve();
@@ -202,7 +200,6 @@ let renderedTimerEntryId = null;
 let timerCompleteChoice = false;
 let timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
 let timerNotesPreviewOpen = false;
-let reviewCalendarSelectedTarget = null;
 
 async function load() {
   const [projects, tags, tasks, entries, schedules, timer, settings, calendarPlans] = await Promise.all([
@@ -561,16 +558,11 @@ function wrapReportChartContent() {
     wrap.querySelector('#projectTrendDetail'),
   ].filter(Boolean).forEach((node) => trend.body.append(node));
 
-  const heatmap = createReportChartSection('heatmap', translateText('chart.heatmap'));
-  wrap.querySelector('.project-heatmap-title')?.remove();
-  const heatmapNode = wrap.querySelector('#projectHeatmap');
-  if (heatmapNode) heatmap.body.append(heatmapNode);
-
   const tracker = createReportChartSection('tracker', translateText('report.todoTracker'));
   [wrap.querySelector('#todoTracker'), wrap.querySelector('#todoTrackerDetail')]
     .filter(Boolean).forEach((node) => tracker.body.append(node));
 
-  wrap.replaceChildren(trend.details, heatmap.details, tracker.details);
+  wrap.replaceChildren(trend.details, tracker.details);
   bindReportChartCollapses();
 }
 
@@ -597,7 +589,10 @@ function reportKpis(from, to) {
   const days = new Set(rows.flatMap((e) => splitEntryByDay(e)
     .map((part) => fmtDate(part.startedAt))
     .filter((date) => date >= fromKey && (!toKey || date <= toKey)))).size;
-  return { seconds, count: rows.length, average: rows.length ? seconds / rows.length : 0, days };
+  // 計時中那段要停止才會存成紀錄；總時數算進去，筆數與平均只看已存的紀錄
+  const now = new Date();
+  const running = runningSecondsSince(S.timer, from, to && to < now ? to : now);
+  return { seconds: seconds + running, count: rows.length, average: rows.length ? seconds / rows.length : 0, days };
 }
 
 // 數字和單位分開，單位才能縮小變淡
@@ -616,17 +611,25 @@ function renderKpiDeltas(from, to) {
   });
 }
 
-function renderReport() {
-  const rows = inRange();
-  const from = rangeStart();
-  const to = rangeEnd();
+function renderReportKpis(from, to) {
   const kpis = reportKpis(from, to);
-
   $('kTime').innerHTML = kpiDurationHtml(kpis.seconds);
   $('kCount').textContent = kpis.count;
   if (kpis.count) $('kAvg').innerHTML = kpiDurationHtml(kpis.average); else $('kAvg').textContent = '—';
   $('kDays').textContent = kpis.days;
   renderKpiDeltas(from, to);
+}
+
+// 總時數含計時中的時間，開著報表時每分鐘更新
+setInterval(() => {
+  if (S.timer && !$('p-report').hidden) renderReportKpis(rangeStart(), rangeEnd());
+}, 60000);
+
+function renderReport() {
+  const rows = inRange();
+  const from = rangeStart();
+  const to = rangeEnd();
+  renderReportKpis(from, to);
   renderDueAlerts();
   renderReportInsights(rows, from, to);
 
@@ -661,108 +664,8 @@ function renderReport() {
   $('reviewLabel').textContent = reviewDates.length
     ? `· ${reviewDates[0]} ～ ${reviewDates[reviewDates.length - 1]}`
     : '';
-  $('dailyReview').innerHTML = renderDailyReview(dailyReviewData(rows, reviewDates));
+  $('dailyReview').innerHTML = renderReviewList(dailyReviewData(rows, reviewDates));
   initializeMarkdownPreviews($('dailyReview'));
-  scrollReviewCalendarToLatest();
-}
-
-// 天數多時日曆會橫向捲動；最新的日子在最右邊，開啟時直接捲過去
-function scrollReviewCalendarToLatest() {
-  const calendar = $('dailyReview').querySelector('.review-calendar');
-  if (calendar) calendar.scrollLeft = calendar.scrollWidth;
-}
-
-// 區塊收起或在別的分頁時量不到寬度，等它真的顯示出來再捲一次
-let dailyReviewWasVisible = false;
-new ResizeObserver(([entry]) => {
-  const visible = entry.contentRect.width > 0;
-  if (visible && !dailyReviewWasVisible) scrollReviewCalendarToLatest();
-  dailyReviewWasVisible = visible;
-}).observe($('dailyReview'));
-
-function renderDailyReview(groups) {
-  hideReviewCalendarTooltip();
-  reviewGroups = groups;
-  const canCalendar = groups.length > 0;
-  if (!canCalendar && reviewMode === 'calendar') reviewMode = 'list';
-  document.querySelectorAll('#reviewMode [data-review-mode]').forEach((button) => {
-    button.classList.toggle('active', button.dataset.reviewMode === reviewMode);
-    if (button.dataset.reviewMode === 'calendar') button.disabled = !canCalendar;
-  });
-  return reviewMode === 'calendar' ? renderReviewCalendar(groups) : renderReviewList(groups);
-}
-
-function hideReviewCalendarTooltip() {
-  reviewCalendarSelectedTarget = null;
-  const tooltip = $('reviewCalendarHoverTooltip');
-  if (!tooltip) return;
-  tooltip.hidden = true;
-  tooltip.classList.remove('is-visible');
-}
-
-function showReviewCalendarTooltip(target) {
-  const tooltip = $('reviewCalendarHoverTooltip');
-  if (!tooltip || !target) return;
-  reviewCalendarSelectedTarget = target;
-  const notePreview = target.dataset.reviewNotes
-    ? renderMarkdownPreview(target.dataset.reviewNotes, 'review-calendar-tooltip-notes')
-    : '';
-  tooltip.innerHTML = `<strong>${esc(target.dataset.reviewTitle || '')}</strong>
-    <span>${esc(target.dataset.reviewStart || '')}–${esc(target.dataset.reviewEnd || '')}</span>
-    <span>${esc(target.dataset.reviewProject || '')}</span>
-    ${notePreview}`;
-  tooltip.hidden = false;
-  tooltip.classList.add('is-visible');
-
-  const rect = target.getBoundingClientRect();
-  const gap = 8;
-  const padding = 8;
-  const tooltipRect = tooltip.getBoundingClientRect();
-  const left = Math.max(padding, Math.min(rect.left, window.innerWidth - tooltipRect.width - padding));
-  const fitsBelow = rect.bottom + gap + tooltipRect.height <= window.innerHeight - padding;
-  const top = fitsBelow
-    ? rect.bottom + gap
-    : Math.max(padding, rect.top - gap - tooltipRect.height);
-  tooltip.style.left = `${Math.round(left)}px`;
-  tooltip.style.top = `${Math.round(top)}px`;
-}
-
-function repositionReviewCalendarTooltip() {
-  if (reviewCalendarSelectedTarget?.isConnected) showReviewCalendarTooltip(reviewCalendarSelectedTarget);
-}
-
-function renderReviewCalendar(groups) {
-  const safeColor = (color) => /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#9a9898';
-  const dates = groups.map((group) => group.date);
-  const calendar = calendarReviewData(groups.flatMap((group) => group.entries), dates);
-  const span = calendar.axis.to - calendar.axis.from;
-  const labels = [];
-  for (let minute = calendar.axis.from; minute <= calendar.axis.to; minute += 60) {
-    const top = ((minute - calendar.axis.from) / span) * 100;
-    labels.push(`<span class="review-calendar-axis-label num" style="top:${top}%">${String(Math.floor(minute / 60)).padStart(2, '0')}:00</span>`);
-  }
-  // displayDate 已含星期，不再另外顯示
-  const dayHeaders = calendar.days.map((day) => `<div class="review-calendar-day-head"><strong>${esc(displayDate(day.date))}</strong></div>`).join('');
-  const dayBodies = calendar.days.map((day) => {
-    const entries = day.entries.map((item) => {
-      const entry = item.entry;
-      const project = S.projects.find((projectItem) => projectItem.id === entry.projectId);
-      const task = S.tasks.find((taskItem) => taskItem.id === entry.taskId);
-      const title = entry.description || task?.title || translateText('common.unnamedWork');
-      const projectName = project?.name || translateText('common.generalWork');
-      const top = ((item.start - calendar.axis.from) / span) * 100;
-      const height = Math.max(4, ((item.end - item.start) / span) * 100);
-      const entryLabel = `${projectName} ${title} ${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}`;
-      return `<div class="review-calendar-entry" tabindex="0" aria-label="${esc(entryLabel)}" data-review-title="${esc(title)}" data-review-start="${esc(fmtClock(entry.startedAt))}" data-review-end="${esc(fmtClock(entry.endedAt))}" data-review-project="${esc(projectName)}" data-review-notes="${esc(entry.notes || '')}" style="--entry-top:${top};--entry-height:${height};--entry-lane:${item.lane};--entry-lanes:${item.lanes};--project-color:${safeColor(project?.color)}">
-        <span class="review-calendar-title">${esc(projectName)}</span>
-      </div>`;
-    }).join('');
-    return `<div class="review-calendar-day-body">${entries}</div>`;
-  }).join('');
-  return `<div class="review-calendar" style="--review-days:${calendar.days.length};--calendar-from:${calendar.axis.from};--calendar-span:${span};--calendar-hours:${span / 60};--calendar-height:${Math.max(480, span * .9)}px">
-    <div class="review-calendar-corner"></div>${dayHeaders}
-    <div class="review-calendar-axis">${labels.join('')}</div>${dayBodies}
-  </div>`;
 }
 
 function renderReviewList(groups) {
@@ -846,7 +749,7 @@ let highlightProjectId = null;
 
 let projectTrendState = null;
 let projectTrendSource = null;
-let reportChartCollapsed = new Set(['heatmap']);
+let reportChartCollapsed = new Set();
 let todoTrackerState = null;
 let todoTrackerSource = null;
 let todoTrackerSelectedId = null;
@@ -1397,8 +1300,6 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     <div id="projectTrend">${stackedAreaSVG(data, currentLocale)}</div>
     <div id="projectTrendTooltip" class="project-trend-tooltip"></div>
     <div class="trend-legend">${projectLinks || `<span class="mute">${translateText('report.noFocusableProject')}</span>`}</div>
-    <div class="project-heatmap-title">${translateText('chart.heatmap')}</div>
-    <div id="projectHeatmap" class="project-heatmap-scroll">${heatmapSVG(data)}</div>
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
   </div>`;
   const trendDetail = report.querySelector('#projectTrendDetail');
@@ -1516,32 +1417,6 @@ $('byProject').addEventListener('focusout', (e) => {
 window.addEventListener('resize', repositionTodoTrackerTooltip);
 window.addEventListener('scroll', repositionTodoTrackerTooltip, true);
 
-$('dailyReview').addEventListener('click', (e) => {
-  const target = e.target.closest('[data-review-title]');
-  if (!target) {
-    hideReviewCalendarTooltip();
-    return;
-  }
-  if (target === reviewCalendarSelectedTarget) hideReviewCalendarTooltip();
-  else showReviewCalendarTooltip(target);
-});
-
-$('dailyReview').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  const target = e.target.closest('[data-review-title]');
-  if (!target) return;
-  e.preventDefault();
-  if (target === reviewCalendarSelectedTarget) hideReviewCalendarTooltip();
-  else showReviewCalendarTooltip(target);
-});
-
-document.addEventListener('click', (e) => {
-  if (e.target.closest('[data-review-title]') || e.target.closest('#reviewCalendarHoverTooltip')) return;
-  hideReviewCalendarTooltip();
-});
-
-window.addEventListener('resize', repositionReviewCalendarTooltip);
-window.addEventListener('scroll', repositionReviewCalendarTooltip, true);
 
 /* ---------------- 專案 ---------------- */
 function renderProjects() {
@@ -2529,13 +2404,22 @@ async function copySummary(btn, dates) {
   setTimeout(() => { btn.textContent = label; }, 1500);
 }
 
-$('copyToday').addEventListener('click', (e) =>
-  copySummary(e.currentTarget, [fmtDate(new Date().toISOString())]));
-
-$('copyRange').addEventListener('click', (e) => {
-  // 依報表分頁選的區間，由舊到新
-  const dates = [...new Set(inRange().map((x) => fmtDate(x.startedAt)))].sort();
-  copySummary(e.currentTarget, dates);
+// 報表與紀錄共用同一個匯出選單；各自跟著該分頁目前的區間與篩選
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('.export-menu[open]').forEach((menu) => {
+    if (!menu.contains(e.target)) menu.open = false;
+  });
+  const button = e.target.closest('[data-export]');
+  if (!button) return;
+  const menu = button.closest('.export-menu');
+  const isReport = menu.dataset.exportScope === 'report';
+  const rows = isReport ? inRange() : filteredEntries();
+  if (button.dataset.export === 'today') copySummary(button, [fmtDate(new Date().toISOString())]);
+  if (button.dataset.export === 'range') copySummary(button, [...new Set(rows.map((x) => fmtDate(x.startedAt)))].sort());
+  if (button.dataset.export === 'csv') {
+    exportCsvOf(rows, isReport ? range : 'filtered');
+    menu.open = false;
+  }
 });
 
 $('addEntry').addEventListener('click', () => {
@@ -2616,12 +2500,6 @@ function download(name, content, type) {
   URL.revokeObjectURL(url);
 }
 
-// 紀錄分頁的 CSV：跟著目前的搜尋與篩選走
-$('exportFiltered').addEventListener('click', () => exportCsvOf(filteredEntries(), 'filtered'));
-
-// 報表分頁的 CSV：跟著區間走
-$('exportCsv').addEventListener('click', () => exportCsvOf(inRange(), range));
-
 function exportCsvOf(rows, tag) {
   const head = ['date', 'start', 'end', 'seconds', 'hours', 'project', 'task', 'description', 'notes', 'tags'];
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -2691,7 +2569,7 @@ function selectTab(name, preserveFocus = false) {
     const offset = activeTab.getBoundingClientRect().left - tabs.getBoundingClientRect().left;
     tabs.scrollLeft += offset - (tabs.clientWidth - activeTab.offsetWidth) / 2;
   }
-  ['report', 'timer', 'calendar', 'projects', 'todos', 'entries', 'schedules', 'tags', 'settings']
+  ['report', 'timer', 'calendar', 'projects', 'todos', 'entries', 'settings']
     .forEach((n) => { $('p-' + n).hidden = n !== name; });
   initializeMarkdownPreviews($('p-' + name));
   document.body.classList.toggle('calendar-active', name === 'calendar');
@@ -2768,16 +2646,12 @@ $('reportApplyRange').addEventListener('click', () => applyCustomRange('report')
 // 進頁預設本週
 range = 'week';
 document.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.range === 'week'));
-document.getElementById('reviewMode').addEventListener('click', (event) => {
+// 按鈕在可收合的標題列裡，不能連帶觸發收合
+$('reviewOpenCalendar').addEventListener('click', (event) => {
   event.stopPropagation();
-  const mode = event.target.dataset.reviewMode;
-  if (!mode || event.target.disabled) return;
-  reviewMode = mode;
-  $('dailyReview').innerHTML = renderDailyReview(reviewGroups);
-  initializeMarkdownPreviews($('dailyReview'));
-  scrollReviewCalendarToLatest();
+  selectTab('calendar');
 });
-document.getElementById('reviewMode').addEventListener('keydown', (event) => event.stopPropagation());
+$('reviewOpenCalendar').addEventListener('keydown', (event) => event.stopPropagation());
 groupReportPanels();
 initCollapse();
 syncRangeControls();

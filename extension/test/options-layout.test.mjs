@@ -17,7 +17,7 @@ assert.match(html, /data-tab="timer"/, 'Management timer should have its own tab
 assert.match(html, /id="p-timer"/, 'Management timer should be inside its own panel');
 assert.match(html, /id="reportDueAlerts"/, 'Report should reserve a first-glance area for due Todo alerts');
 assert.match(html,
-  /data-tab="report"[\s\S]*data-tab="timer"[\s\S]*data-tab="projects"[\s\S]*data-tab="todos"[\s\S]*data-tab="entries"[\s\S]*data-tab="schedules"[\s\S]*data-tab="tags"[\s\S]*data-tab="settings"/,
+  /data-tab="report"[\s\S]*data-tab="timer"[\s\S]*data-tab="projects"[\s\S]*data-tab="todos"[\s\S]*data-tab="entries"[\s\S]*data-tab="settings"/,
   'Management tabs should follow the requested order');
 for (const id of [
   'managementTimer', 'mgTimerClock', 'mgTimerDescription', 'mgTimerProject',
@@ -155,7 +155,8 @@ assert.match(options, /renderMarkdownPreview\(task\.notes, 'notes'\)/,
   'Linked Todo notes should render with the shared Markdown preview');
 assert.match(css, /\.entry-todo-note\s*>\s*summary\s*\{[^}]*cursor:\s*pointer/s,
   'Linked Todo notes should remain collapsed behind a subtle interactive summary');
-assert.match(html, /id="byProject"[\s\S]*id="projectTrend"[\s\S]*id="projectHeatmap"/, 'Report should combine trend and heatmap in the project panel');
+assert.match(html, /id="byProject"[\s\S]*id="projectTrend"/, 'Report should show the trend in the project panel');
+assert.doesNotMatch(html, /projectHeatmap/, 'Trend and heatmap show the same data, so only the trend stays');
 assert.match(html, /id="reportInsights"/, 'Report should expose data quality and Todo performance insights');
 assert.match(html, /data-collapse="rep-insights"/, 'Workspace status should have its own collapsible heading');
 assert.match(html, /data-collapse-body="rep-insights"/, 'Workspace status should have a collapsible body');
@@ -165,7 +166,11 @@ assert.doesNotMatch(html, /data-collapse="rep-review"[^>]*data-collapse-default=
 assert.match(html, /data-collapse="rep-insights"[\s\S]*data-collapse="rep-trend"[\s\S]*data-collapse="rep-review"/, 'Report panels should put the important sections first');
 assert.doesNotMatch(html, /data-collapse="rep-todo-tracker"|data-collapse-body="rep-todo-tracker"/, 'Todo Tracker should not keep the obsolete nested collapse markup');
 assert.match(options, /const todoTrackerMount = report\.querySelector\('#todoTracker'\)/, 'Todo Tracker should preserve its mount when the project report rerenders');
-assert.match(html, /data-review-mode="calendar"[^>]*active|class="btn-sm active"[^>]*data-review-mode="calendar"/, 'Calendar should be the default review mode');
+assert.match(html, /id="reviewOpenCalendar"/, 'Daily review should link to the calendar tab instead of keeping its own calendar');
+assert.match(html, /id="p-schedules"[^>]*data-collapse-body="todo-schedules"/, 'Schedules should live in the Todo tab');
+assert.match(html, /id="p-tags"[^>]*data-collapse-body="set-tags"/, 'Tags should live in settings');
+assert.doesNotMatch(html, /data-tab="(?:schedules|tags)"/, 'Schedules and tags should not have their own tabs');
+assert.equal((html.match(/class="export-menu"/g) || []).length, 2, 'Report and entries should share the export menu');
 assert.doesNotMatch(html, /id="byDay"/, 'Report should not render a separate daily trend panel');
 assert.match(options, /buildProjectTrendData/, 'Report should build the fused project trend data');
 assert.match(options, /entryOverlapsRange/, 'Report ranges should include entries that cross midnight');
@@ -192,7 +197,6 @@ assert.match(css, /\.report-status-metrics\s*\{/, 'Compact Todo summary should h
 assert.match(css, /\.report-status-donut\s*\{[^}]*flex:\s*0\s+0\s+160px/s, 'Todo donut should be large enough to read');
 assert.match(css, /\.report-status-donut \.todo-health-donut-svg\s*\{[^}]*width:\s*160px[^}]*height:\s*160px/s, 'Todo donut SVG should use the larger size');
 assert.match(css, /#p-report > h2\.sec,\s*#p-report > \.report-panel > h2\.sec\s*\{/, 'Report section headings should share one typography rule');
-assert.match(css, /\.project-heatmap-svg \.heatmap-cell rect\s*\{[^}]*fill-opacity:/s, 'Heatmap cells should use a readable translucent project color');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
   'Report navigation should expose one way to clear a stale focused target');
 assert.match(options, /function selectTab\(name, preserveFocus = false\)/,
@@ -239,7 +243,7 @@ assert.match(options, /createReportChartSection/, 'Report charts should be wrapp
 assert.match(options, /dataset\.reportChart = id/, 'Report chart sections should expose a collapse identity');
 assert.match(options, /wrapReportChartContent/, 'Report charts should be grouped after rendering');
 assert.match(options, /reportChartCollapsed/, 'Report chart collapse state should be tracked');
-assert.match(options, /let reportChartCollapsed = new Set\(\['heatmap'\]\)/, 'Todo Tracker should be visible when the project report is opened');
+assert.match(options, /let reportChartCollapsed = new Set\(\)/, 'Todo Tracker should be visible when the project report is opened');
 assert.match(css, /\.report-chart-title/, 'Report chart collapse headings should have dedicated styles');
 assert.match(css, /\.report-action-grid\s*\{/, 'Report should group actionable items in a compact grid');
 assert.match(css, /\.report-due-alerts\s*\{/, 'Report due alerts should have a dedicated compact style');
@@ -279,8 +283,6 @@ assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-action-grid\s*\{[
   'Report action cards should stack on narrow screens');
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.report-project-row\s*\{[^}]*grid-template-columns:/s,
   'Report project rows should reflow on narrow screens');
-assert.match(options, /review-calendar-tooltip/, 'Calendar hover should use a real tooltip element');
-assert.match(options, /let reviewMode = 'calendar'/, 'Report should initialize the review in calendar mode');
 assert.doesNotMatch(options, /groups\.length\s*<=\s*7/, 'Calendar should remain available for ranges longer than one week');
 assert.doesNotMatch(options, /data-tooltip="\$\{esc\(tooltip\)\}"/, 'Calendar hover should not render tooltip content through attr()');
 assert.match(options, /getTimer/, 'Management timer should load the shared timer');
@@ -299,31 +301,6 @@ assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*300px[^}]
   'Management timer notes should grow with the source instead of nesting scroll areas');
 assert.match(options, /'› '\.repeat\(p\.depth\)/,
   'Management timer project options should use compact hierarchy labels');
-assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto/s, 'Calendar should scroll horizontally');
-assert.match(css, /\.review-calendar\s*\{[^}]*display:\s*grid/s, 'Calendar should keep its grid layout');
-assert.match(css, /\.review-calendar\s*\{[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/s,
-  'Calendar should allow vertical scrolling while keeping horizontal scrolling');
-assert.match(css, /\.review-calendar\s*\{[^}]*max-height:\s*min\(72vh,\s*640px\)/s,
-  'Calendar should cap its viewport height');
-assert.match(css, /\.review-calendar-tooltip\[hidden\]\s*\{[^}]*display:\s*none/s,
-  'Hidden calendar tooltips should not expand the scroll range');
-assert.match(options, /reviewCalendarHoverTooltip/, 'Calendar should use one shared click preview');
-assert.match(html, /id="reviewCalendarHoverTooltip"[^>]*role="tooltip"/, 'Calendar tooltip should live outside the scrollable grid');
-assert.match(options, /dailyReview'\)\.addEventListener\('click'/, 'Calendar preview should open from a click');
-assert.match(options, /dailyReview'\)\.addEventListener\('keydown'/, 'Calendar preview should support keyboard activation');
-assert.match(options, /reviewCalendarSelectedTarget/, 'Calendar preview should keep the selected entry stable');
-assert.match(options, /showReviewCalendarTooltip/, 'Calendar click should position the shared preview');
-assert.match(options, /repositionReviewCalendarTooltip/, 'Calendar preview should reposition while the viewport moves');
-assert.doesNotMatch(options, /dailyReview'\)\.addEventListener\('pointerover'/, 'Calendar preview should not depend on hover');
-assert.doesNotMatch(options, /dailyReview'\)\.addEventListener\('pointerout'/, 'Calendar preview should not close when the pointer leaves an entry');
-assert.doesNotMatch(options, /class="review-calendar-entry"[^>]*\stitle=/, 'Calendar entries should not create a second native title preview');
-assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*position:\s*fixed/s,
-  'Calendar tooltip should escape the scrollable calendar');
-assert.match(css, /\.review-calendar-tooltip\s*\{[^}]*pointer-events:\s*auto/s,
-  'Calendar tooltip should capture the pointer for scrolling');
-assert.doesNotMatch(options, /<div class="review-calendar-tooltip" role="tooltip">/,
-  'Calendar entries should not own tooltips inside the scrollable grid');
-assert.doesNotMatch(css, /\.review-calendar\s*\{\s*overflow:\s*visible;\s*\}/, 'Calendar should not override horizontal scrolling');
 assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
 assert.match(options,
   /const workspaceSections = \$\('projectWorkspace'\)\.querySelectorAll\('\.workspace-section'\);[\s\S]*?workspaceSections\.forEach\(\(section, index\) => \{\s*if \(index > 0 && !openSections\.includes\(section\.dataset\.workspaceSection\)\) section\.classList\.add\('is-collapsed'\);/,

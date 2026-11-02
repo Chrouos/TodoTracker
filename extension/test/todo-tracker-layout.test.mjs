@@ -5,7 +5,6 @@ const html = await readFile(new URL('../src/options/options.html', import.meta.u
 const css = await readFile(new URL('../src/options/options.css', import.meta.url), 'utf8');
 const options = await readFile(new URL('../src/options/options.js', import.meta.url), 'utf8');
 
-assert.match(html, /id="projectHeatmap"/, 'Report should keep the project heatmap mount point');
 assert.match(html, /id="todoTracker"/, 'Report should provide a Todo tracker mount point');
 assert.match(html, /id="todoTrackerDetail"/, 'Report should provide a Todo tracker detail mount point');
 assert.match(options, /from ['"]\.\.\/lib\/todo-tracker\.js['"]/, 'Report should import Todo tracker data');
@@ -64,7 +63,5 @@ assert.match(css, /\.todo-tracker-tooltip\s*\{[^}]*position:\s*fixed/s, 'Todo tr
 assert.match(css, /\.todo-tracker-tooltip\s*\{[^}]*pointer-events:\s*none/s, 'Todo tracker tooltip should not trap the pointer');
 assert.match(css, /\.todo-tracker-work\.is-hovered/, 'Todo tracker should visibly track the current hovered date cell');
 assert.match(css, /\.todo-tracker-label-details/, 'Todo tracker labels should have disclosure styles');
-assert.match(css, /\.project-heatmap-svg \.heatmap-cell\.is-hovered rect\s*\{[^}]*stroke:\s*(?!var\(--ink\))/s,
-  'Heatmap hover should not use the heavy black ink outline');
 
 console.log('todo tracker layout contract passed');

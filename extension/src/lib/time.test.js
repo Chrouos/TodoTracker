@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activeRange,
-  calendarReviewData,
   clipEntryToRange,
   currentWeekDateRange,
   dailyReviewData,
@@ -27,21 +26,6 @@ test('range helpers include and clip overnight work by the selected local window
   const clipped = clipEntryToRange(overnight, dayAfter, nextDay);
   assert.equal(clipped.startedAt, dayAfter.toISOString());
   assert.equal(clipped.endedAt, new Date(2026, 7, 11, 1, 30).toISOString());
-});
-
-test('calendarReviewData maps work to a shared time axis', () => {
-  const result = calendarReviewData([
-    { id: 'late', startedAt: '2026-08-10T13:30:00+08:00', endedAt: '2026-08-10T15:00:00+08:00' },
-    { id: 'early', startedAt: '2026-08-10T09:00:00+08:00', endedAt: '2026-08-10T10:30:00+08:00' },
-    { id: 'next', startedAt: '2026-08-11T10:00:00+08:00', endedAt: '2026-08-11T11:00:00+08:00' },
-  ], ['2026-08-10', '2026-08-11']);
-
-  assert.deepEqual(result.axis, { from: 8 * 60, to: 18 * 60 });
-  assert.deepEqual(result.days[0].entries.map(({ id, start, end }) => ({ id, start, end })), [
-    { id: 'early', start: 540, end: 630 },
-    { id: 'late', start: 810, end: 900 },
-  ]);
-  assert.deepEqual(result.days[1].entries[0].start, 600);
 });
 
 test('dailyReviewData keeps empty dates and sorts work by start time', () => {
@@ -75,19 +59,6 @@ test('dailyReviewData splits overnight work into each local calendar day', () =>
   }))), [
     [{ id: 'overnight', startedAt: start.toISOString(), endedAt: midnight.toISOString() }],
     [{ id: 'overnight', startedAt: midnight.toISOString(), endedAt: end.toISOString() }],
-  ]);
-});
-
-test('calendarReviewData places overnight work on both local calendar days', () => {
-  const result = calendarReviewData([{
-    id: 'overnight',
-    startedAt: new Date(2026, 7, 10, 23, 30).toISOString(),
-    endedAt: new Date(2026, 7, 11, 1, 30).toISOString(),
-  }], ['2026-08-10', '2026-08-11']);
-
-  assert.deepEqual(result.days.map((day) => day.entries.map(({ id, start, end }) => ({ id, start, end }))), [
-    [{ id: 'overnight', start: 23 * 60 + 30, end: 1440 }],
-    [{ id: 'overnight', start: 0, end: 90 }],
   ]);
 });
 

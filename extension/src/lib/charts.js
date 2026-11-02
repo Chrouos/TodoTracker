@@ -16,11 +16,6 @@ function trendY(seconds, maxSeconds, top, height) {
   return top + (1 - (maxSeconds ? seconds / maxSeconds : 0)) * height;
 }
 
-function compactDuration(seconds) {
-  const totalMinutes = Math.max(0, Math.floor(Number(seconds) / 60));
-  return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, '0')}m`;
-}
-
 /** 每日工時折線圖：保留日期順序，適合快速看出工作量的起伏。 */
 export function lineSVG(data, locale = 'zh-TW') {
   if (!data?.dates?.length || !data.values?.length) return trendEmpty(locale);
@@ -139,38 +134,5 @@ export function stackedAreaSVG(data, locale = 'zh-TW') {
 
   return `<svg class="project-trend-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="${esc(translate(locale, 'chart.trend'))}">
     ${grid}${areas}${zones}${labels}
-  </svg>`;
-}
-
-export function heatmapSVG(data, locale = 'zh-TW') {
-  if (!data?.dates?.length || !data.series?.length) return trendEmpty(locale);
-
-  const labelW = 150, colW = Math.max(72, Math.min(132, 610 / data.dates.length));
-  const W = labelW + colW * data.dates.length + 16;
-  const rowH = 34, headerH = 24, H = headerH + rowH * data.series.length + 8;
-  const maxCell = Math.max(1, data.maxCellSeconds || 0);
-  const x = (index) => labelW + index * colW;
-  const cells = data.series.map((series, row) => {
-    const y = headerH + row * rowH;
-    const label = `<text x="8" y="${y + 21}" class="heatmap-label">${esc(series.name)}</text>`;
-    const columns = data.dates.map((date, index) => {
-      const value = series.values[index] || 0;
-      const level = value === 0 ? 0 : Math.min(4, Math.max(1, Math.ceil((value / maxCell) * 4)));
-      const total = data.dailyTotals[index] || 0;
-      const pct = total ? Math.round((value / total) * 100) : 0;
-      const opacity = value ? (0.2 + level * 0.16).toFixed(2) : '1';
-      return `<g class="heatmap-cell" data-project-id="${esc(series.id)}" data-trend-date="${esc(date)}" tabindex="0">
-        <rect x="${x(index) + 3}" y="${y + 3}" width="${colW - 6}" height="${rowH - 6}" rx="4" fill="${value ? esc(series.color) : 'var(--surface-soft)'}" style="--heatmap-opacity:${opacity}"></rect>
-        <text x="${x(index) + colW / 2}" y="${y + 21}" text-anchor="middle" class="heatmap-cell-text">${value ? esc(compactDuration(value)) : '—'}</text>
-        <title>${esc(date)} · ${esc(series.name)} · ${esc(formatDuration(value, locale))} · ${pct}%</title>
-      </g>`;
-    }).join('');
-    return label + columns;
-  }).join('');
-  const headers = data.dates.map((date, index) =>
-    `<text x="${x(index) + colW / 2}" y="16" text-anchor="middle" class="axis-label">${esc(date.slice(5))}</text>`).join('');
-
-  return `<svg class="project-heatmap-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;min-width:${W}px;max-width:${W}px" role="img" aria-label="${esc(translate(locale, 'chart.heatmap'))}">
-    ${headers}${cells}
   </svg>`;
 }
