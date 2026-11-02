@@ -56,6 +56,10 @@
         <select id="task" data-i18n-placeholder="popup.todoPlaceholder"></select>
       </div>
       <div id="tagRow" class="tagrow"></div>
+      <label id="timerStartField" class="quick-field" hidden>
+        <span data-i18n="timer.startedAt">開始時間</span>
+        <input id="timerStart" type="datetime-local" />
+      </label>
 
       <!-- 計時中隨手記；停止時會跟著存進那筆紀錄 -->
       <div id="liveLog" hidden>
@@ -122,30 +126,23 @@
         <span data-i18n="todo.dueTime">截止時間（可選）</span>
         <input id="todoDueTime" type="time" />
       </label>
-      <label class="quick-field">
-        <span data-i18n="common.filter">清單篩選</span>
-        <select id="todoFilter"></select>
-      </label>
-      <label class="quick-field">
-        <span data-i18n="todo.priority">優先級篩選</span>
-        <select id="todoPriorityFilter">
-          <option value="" data-i18n="todo.allPriorities">— 全部優先級 —</option>
-          <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
-          <option value="high" data-i18n="todo.priority.high">高</option>
-          <option value="normal" data-i18n="todo.priority.normal">一般</option>
-          <option value="low" data-i18n="todo.priority.low">低</option>
-        </select>
-      </label>
-      <label class="quick-field">
-        <span data-i18n="todo.status">狀態篩選</span>
-        <select id="todoStatusFilter">
-          <option value="all" data-i18n="todo.status.all">全部</option>
-          <option value="active" data-i18n="todo.status.active">未完成</option>
-          <option value="doing" data-i18n="todo.status.doing">進行中</option>
-          <option value="todo" data-i18n="todo.status.todo">待辦</option>
-          <option value="done" data-i18n="todo.status.done">已完成</option>
-        </select>
-      </label>
+    </div>
+    <div class="todo-filters">
+      <select id="todoFilter" data-i18n-aria-label="common.filter" aria-label="清單篩選"></select>
+      <select id="todoStatusFilter" data-i18n-aria-label="todo.status" aria-label="狀態篩選">
+        <option value="active" data-i18n="todo.status.active">未完成</option>
+        <option value="doing" data-i18n="todo.status.doing">進行中</option>
+        <option value="todo" data-i18n="todo.status.todo">待辦</option>
+        <option value="done" data-i18n="todo.status.done">已完成</option>
+        <option value="all" data-i18n="todo.status.all">全部</option>
+      </select>
+      <select id="todoPriorityFilter" data-i18n-aria-label="todo.priority" aria-label="優先級篩選">
+        <option value="" data-i18n="todo.allPriorities">— 全部優先級 —</option>
+        <option value="urgent" data-i18n="todo.priority.urgent">緊急</option>
+        <option value="high" data-i18n="todo.priority.high">高</option>
+        <option value="normal" data-i18n="todo.priority.normal">一般</option>
+        <option value="low" data-i18n="todo.priority.low">低</option>
+      </select>
     </div>
     <div class="hr"></div>
     <div id="todoList"></div>

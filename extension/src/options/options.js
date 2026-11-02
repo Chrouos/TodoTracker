@@ -11,7 +11,7 @@ import {
   translate,
 } from '../lib/i18n.js';
 import {
-  fmtDate, fmtClock, startOfDay, startOfMonth, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
+  fmtDate, fmtClock, startOfDay, localDateRange, activeRange, rangeControlState, currentWeekDateRange, dailySeries,
   dailyReviewData, runningSecondsSince, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
@@ -28,7 +28,7 @@ import {
 } from '../lib/todo-filter.js';
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trackerLevel } from '../lib/todo-tracker.js';
-import { comparisonBounds, deltaPercent, reportRangeBounds, trendDateBounds } from '../lib/report-range.js';
+import { comparisonBounds, deltaPercent, reportRangeBounds, shiftRangeAnchor, trendDateBounds } from '../lib/report-range.js';
 import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
 import {
@@ -189,6 +189,7 @@ document.addEventListener('change', (event) => {
   if (host) initializeMarkdownPreviews(host, true);
 });
 let range = 'week';
+let rangeOffset = 0;   // 0 是本期，-1 是上一期
 const customRange = { from: '', to: '' };
 let customRangeOpen = false;
 const customReturnRange = { report: 'week', entries: 'all' };
@@ -214,13 +215,14 @@ async function load() {
   $('initialLoading').hidden = true;
 }
 
+const rangeAnchor = () => shiftRangeAnchor(range, new Date(), rangeOffset);
 function rangeStart() {
   if (range === 'custom') return localDateRange(customRange.from, customRange.to)?.from || new Date(0);
-  return reportRangeBounds(range, new Date(), S.settings.weekStartsOn).from;
+  return reportRangeBounds(range, rangeAnchor(), S.settings.weekStartsOn).from;
 }
 function rangeEnd() {
   if (range === 'custom') return localDateRange(customRange.from, customRange.to)?.to || null;
-  return reportRangeBounds(range, new Date(), S.settings.weekStartsOn).to;
+  return reportRangeBounds(range, rangeAnchor(), S.settings.weekStartsOn).to;
 }
 const inRange = () => {
   const from = rangeStart();
@@ -229,7 +231,17 @@ const inRange = () => {
     .filter((e) => entryOverlapsRange(e, from, to));
 };
 
+function renderRangeStep() {
+  $('rangeStep').hidden = customRangeOpen || range === 'all' || range === 'custom';
+  if ($('rangeStep').hidden) return;
+  const from = fmtDate(rangeStart());
+  const to = fmtDate(new Date(rangeEnd().getTime() - 1));
+  $('rangeStepLabel').textContent = from === to ? from : `${from} ～ ${to}`;
+  $('rangeNext').disabled = rangeOffset >= 0;
+}
+
 function syncRangeControls() {
+  renderRangeStep();
   const controls = rangeControlState(customRangeOpen);
   $('reportCustomRange').hidden = !controls.custom;
   $('entriesCustomRange').hidden = !controls.custom;
@@ -409,6 +421,8 @@ function renderTimer() {
   $('mgTimerStatus').textContent = timer ? translateText('timer.running') : translateText('timer.notStarted');
   $('mgTimerToggle').textContent = timer ? translateText('timer.stopAndSave') : translateText('timer.startAndSave');
   $('mgTimerIdleNotice').hidden = Boolean(timer);
+  $('mgTimerStartField').hidden = !timer;
+  if (timer && $('mgTimerStart') !== document.activeElement) $('mgTimerStart').value = toLocalInput(timer.startedAt);
   $('mgTimerDescription').value = current.description || '';
   if (!timerNotesDirty && (!isMarkdownEditorFocused($('mgTimerNotes')) || renderedTimerEntryId !== (timer?.entryId || null))) {
     $('mgTimerNotes').value = current.notes || '';
@@ -513,6 +527,16 @@ $('mgTimerNotesEditToggle').addEventListener('click', () => setTimerNotesPreview
 $('mgTimerNotesPreviewToggle').addEventListener('click', () => setTimerNotesPreviewOpen(true));
 $('mgTimerComplete').addEventListener('change', (event) => {
   timerCompleteChoice = event.target.checked;
+});
+$('mgTimerStart').addEventListener('change', async (event) => {
+  if (!S.timer) return;
+  const updated = event.target.value ? await db.setTimerStart(fromLocalInput(event.target.value)) : null;
+  if (!updated) {
+    event.target.value = toLocalInput(S.timer.startedAt);
+    showToast(translateText('timer.startInvalid'));
+    return;
+  }
+  await load();
 });
 $('mgTimerPlanUnlink').addEventListener('click', async () => {
   await db.patchTimer({ planId: null }, { expectedEntryId: S.timer?.entryId });
@@ -650,6 +674,7 @@ setInterval(() => {
 }, 60000);
 
 function renderReport() {
+  renderRangeStep();
   const rows = inRange();
   const from = rangeStart();
   const to = rangeEnd();
@@ -661,15 +686,17 @@ function renderReport() {
   const today = startOfDay();
   const customBounds = range === 'custom' ? localDateRange(customRange.from, customRange.to) : null;
   const quickBounds = range === 'today' || range === 'week'
-    ? trendDateBounds(range, new Date(), S.settings.weekStartsOn)
+    ? trendDateBounds(range, rangeAnchor(), S.settings.weekStartsOn)
     : null;
   const lineFrom = customBounds
     ? customBounds.from
     : quickBounds?.from
-      ?? (range === 'month' ? startOfMonth() : new Date(today.getTime() - 29 * 864e5));
+      ?? (range === 'month' ? from : new Date(today.getTime() - 29 * 864e5));
   const lineTo = customBounds
     ? new Date(customBounds.to.getTime() - 864e5)
-    : quickBounds?.to ?? new Date();
+    : rangeOffset < 0 && range !== 'today'
+      ? new Date(to.getTime() - 864e5)   // 過去的週、月要畫到最後一天
+      : quickBounds?.to ?? new Date();
   const trendEndExclusive = new Date(lineTo.getTime() + 864e5);
   const trendEntries = S.entries.filter((e) => entryOverlapsRange(e, lineFrom, trendEndExclusive));
   const trackerEntries = S.entries.filter((e) => e.endedAt && !e.deletedAt);
@@ -2512,7 +2539,20 @@ function renderSettings() {
   $('stNotesEditor').value = normalizeMarkdownEditorMode(S.settings.notesEditor);
   $('stLanguage').value = normalizeLanguagePreference(S.settings.language);
   initializeMarkdownEditors(S.settings.notesEditor);
+  renderShortcuts();
 }
+
+async function renderShortcuts() {
+  const commands = await chrome.commands?.getAll?.();
+  $('stShortcutsRow').hidden = !commands;
+  if (!commands) return;
+  const label = { 'toggle-timer': 'settings.shortcutToggle', _execute_action: 'settings.shortcutPopup' };
+  $('stShortcuts').textContent = commands
+    .filter((command) => label[command.name])
+    .map((command) => `${translateText(label[command.name])} ${command.shortcut || translateText('settings.shortcutUnset')}`)
+    .join(' · ');
+}
+$('stShortcutsEdit').addEventListener('click', () => chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }));
 $('saveSettings').addEventListener('click', async () => {
   await db.saveSettings({
     idleThresholdMin: Math.max(1, Number($('stIdle').value) || 15),
@@ -2670,10 +2710,13 @@ $('range').addEventListener('click', (e) => {
   if (r === 'back') { closeCustomRange(); return; }
   if (r === 'custom') { openCustomRange(); return; }
   range = r;
+  rangeOffset = 0;
   customRangeOpen = false;
   syncRangeControls();
   renderReport();
 });
+$('rangePrev').addEventListener('click', () => { rangeOffset -= 1; renderReport(); });
+$('rangeNext').addEventListener('click', () => { rangeOffset = Math.min(0, rangeOffset + 1); renderReport(); });
 $('reportApplyRange').addEventListener('click', () => applyCustomRange('report'));
 
 // 進頁預設本週

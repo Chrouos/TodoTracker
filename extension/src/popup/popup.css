@@ -96,6 +96,8 @@ main[hidden] { display: none; }
   background: var(--surface-soft);
 }
 .todo-advanced[hidden] { display: none; }
+.todo-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--xs); margin-top: var(--sm); }
+.todo-filters select { width: 100%; min-width: 0; height: 28px; font-size: 11px; }
 .quick-field { display: flex; align-items: center; gap: var(--sm); min-width: 0; }
 .quick-field > span { flex: 0 0 88px; color: var(--text-mute); font-size: 11px; }
 .quick-field select,
@@ -140,7 +142,10 @@ main[hidden] { display: none; }
 /* 計時中，面板已顯示專案與描述，欄位預設收起避免重複 */
 #toggleDetails { align-self: flex-end; }
 #toggleDetails[hidden] { display: none; }
-.fields.is-summary #desc, .fields.is-summary .two, .fields.is-summary #tagRow { display: none; }
+.fields.is-summary #desc, .fields.is-summary .two, .fields.is-summary #tagRow, .fields.is-summary #timerStartField { display: none; }
+.badge.overdue { color: var(--danger); border-color: var(--danger); }
+.badge.due-today { color: var(--warning-text); border-color: var(--warning); }
+.todo-branch { flex: 0 0 auto; color: var(--text-mute); font-size: 11px; }
 
 .goal { padding-bottom: var(--md); }
 .goal[hidden] { display: none; }

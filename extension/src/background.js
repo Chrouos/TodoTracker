@@ -9,7 +9,7 @@
 import * as db from './lib/db.js';
 import { getTimer, patchTimer, getSettings } from './lib/db.js';
 import { fmtBadge } from './lib/time.js';
-import { getBrowserLocale, resolveLocale, translate } from './lib/i18n.js';
+import { formatDuration, getBrowserLocale, resolveLocale, translate } from './lib/i18n.js';
 
 const ALARM_TICK = 'tt-tick';
 const ALARM_SCHED = 'tt-sched';   // 每分鐘檢查排程與提醒
@@ -113,6 +113,25 @@ function notify(id, title, message) {
     priority: 1,
   });
 }
+
+/** 全域快捷鍵：不開 popup 就能開始或停止，開始時沿用 popup 暫存的選擇 */
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== 'toggle-timer') return;
+  const locale = await currentLocale();
+  const unnamed = translate(locale, 'common.unnamedWork');
+  if (await getTimer()) {
+    const entry = await db.stopTimer();
+    notify(`ts-timer-${entry.id}`, translate(locale, 'notification.timerStopped'),
+      `${entry.description || unnamed} · ${formatDuration(db.durationSec(entry), locale)}`);
+    return;
+  }
+  const { draft } = await chrome.storage.local.get('draft');
+  const timer = await db.startTimer({
+    projectId: draft?.projectId || null, taskId: draft?.taskId || null,
+    description: draft?.description || '', tagIds: draft?.tagIds || [],
+  });
+  notify(`ts-timer-${timer.entryId}`, translate(locale, 'notification.timerStarted'), timer.description || unnamed);
+});
 
 // 點通知就打開管理頁的 Todo
 chrome.notifications.onClicked.addListener((id) => {

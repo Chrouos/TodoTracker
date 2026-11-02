@@ -4,5 +4,11 @@
   },
   "extensionDescription": {
     "message": "追蹤工作時間、管理 Todo 與檢視工作報表。"
+  },
+  "commandToggleTimer": {
+    "message": "開始或停止計時"
+  },
+  "commandOpenPopup": {
+    "message": "開啟 TodoTracker popup"
   }
 }

@@ -4,5 +4,11 @@
   },
   "extensionDescription": {
     "message": "作業時間を記録し、Todoを管理して、作業レポートを確認できます。"
+  },
+  "commandToggleTimer": {
+    "message": "タイマーを開始または停止"
+  },
+  "commandOpenPopup": {
+    "message": "TodoTracker のポップアップを開く"
   }
 }

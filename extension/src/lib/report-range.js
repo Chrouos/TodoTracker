@@ -50,6 +50,15 @@ const shiftDays = (date, days) => {
   return next;
 };
 
+/** 往前或往後 offset 期後落在哪一天，交給 reportRangeBounds 算出該期區間 */
+export function shiftRangeAnchor(range, now = new Date(), offset = 0) {
+  if (!offset) return now;
+  if (range === 'today') return shiftDays(now, offset);
+  if (range === 'week') return shiftDays(now, offset * 7);
+  if (range === 'month') return new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  return now;
+}
+
 /**
  * KPI 比較區間。今天／本週／本月只比「同樣經過的時間」，
  * 否則週一早上跟上週整週比，永遠是大幅下降。「全部」沒有上一期。
@@ -64,6 +73,8 @@ export function comparisonBounds(range, bounds, now = new Date()) {
   const cutoff = now < to ? now : to;
   if (range === 'month') {
     const previousFrom = new Date(from.getFullYear(), from.getMonth() - 1, 1);
+    // 已經結束的月份就跟上個月整月比
+    if (cutoff >= to) return { current: { from, to }, previous: { from: previousFrom, to: from } };
     const elapsed = new Date(
       from.getFullYear(), from.getMonth() - 1, cutoff.getDate(),
       cutoff.getHours(), cutoff.getMinutes(), cutoff.getSeconds(),

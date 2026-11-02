@@ -7,6 +7,7 @@ globalThis.chrome = {
   runtime: { onInstalled: event(), onStartup: event(), onMessageExternal: { addListener(fn) { external = fn; } } },
   alarms: { onAlarm: event() }, idle: { onStateChanged: event() },
   notifications: { onClicked: event() },
+  commands: { onCommand: event() },
   storage: { onChanged: event(), local: {
     async get(key) { return structuredClone({ [key]: storage[key] }); },
     async set(patch) { Object.assign(storage, structuredClone(patch)); },

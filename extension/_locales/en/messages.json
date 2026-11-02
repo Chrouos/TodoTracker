@@ -4,5 +4,11 @@
   },
   "extensionDescription": {
     "message": "Track work time, manage Todos, and review work reports."
+  },
+  "commandToggleTimer": {
+    "message": "Start or stop the timer"
+  },
+  "commandOpenPopup": {
+    "message": "Open the TodoTracker popup"
   }
 }

@@ -16,6 +16,12 @@ const POPUP = '/extension/src/popup/popup.html';
 const OPTIONS = '/extension/src/options/options.html';
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2' };
 const ago = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();
+// datetime-local takes browser-local time; the browser context uses the system time zone like Node.
+const localInput = (iso) => {
+  const date = new Date(iso);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 const seed = () => ({
   settings: { language: 'zh-TW', weekStartsOn: 1, notesEditor: 'toolbar', dailyGoalHours: 8, idleThresholdMin: 5, roundToMin: 0 },
@@ -108,7 +114,7 @@ test('popup: Space on a focused button does that button\'s job, not the timer', 
 
   await page.locator('[data-check="other"]').focus();
   await page.keyboard.press('Space');
-  await page.waitForFunction(() => document.querySelector('[data-check="other"]')?.getAttribute('aria-checked') === 'true');
+  await page.waitForFunction(() => !document.querySelector('[data-check="other"]'));
   assert.equal(storage.tasks.find((task) => task.id === 'other').status, 'done');
   assert.equal(storage.timer, undefined);
   assert.deepEqual(errors, []);
@@ -269,6 +275,95 @@ test('options: a deleted entry can be restored from the toast', async () => {
   await page.locator('#appToast .app-toast-action').click();
   await page.locator('#entryList', { hasText: 'First entry' }).waitFor();
   assert.equal(storage.entries.find((entry) => entry.id === 'e1').deletedAt, null);
+  await context.close();
+});
+
+test('popup: the start time of a running timer can be corrected', async () => {
+  const storage = { ...seed(), timer: running({ idleSince: ago(10) }) };
+  const { context, page } = await open(POPUP, storage);
+  const input = page.locator('#timerStart');
+  assert.equal(await input.isVisible(), false);
+  await page.locator('#toggleDetails').click();
+
+  await input.fill(localInput(ago(5)));
+  await input.blur();
+  await page.waitForFunction(() => document.getElementById('clock').textContent.startsWith('00:0'));
+  assert.ok(Math.abs(Date.now() - new Date(storage.timer.startedAt)) < 6.5 * 60000);
+  assert.equal(storage.timer.idleSince, null, 'idle before the new start no longer needs an answer');
+
+  const before = storage.timer.startedAt;
+  await input.fill(localInput(new Date(Date.now() + 3600000).toISOString()));
+  await input.blur();
+  await page.locator('#appToast.is-visible').waitFor();
+  assert.equal(storage.timer.startedAt, before);
+  assert.equal(await input.inputValue(), localInput(before));
+  await context.close();
+});
+
+test('popup: filters sit outside the create panel and survive reopening', async () => {
+  const storage = seed();
+  storage.tasks.push(
+    { id: 'child', title: 'Child', projectId: 'web', parentId: 'parent', status: 'todo', priority: 'normal', dueDate: '2020-01-01', openedAt: ago(100), createdAt: ago(100), sortOrder: 3 },
+    { id: 'finished', title: 'Finished', projectId: 'web', status: 'done', priority: 'normal', openedAt: ago(100), completedAt: ago(50), createdAt: ago(100), sortOrder: 4 },
+  );
+  const { context, page } = await open(POPUP, storage);
+  await page.locator('[data-tab="todo"]').click();
+  assert.equal(await page.locator('#todoAdvanced').isVisible(), false);
+  assert.equal(await page.locator('#todoStatusFilter').isVisible(), true);
+  assert.equal(await page.locator('#todoStatusFilter').inputValue(), 'active');
+  const titles = await page.locator('#todoList .t1').allTextContents();
+  assert.ok(!titles.some((title) => title.includes('Finished')), 'completed Todos stay out by default');
+  const parentAt = titles.findIndex((title) => title.includes('Parent'));
+  assert.match(titles[parentAt + 1], /Child/, 'a subtask follows its parent');
+  assert.equal(await page.locator('#todoList .todo-branch').count(), 1);
+  assert.equal(await page.locator('#todoList .badge.overdue').count(), 1);
+
+  await page.locator('#todoStatusFilter').selectOption('done');
+  await page.locator('#todoList', { hasText: 'Finished' }).waitFor();
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('initialLoading')?.hidden);
+  assert.equal(await page.locator('#tab-todo').isVisible(), true);
+  assert.equal(await page.locator('#todoStatusFilter').inputValue(), 'done');
+  assert.match(await page.locator('#todoList').textContent(), /Finished/);
+  await context.close();
+});
+
+test('options: the report steps through past periods', async () => {
+  const lastWeekDay = new Date(Date.now() - 7 * 86400000);
+  lastWeekDay.setHours(9, 0, 0, 0);
+  const iso = (date) => date.toISOString();
+  const storage = seed();
+  storage.entries.push({ id: 'old', clientEntryId: 'old', projectId: 'web', taskId: null, description: 'Last week work', notes: '', tagIds: [], startedAt: iso(lastWeekDay), endedAt: iso(new Date(lastWeekDay.getTime() + 3600000)), createdAt: iso(lastWeekDay), deletedAt: null });
+  const { context, page, errors } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  assert.equal(await page.locator('#rangeNext').isDisabled(), true);
+  const current = await page.locator('#rangeStepLabel').textContent();
+  assert.doesNotMatch(await page.locator('#dailyReview').textContent(), /Last week work/);
+
+  await page.locator('#rangePrev').click();
+  assert.notEqual(await page.locator('#rangeStepLabel').textContent(), current);
+  assert.match(await page.locator('#dailyReview').textContent(), /Last week work/);
+  assert.equal(await page.locator('#kCount').textContent(), '1');
+  assert.equal((await page.locator('#dailyReview .daily-review-entry').count()), 1);
+
+  await page.locator('#rangeNext').click();
+  assert.equal(await page.locator('#rangeStepLabel').textContent(), current);
+  await page.locator('#rangePrev').click();
+  await page.locator('[data-range="month"]').click();
+  assert.equal(await page.locator('#rangeNext').isDisabled(), true, 'choosing a range returns to the current period');
+  await page.locator('[data-range="all"]').click();
+  assert.equal(await page.locator('#rangeStep').isVisible(), false);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test('options: the start time of a running timer can be corrected', async () => {
+  const storage = { ...seed(), timer: running() };
+  const { context, page } = await open(OPTIONS, storage, { width: 1280, height: 860 });
+  await page.locator('[data-tab="timer"]').click();
+  await page.locator('#mgTimerStart').fill(localInput(ago(5)));
+  await page.locator('#mgTimerStart').blur();
+  await page.waitForFunction(() => document.getElementById('mgTimerClock').textContent.startsWith('00:0'));
+  assert.ok(Math.abs(Date.now() - new Date(storage.timer.startedAt)) < 6.5 * 60000);
   await context.close();
 });
 

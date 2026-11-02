@@ -360,6 +360,12 @@ section[hidden] { display: none; }
   color: var(--warning-text); font-size: 13px;
 }
 .idle-banner .grow { flex: 1 1 240px; }
+.range-step { display: flex; align-items: center; gap: var(--xs); white-space: nowrap; }
+#p-report > .toolbar { flex-wrap: wrap; }
+.range-step[hidden] { display: none; }
+.range-step button:disabled { opacity: .35; cursor: default; }
+.timer-start-field { margin-top: var(--md); max-width: 260px; }
+.shortcut-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sm); margin-top: var(--md); padding-top: var(--md); border-top: 1px solid var(--hairline); }
 .entry-todo-note { margin-top: var(--xs); }
 .entry-todo-note > summary { cursor: pointer; color: var(--text-mute); font-size: 12px; }
 .entry-todo-note[open] > summary { margin-bottom: var(--xs); }

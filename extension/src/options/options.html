@@ -56,6 +56,9 @@
         <label class="field"><span data-i18n="timer.todo">Todo</span><select id="mgTimerTask"></select></label>
       </div>
 
+      <label id="mgTimerStartField" class="field timer-start-field" hidden><span data-i18n="timer.startedAt">開始時間</span>
+        <input id="mgTimerStart" type="datetime-local" /></label>
+
       <div class="field timer-tags-field">
         <span data-i18n="timer.tags">標籤</span>
         <div id="mgTimerTags" class="timer-tags"></div>
@@ -101,6 +104,11 @@
         <span>～</span>
         <label><span data-i18n="entry.end">結束</span> <input id="reportRangeTo" type="date" /></label>
         <button id="reportApplyRange" class="btn-sm" type="button" data-i18n="report.apply">套用</button>
+      </div>
+      <div class="range-step" id="rangeStep">
+        <button id="rangePrev" class="btn-sm" type="button" data-i18n-title="report.previousPeriod" data-i18n-aria-label="report.previousPeriod" title="上一期" aria-label="上一期">‹</button>
+        <span id="rangeStepLabel" class="cap num"></span>
+        <button id="rangeNext" class="btn-sm" type="button" data-i18n-title="report.nextPeriod" data-i18n-aria-label="report.nextPeriod" title="下一期" aria-label="下一期">›</button>
       </div>
       <div class="grow"></div>
       <details class="export-menu" data-export-scope="report">
@@ -411,6 +419,11 @@
         </label>
       </div>
       <div class="actions"><button id="saveSettings" class="btn-primary" data-i18n="common.save">儲存設定</button></div>
+      <div id="stShortcutsRow" class="shortcut-row" hidden>
+        <span class="cap" data-i18n="settings.shortcutLabel">快捷鍵</span>
+        <span id="stShortcuts" class="cap num grow"></span>
+        <button id="stShortcutsEdit" type="button" class="btn-sm" data-i18n="settings.shortcutEdit">變更快捷鍵</button>
+      </div>
     </div>
 
     <h2 class="sec" data-collapse="set-tags" data-collapse-default="closed"><span class="mark">[+]</span> <span data-i18n="nav.tags">標籤</span></h2>

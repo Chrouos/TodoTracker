@@ -461,6 +461,15 @@ export async function patchTimer(patch, { expectedEntryId } = {}) {
 }
 
 /** A notes draft belongs to one timer, even after another interface stops it. */
+/** 補救忘記按開始。開始時間要早於現在；閒置點落在新的開始之前就不用再問。無效時回傳 null */
+export async function setTimerStart(startedAt) {
+  const t = await getTimer();
+  const start = new Date(startedAt).getTime();
+  if (!t || !Number.isFinite(start) || start >= Date.now()) return null;
+  const idleBeforeStart = t.idleSince && new Date(t.idleSince).getTime() <= start;
+  return patchTimer({ startedAt: new Date(start).toISOString(), ...(idleBeforeStart ? { idleSince: null } : {}) });
+}
+
 export async function saveTimerNotes({ entryId, notes }) {
   if (typeof entryId !== 'string' || !entryId || typeof notes !== 'string') throw new Error('Invalid timer note owner');
   const timer = await patchTimer({ notes }, { expectedEntryId: entryId });

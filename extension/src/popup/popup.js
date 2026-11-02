@@ -7,7 +7,8 @@ import { createToast } from '../lib/toast.js';
 // popup 空間有限，上限拉到 260px，超過才捲
 const growLive = autoGrow(document.getElementById('liveText'), { min: 88, max: 260 });
 const growLog = autoGrow(document.getElementById('logText'), { min: 72, max: 220 });
-import { fmtHMS, fmtDate, runningSecondsSince, startOfDay, startOfWeek } from '../lib/time.js';
+import { fmtHMS, fmtDate, fromLocalInput, runningSecondsSince, startOfDay, startOfWeek, toLocalInput } from '../lib/time.js';
+import { dueLabel, flattenTodoTree, taskMetrics } from '../lib/tasks.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
 import { dailyGoalProgress } from '../lib/report-metrics.js';
 import { filterTasks, normalizePriority, normalizeStatus, priorityLabel } from '../lib/todo-filter.js';
@@ -36,6 +37,13 @@ let pendingLogId = null;
 /** 補寫到一半的內容；popup 隨時可能被關掉，所以每次輸入都先存起來 */
 let logDraftText = null;
 let todoAdvancedOpen = false;
+/** 關掉 popup 也留著的分頁與清單篩選 */
+let popupUi = { tab: 'track', project: '', priority: '', status: 'active' };
+let popupUiRestored = false;
+const savePopupUi = (patch) => {
+  popupUi = { ...popupUi, ...patch };
+  chrome.storage.local.set({ popupUi });
+};
 
 /* ---------------- draft（計時前暫存的選擇，關掉 popup 也留著） ---------------- */
 const getDraft = async () =>
@@ -57,6 +65,11 @@ async function load() {
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
   await restoreLogDraft();
+  if (!popupUiRestored) {
+    popupUiRestored = true;
+    popupUi = { ...popupUi, ...(await chrome.storage.local.get('popupUi')).popupUi };
+    switchTab(popupUi.tab);
+  }
   render();
   $('initialLoading').hidden = true;
 }
@@ -175,6 +188,8 @@ function renderFields() {
 
   // 即時工作紀錄只在計時中出現
   $('liveLog').hidden = !state.timer;
+  $('timerStartField').hidden = !state.timer;
+  if (state.timer && $('timerStart') !== document.activeElement) $('timerStart').value = toLocalInput(state.timer.startedAt);
   if (state.timer && ($('liveText') !== document.activeElement || liveNotesEntryId !== state.timer.entryId)) {
     $('liveText').value = state.timer.notes || '';
     liveNotesEntryId = state.timer.entryId;
@@ -270,16 +285,16 @@ function renderTodo() {
   const statusFilter = $('todoStatusFilter');
   const createProject = $('todoCreateProject');
   const parentSelect = $('todoParent');
-  const keepFilter = filterSelect.value;
-  const keepPriorityFilter = priorityFilter.value;
-  const keepStatusFilter = normalizeStatus(statusFilter.value || 'all');
+  const keepPriorityFilter = popupUi.priority;
+  const keepStatusFilter = normalizeStatus(popupUi.status);
   const keepCreateProject = createProject.value;
   const keepParent = parentSelect.value;
   const projectOptions = flattenTree(state.projects, { includeArchived: false });
 
   filterSelect.innerHTML = `<option value="">${translate(currentLocale, 'common.projectOption')}</option>` +
     projectOptions.map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
-  filterSelect.value = keepFilter;
+  // 專案可能已被刪除或封存，找不到就回到全部
+  filterSelect.value = projectOptions.some((p) => p.id === popupUi.project) ? popupUi.project : '';
   priorityFilter.value = keepPriorityFilter;
   statusFilter.value = keepStatusFilter;
 
@@ -307,21 +322,27 @@ function renderTodo() {
   const filter = filterSelect.value;
   const priority = priorityFilter.value;
   const status = keepStatusFilter;
-  const list = filterTasks(state.tasks, {
+  const filtered = filterTasks(state.tasks, {
     projectScope: filter ? new Set([filter]) : null,
     priority,
     status,
-  })
-    .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.sortOrder - b.sortOrder));
+  });
+  const list = [
+    ...flattenTodoTree(filtered.filter((t) => t.status !== 'done')),
+    ...flattenTodoTree(filtered.filter((t) => t.status === 'done')),
+  ];
 
   $('todoList').innerHTML = list.length
     ? list.map((t) => {
         const p = state.projects.find((x) => x.id === t.projectId);
         const done = t.status === 'done';
-        return `<div class="item ${done ? 'done' : ''}">
+        const due = taskMetrics(t, []);
+        const urgentDue = !done && (due.isLate || due.dueDelta === 0);
+        return `<div class="item ${done ? 'done' : ''}"${t.depth ? ` style="padding-left:${t.depth * 14}px"` : ''}>
+          ${t.depth ? '<span class="todo-branch" aria-hidden="true">↳</span>' : ''}
           <button class="check${done ? ' is-done' : ''}" data-check="${t.id}" role="checkbox" aria-checked="${done}" aria-label="${translate(currentLocale, done ? 'todo.reopen' : 'todo.markDone')}" title="${translate(currentLocale, done ? 'todo.reopen' : 'todo.markDone')}"><span aria-hidden="true">${done ? '✓' : ''}</span></button>
           <div class="main">
-            <div class="t1">${esc(t.title)}${['urgent', 'high'].includes(normalizePriority(t.priority)) ? ` <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>` : ''}</div>
+            <div class="t1">${esc(t.title)}${['urgent', 'high'].includes(normalizePriority(t.priority)) ? ` <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>` : ''}${urgentDue ? ` <span class="badge${due.isLate ? ' overdue' : ' due-today'}">${dueLabel(due, done, currentLocale)}</span>` : ''}</div>
             <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
           <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="${translate(currentLocale, 'todo.addSubtask')}">${translate(currentLocale, 'popup.addSubtaskButton')}</button>
@@ -361,6 +382,19 @@ $('toggle').addEventListener('click', async () => {
     });
   }
   await load();
+});
+$('timerStart').addEventListener('change', async (e) => {
+  if (!state.timer) return;
+  const updated = e.target.value ? await db.setTimerStart(fromLocalInput(e.target.value)) : null;
+  if (!updated) {
+    e.target.value = toLocalInput(state.timer.startedAt);
+    showToast(translate(currentLocale, 'timer.startInvalid'));
+    return;
+  }
+  state.timer = updated;
+  renderStats();
+  renderIdle();
+  $('clock').textContent = fmtHMS((Date.now() - new Date(updated.startedAt).getTime()) / 1000);
 });
 $('popupPlanUnlink').addEventListener('click', async () => {
   await db.patchTimer({ planId: null }, { expectedEntryId: state.timer?.entryId });
@@ -507,9 +541,13 @@ $('todoMore').addEventListener('click', () => {
   }
   renderTodo();
 });
-$('todoFilter').addEventListener('change', renderTodo);
-$('todoPriorityFilter').addEventListener('change', renderTodo);
-$('todoStatusFilter').addEventListener('change', renderTodo);
+const onTodoFilterChange = (key) => (e) => {
+  savePopupUi({ [key]: e.target.value });
+  renderTodo();
+};
+$('todoFilter').addEventListener('change', onTodoFilterChange('project'));
+$('todoPriorityFilter').addEventListener('change', onTodoFilterChange('priority'));
+$('todoStatusFilter').addEventListener('change', onTodoFilterChange('status'));
 $('todoCreateProject').addEventListener('change', renderTodo);
 
 $('todoList').addEventListener('click', async (e) => {
@@ -548,6 +586,7 @@ $('todoList').addEventListener('click', async (e) => {
 
 /* 分頁切換 */
 function switchTab(name) {
+  savePopupUi({ tab: name });
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   $('tab-track').hidden = name !== 'track';
   $('tab-todo').hidden = name !== 'todo';
