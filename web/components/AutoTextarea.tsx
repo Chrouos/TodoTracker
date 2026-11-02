@@ -26,10 +26,19 @@ export default function AutoTextarea({
     const el = ref.current;
     if (!el) return;
     const fit = () => {
+      // Measuring a collapsed textarea can clamp every enclosing scroll container.
+      const scrollPositions: [HTMLElement, number, number][] = [];
+      for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+        scrollPositions.push([node, node.scrollTop, node.scrollLeft]);
+      }
       el.style.height = 'auto';
       const want = Math.max(min, el.scrollHeight + 2);
       el.style.height = `${Math.min(max, want)}px`;
       el.style.overflowY = want > max ? 'auto' : 'hidden';
+      for (const [node, top, left] of scrollPositions) {
+        if (node.scrollTop !== top) node.scrollTop = top;
+        if (node.scrollLeft !== left) node.scrollLeft = left;
+      }
     };
     fit();
     let previousWidth = el.getBoundingClientRect().width;

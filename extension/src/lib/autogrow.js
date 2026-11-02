@@ -9,10 +9,19 @@ export function autoGrow(el, { min = 72, max = 280 } = {}) {
   el.style.minHeight = `${min}px`;
 
   const fit = () => {
+    // Measuring a collapsed textarea can clamp every enclosing scroll container.
+    const scrollPositions = [];
+    for (let node = el; node; node = node.parentElement) {
+      scrollPositions.push([node, node.scrollTop, node.scrollLeft]);
+    }
     el.style.height = 'auto';                    // 先收掉才量得到真實 scrollHeight
     const want = Math.max(min, el.scrollHeight + 2);
     el.style.height = `${Math.min(max, want)}px`;
     el.style.overflowY = want > max ? 'auto' : 'hidden';
+    for (const [node, top, left] of scrollPositions) {
+      if (node.scrollTop !== top) node.scrollTop = top;
+      if (node.scrollLeft !== left) node.scrollLeft = left;
+    }
   };
 
   el.addEventListener('input', fit);
