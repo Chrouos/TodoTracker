@@ -1,4 +1,11 @@
-import { startOfDay, startOfWeek } from './time.js';
+import { fmtDate, startOfDay, startOfWeek } from './time.js';
+
+/** 回顧的資料只有所選區間，區間外的日期不能列出來，否則有紀錄的日子會顯示成沒有紀錄。 */
+export function reviewDatesInRange(dates, from, to) {
+  const fromKey = fmtDate(from);
+  const toKey = to ? fmtDate(new Date(to.getTime() - 1)) : null;
+  return dates.filter((date) => date >= fromKey && (!toKey || date <= toKey));
+}
 
 export function reportRangeBounds(range, now = new Date(), weekStartsOn = 1) {
   const today = startOfDay(now);

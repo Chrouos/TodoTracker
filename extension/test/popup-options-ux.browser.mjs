@@ -329,6 +329,14 @@ test('popup: filters sit outside the create panel and survive reopening', async 
   assert.match(titles[parentAt + 1], /Child/, 'a subtask follows its parent');
   assert.equal(await page.locator('#todoList .todo-branch').count(), 1);
   assert.equal(await page.locator('#todoList .badge.overdue').count(), 1);
+  storage.tasks.find((task) => task.id === 'child').title = 'A very long subtask title '.repeat(6);
+  await page.evaluate(() => window.__storageChanged(['tasks']));
+  await page.waitForFunction(() => document.querySelector('.todo-title-text')?.parentElement && [...document.querySelectorAll('.todo-title-text')].some((node) => node.textContent.startsWith('A very long')));
+  const clipped = await page.locator('#todoList .badge.overdue').evaluate((badge) => {
+    const row = badge.closest('.item').getBoundingClientRect();
+    return badge.getBoundingClientRect().right > row.right;
+  });
+  assert.equal(clipped, false, 'a long title must not push the overdue badge out of the row');
 
   await page.locator('#todoStatusFilter').selectOption('done');
   await page.locator('#todoList', { hasText: 'Finished' }).waitFor();
@@ -376,6 +384,36 @@ test('options: the start time of a running timer can be corrected', async () => 
   await page.locator('#mgTimerStart').blur();
   await page.waitForFunction(() => document.getElementById('mgTimerClock').textContent.startsWith('00:0'));
   assert.ok(Math.abs(Date.now() - new Date(storage.timer.startedAt)) < 6.5 * 60000);
+  await context.close();
+});
+
+test('side panel: fills its width and follows changes made elsewhere', async () => {
+  const storage = seed();
+  const { context, page, errors } = await open(`${POPUP}?view=panel`, storage, { width: 520, height: 900 });
+  assert.equal(await page.locator('body').evaluate((body) => Math.round(body.getBoundingClientRect().width)), 520);
+  assert.equal(await page.locator('#openSidePanel').isVisible(), false);
+
+  storage.timer = running({ description: 'Started elsewhere' });
+  await page.evaluate(() => window.__storageChanged(['timer']));
+  await page.waitForFunction(() => document.getElementById('toggle').dataset.state === 'running');
+  assert.match(await page.locator('#ctx').textContent(), /Started elsewhere/);
+
+  await page.locator('[data-tab="todo"]').click();
+  await page.locator('#todoPriorityFilter').focus();
+  storage.tasks.push({ id: 'late', title: 'Added elsewhere', projectId: 'web', status: 'todo', priority: 'normal', openedAt: ago(1), createdAt: ago(1), sortOrder: 9 });
+  await page.evaluate(() => window.__storageChanged(['tasks']));
+  await page.waitForTimeout(250);
+  assert.doesNotMatch(await page.locator('#todoList').textContent(), /Added elsewhere/, 'an open dropdown is left alone');
+  await page.locator('#todoPriorityFilter').blur();
+  await page.locator('#todoList', { hasText: 'Added elsewhere' }).waitFor();
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test('popup: keeps its fixed width and offers the side panel when available', async () => {
+  const { context, page } = await open(POPUP, seed());
+  assert.equal(await page.locator('body').evaluate((body) => Math.round(body.getBoundingClientRect().width)), 380);
+  assert.equal(await page.locator('#openSidePanel').isVisible(), false, 'hidden where the API is missing');
   await context.close();
 });
 
@@ -542,5 +580,34 @@ test('options: keeping idle time only clears the prompt', async () => {
   await page.waitForFunction(() => document.getElementById('idleBanner').hidden);
   assert.equal(storage.timer.idleSince, null);
   assert.equal(storage.timer.startedAt, startedAt);
+  await context.close();
+});
+
+test('options: notes typed before starting are kept, later edits saved, and stopping clears the field', async () => {
+  const storage = seed();
+  const { context, page, errors } = await open(OPTIONS, storage, { width: 1200, height: 800 });
+  await page.locator('[data-tab="timer"]').click();
+  const notes = page.locator('#mgTimerNotes');
+  await notes.fill('before start');
+  await page.locator('#mgTimerToggle').click();
+  await page.waitForFunction(() => document.getElementById('mgTimerStatus').closest('#managementTimer').classList.contains('is-running'));
+  assert.equal(storage.timer.notes, 'before start');
+  const entryId = storage.timer.entryId;
+
+  await page.locator('#mgTimerNotesPreview').click();
+  await notes.press('Control+End');
+  await page.keyboard.type(' after');
+  await page.waitForTimeout(800);
+  assert.equal(storage.timer.notes, 'before start after');
+
+  await page.locator('#mgTimerToggle').click();
+  await page.waitForFunction(() => !document.getElementById('managementTimer').classList.contains('is-running'));
+  assert.equal(await notes.inputValue(), '');
+  assert.equal(storage.entries.find((entry) => entry.id === entryId).notes, 'before start after');
+
+  await page.locator('#mgTimerToggle').click();
+  await page.waitForFunction(() => document.getElementById('managementTimer').classList.contains('is-running'));
+  assert.equal(storage.timer.notes, '', 'the next timer must not inherit the previous notes');
+  assert.deepEqual(errors, []);
   await context.close();
 });

@@ -47,7 +47,6 @@ test('Web report metrics expose quality and project Todo summaries', () => {
     reopenCount: 0, sortOrder: 0, createdAt: '', updatedAt: '', dueTime: null, scheduleId: null,
   }];
 
-  assert.equal(buildReportQuality(entries, tasks, '2026-08-21').unlinkedTaskSeconds, 3600);
   assert.equal(buildReportQuality(entries, tasks, '2026-08-21').overdueTodoCount, 1);
   assert.deepEqual(buildProjectTaskMetrics(tasks, entries, '2026-08-21')[0], {
     projectId: 'p1',

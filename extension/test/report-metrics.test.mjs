@@ -29,7 +29,7 @@ test('overlapSeconds splits an overnight entry at local day boundaries', () => {
   assert.equal(overlapSeconds(overnight, '2026-08-21', '2026-08-21'), 5400);
 });
 
-test('buildReportQuality counts unclassified, missing-note, and unlinked-task work', () => {
+test('buildReportQuality counts unclassified work and overdue Todos', () => {
   const entries = [
     entry({ id: 'unclassified', endedAt: '2026-08-20T23:45:00+08:00' }),
     entry({
@@ -37,7 +37,7 @@ test('buildReportQuality counts unclassified, missing-note, and unlinked-task wo
       startedAt: '2026-08-21T09:00:00+08:00', endedAt: '2026-08-21T11:00:00+08:00',
     }),
     entry({
-      id: 'missing-note', projectId: 'p1',
+      id: 'no-notes', projectId: 'p1',
       startedAt: '2026-08-21T13:00:00+08:00', endedAt: '2026-08-21T14:00:00+08:00',
     }),
   ];
@@ -48,13 +48,9 @@ test('buildReportQuality counts unclassified, missing-note, and unlinked-task wo
 
   assert.deepEqual(buildReportQuality(entries, tasks, '2026-08-21'), {
     unclassifiedSeconds: 900,
-    missingNotesCount: 2,
-    unlinkedTaskSeconds: 3600,
     overdueTodoCount: 2,
     overdueTaskIds: ['t1', 't2'],
     unclassifiedEntryIds: ['unclassified'],
-    missingNotesEntryIds: ['unclassified', 'missing-note'],
-    unlinkedTaskEntryIds: ['missing-note'],
   });
 });
 
@@ -82,36 +78,28 @@ test('buildProjectTaskMetrics reports completion, work, and overdue state by pro
 
 test('buildReportQuality keeps entry ids for actionable data issues', () => {
   const quality = buildReportQuality([
-    entry({ id: 'missing-note', projectId: 'p1', taskId: 't1' }),
+    entry({ id: 'no-notes', projectId: 'p1', taskId: 't1' }),
     entry({ id: 'unlinked', projectId: 'p1' }),
     entry({ id: 'unclassified' }),
   ], [], '2026-08-21');
 
-  assert.deepEqual(quality.missingNotesEntryIds, ['missing-note', 'unlinked', 'unclassified']);
-  assert.deepEqual(quality.unlinkedTaskEntryIds, ['unlinked']);
   assert.deepEqual(quality.unclassifiedEntryIds, ['unclassified']);
 });
 
 test('buildReportActionItems puts actionable data issues before informational ones', () => {
   assert.deepEqual(buildReportActionItems({
     overdueTodoCount: 2,
-    unlinkedTaskSeconds: 3600,
     unclassifiedSeconds: 900,
-    missingNotesCount: 1,
   }), [
     { kind: 'overdue', tone: 'danger', label: '逾期 Todo', value: 2 },
-    { kind: 'unlinked', tone: 'warning', label: '未綁定 Todo', value: 3600 },
     { kind: 'unclassified', tone: 'warning', label: '未分類工時', value: 900 },
-    { kind: 'missing-notes', tone: 'muted', label: '未填寫工作備註', value: 1 },
   ]);
 });
 
 test('buildReportActionItems returns a clear state when there is nothing to fix', () => {
   assert.deepEqual(buildReportActionItems({
     overdueTodoCount: 0,
-    unlinkedTaskSeconds: 0,
     unclassifiedSeconds: 0,
-    missingNotesCount: 0,
   }), [
     { kind: 'clear', tone: 'success', label: '目前沒有待處理項目', value: 0 },
   ]);

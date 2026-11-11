@@ -24,6 +24,10 @@ test('external calendar CRUD returns snapshots and rejects invalid inputs and or
   assert.equal((await call('getAll')).data.calendarPlans[0].title, 'Plan');
   assert.equal((await call('upsertCalendarPlan', { title: '' })).ok, false);
   assert.deepEqual(await call('getAll', null, 'https://example.com'), { ok: false, error: 'origin_not_allowed' });
+  for (const origin of ['http://localhost:3001', 'http://localhost', 'http://127.0.0.1:8080', 'https://localhost:3000', 'http://localhost:30000']) {
+    assert.deepEqual(await call('getAll', null, origin), { ok: false, error: 'origin_not_allowed' }, origin);
+  }
+  assert.equal((await call('getAll', null, 'http://127.0.0.1:3000')).ok, true);
   await call('deleteCalendarPlan', { id: created.data.id });
   assert.deepEqual((await call('getAll')).data.calendarPlans, []);
 });

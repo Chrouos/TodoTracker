@@ -3,6 +3,7 @@ import { createCalendarController } from './calendar.js';
 import {
   applyTranslations,
   formatDisplayDate,
+  formatCompactDuration,
   formatDisplayTime,
   formatDuration,
   getBrowserLocale,
@@ -15,7 +16,7 @@ import {
   dailyReviewData, runningSecondsSince, toLocalInput, fromLocalInput,
   clipEntryToRange, durationInRange, entryOverlapsRange, splitEntryByDay,
 } from '../lib/time.js';
-import { stackedAreaSVG, lineSVG, donutSVG } from '../lib/charts.js';
+import { stackedBarSVG, lineSVG } from '../lib/charts.js';
 import { initCollapse } from '../lib/collapse.js';
 import { childrenOf, flattenTree, rollup, pathOf, indentLabel } from '../lib/tree.js';
 import { buildSummary, copyToClipboard } from '../lib/summary.js';
@@ -29,8 +30,8 @@ import {
 import { projectIdForTask, tasksForProject, sortTasksForManualEntry } from '../lib/entry-relations.js';
 import { trackerLevel } from '../lib/todo-tracker.js';
 import { backupReminder, backupSnoozeUntil } from '../lib/backup.js';
-import { comparisonBounds, deltaPercent, reportRangeBounds, shiftRangeAnchor, trendDateBounds } from '../lib/report-range.js';
-import { buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
+import { comparisonBounds, deltaPercent, reportRangeBounds, reviewDatesInRange, shiftRangeAnchor, trendDateBounds } from '../lib/report-range.js';
+import { buildProjectShare, buildProjectTrendData, buildProjectDetailData } from '../lib/project-trend.js';
 import { buildTodoTrackerData, syncTodoTrackerCollapseState } from '../lib/todo-tracker.js';
 import {
   clearReportFocus,
@@ -47,6 +48,7 @@ import {
 } from '../lib/report-metrics.js';
 import {
   mountMarkdownEditor,
+  isPreviewShortcut,
   normalizeMarkdownEditorMode,
   serializeTaskCheckboxToggle,
 } from '../lib/markdown-editor.js';
@@ -59,6 +61,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const translateText = (key, variables) => translate(currentLocale, key, variables);
 const fmtHM = (seconds) => formatDuration(seconds, currentLocale);
+const fmtShort = formatCompactDuration;
+// 報表的日期統一用 2026/11/05，座標軸與表頭省略年份
+const slashDate = (date) => String(date).replaceAll('-', '/');
+const shortDate = (date) => slashDate(String(date).slice(5));
 const displayDate = (value) => formatDisplayDate(value, currentLocale);
 const displayClock = (value) => formatDisplayTime(value, currentLocale);
 
@@ -81,6 +87,7 @@ function initializeMarkdownEditors(mode = db.DEFAULT_SETTINGS.notesEditor) {
       mode: editorMode,
       min: textarea.id === 'mgTimerNotes' ? 300 : 160,
       preview: textarea.id !== 'mgTimerNotes',
+      onPreviewRequest: textarea.id === 'mgTimerNotes' ? () => setTimerNotesPreviewOpen(true) : undefined,
       translate: (key) => translateText(`editor.${key}`),
       onEmptyParagraphEnter: textarea.id === 'enNotes'
         ? () => $('entryForm').requestSubmit($('entrySave'))
@@ -237,7 +244,7 @@ function renderRangeStep() {
   if ($('rangeStep').hidden) return;
   const from = fmtDate(rangeStart());
   const to = fmtDate(new Date(rangeEnd().getTime() - 1));
-  $('rangeStepLabel').textContent = from === to ? from : `${from} ～ ${to}`;
+  $('rangeStepLabel').textContent = from === to ? slashDate(from) : `${slashDate(from)} ～ ${slashDate(to)}`;
   $('rangeNext').disabled = rangeOffset >= 0;
 }
 
@@ -389,20 +396,32 @@ function syncTimerNotesMode() {
 }
 
 function setTimerNotesPreviewOpen(open) {
+  const hadFocus = isMarkdownEditorFocused($('mgTimerNotes'));
   timerNotesPreviewOpen = open;
   const editor = $('mgTimerNotes').closest('.markdown-editor');
   if (editor) editor.hidden = open;
   $('mgTimerNotes').hidden = open;
   $('mgTimerNotesPreview').hidden = !open;
   syncTimerNotesMode();
-  if (open) renderTimerNotesPreview();
-  else markdownEditors.get($('mgTimerNotes'))?.sync();
+  if (open) {
+    renderTimerNotesPreview();
+    if (hadFocus) $('mgTimerNotesPreview').focus({ preventScroll: true });
+  } else markdownEditors.get($('mgTimerNotes'))?.sync();
+}
+
+function editTimerNotes() {
+  setTimerNotesPreviewOpen(false);
+  markdownEditors.get($('mgTimerNotes'))?.focus();
 }
 
 $('mgTimerNotesPreview').addEventListener('click', (event) => {
   if (event.target.closest('a, input')) return;
-  setTimerNotesPreviewOpen(false);
-  markdownEditors.get($('mgTimerNotes'))?.focus();
+  editTimerNotes();
+});
+$('mgTimerNotesPreview').addEventListener('keydown', (event) => {
+  if (!isPreviewShortcut(event)) return;
+  event.preventDefault();
+  editTimerNotes();
 });
 
 function renderTimer() {
@@ -459,7 +478,11 @@ function renderTimer() {
   } else {
     startTimerTicker(timer);
   }
-  if (timerNotesPreviewOpen) renderTimerNotesPreview();
+  // 停止計時後筆記清空時回到編輯，不留下空白預覽
+  if (timerNotesPreviewOpen) {
+    if ($('mgTimerNotes').value.trim()) renderTimerNotesPreview();
+    else setTimerNotesPreviewOpen(false);
+  }
 }
 
 async function patchManagementTimer(patch) {
@@ -514,18 +537,22 @@ $('mgTimerTags').addEventListener('click', async (event) => {
   renderTimer();
 });
 $('mgTimerNotes').addEventListener('input', () => {
-  timerNotesDirty = true;
+  // 草稿已存在 timerDraft，不算待寫入；標記會讓畫面認不到新開始的計時，之後的筆記就存不進去
   if (!S.timer) {
     timerDraft.notes = $('mgTimerNotes').value;
     return;
   }
+  timerNotesDirty = true;
   $('mgTimerSaved').textContent = translateText('timer.saving');
   clearTimeout(timerNotesSaveTimer);
   const entryId = renderedTimerEntryId;
   timerNotesSaveTimer = setTimeout(() => flushManagementTimerNotes(entryId), 500);
 });
-$('mgTimerNotesEditToggle').addEventListener('click', () => setTimerNotesPreviewOpen(false));
-$('mgTimerNotesPreviewToggle').addEventListener('click', () => setTimerNotesPreviewOpen(true));
+$('mgTimerNotesEditToggle').addEventListener('click', editTimerNotes);
+$('mgTimerNotesPreviewToggle').addEventListener('click', () => {
+  setTimerNotesPreviewOpen(true);
+  $('mgTimerNotesPreview').focus({ preventScroll: true });
+});
 $('mgTimerComplete').addEventListener('change', (event) => {
   timerCompleteChoice = event.target.checked;
 });
@@ -550,14 +577,20 @@ $('mgTimerToggle').addEventListener('click', async () => {
     timerCompleteChoice = false;
     timerDraft = { description: '', projectId: '', taskId: '', tagIds: [], notes: '' };
   } else {
+    const notes = $('mgTimerNotes').value;
     const started = await db.startTimer({
       description: $('mgTimerDescription').value,
       projectId: $('mgTimerProject').value || null,
       taskId: $('mgTimerTask').value || null,
       tagIds: [...(timerDraft.tagIds || [])],
-      notes: $('mgTimerNotes').value,
+      notes,
     });
     timerDraft = { ...timerDraft, ...started };
+    // 等待開始的期間又打了字：留在欄位裡，之後寫進這筆計時
+    if ($('mgTimerNotes').value !== notes) {
+      renderedTimerEntryId = started.entryId;
+      timerNotesDirty = true;
+    }
   }
   await reloadTimerViewPreservingScroll();
 });
@@ -597,20 +630,22 @@ function wrapReportChartContent() {
   const wrap = document.querySelector('#byProject .project-trend-wrap');
   if (!wrap || wrap.querySelector('.report-chart-collapse')) return;
 
-  const trend = createReportChartSection('trend', translateText('report.projectAll'));
+  const trend = document.createElement('div');
+  trend.className = 'report-trend-body';
   [
     wrap.querySelector('.project-trend-toolbar'),
     wrap.querySelector('#projectTrend'),
     wrap.querySelector('#projectTrendTooltip'),
     wrap.querySelector('.trend-legend'),
+    wrap.querySelector('#projectShare'),
     wrap.querySelector('#projectTrendDetail'),
-  ].filter(Boolean).forEach((node) => trend.body.append(node));
+  ].filter(Boolean).forEach((node) => trend.append(node));
 
   const tracker = createReportChartSection('tracker', translateText('report.todoTracker'));
   [wrap.querySelector('#todoTracker'), wrap.querySelector('#todoTrackerDetail')]
     .filter(Boolean).forEach((node) => tracker.body.append(node));
 
-  wrap.replaceChildren(trend.details, tracker.details);
+  wrap.replaceChildren(trend, tracker.details);
   bindReportChartCollapses();
 }
 
@@ -644,7 +679,7 @@ function reportKpis(from, to) {
 }
 
 // 數字和單位分開，單位才能縮小變淡
-const kpiDurationHtml = (seconds) => esc(fmtHM(seconds)).replace(/\D+/g, (unit) => `<span class="kpi-unit">${unit}</span>`);
+const kpiDurationHtml = (seconds) => esc(fmtShort(seconds)).replace(/\D+/g, (unit) => `<span class="kpi-unit">${unit}</span>`);
 
 function renderKpiDeltas(from, to) {
   const bounds = comparisonBounds(range, { from, to }, new Date());
@@ -652,10 +687,9 @@ function renderKpiDeltas(from, to) {
   const previous = bounds && reportKpis(bounds.previous.from, bounds.previous.to);
   [['kTimeDelta', 'seconds'], ['kCountDelta', 'count'], ['kAvgDelta', 'average'], ['kDaysDelta', 'days']].forEach(([id, key]) => {
     const delta = bounds ? deltaPercent(current[key], previous[key]) : null;
-    // 工時多寡沒有好壞之分，所以只用箭頭、不用紅綠色
     if (delta === null) $(id).textContent = '';
     else if (delta === 0) $(id).textContent = translateText('report.noChange');
-    else $(id).textContent = `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)}% ${translateText('report.vsPrevious')}`;
+    else $(id).innerHTML = `<span class="kpi-delta-${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)}%</span> ${esc(translateText('report.vsPrevious'))}`;
   });
 }
 
@@ -710,12 +744,14 @@ function renderReport() {
 
   // 太多天會擠爆，最多顯示最近 14 天
   const tlDates = series.map((d) => d.date).slice(customBounds ? 0 : -14);
-  const reviewDates = range === 'week' && !customBounds
+  const reviewDates = reviewDatesInRange(range === 'week' && !customBounds
     ? dailySeries([], lineFrom, lineTo, () => 0).map((d) => d.date)
-    : tlDates;
-  $('reviewLabel').textContent = reviewDates.length
-    ? `· ${reviewDates[0]} ～ ${reviewDates[reviewDates.length - 1]}`
-    : '';
+    : tlDates, from, to);
+  $('reviewLabel').textContent = !reviewDates.length
+    ? ''
+    : reviewDates.length === 1
+      ? `· ${slashDate(reviewDates[0])}`
+      : `· ${slashDate(reviewDates[0])} ～ ${slashDate(reviewDates[reviewDates.length - 1])}`;
   $('dailyReview').innerHTML = renderReviewList(dailyReviewData(rows, reviewDates));
   initializeMarkdownPreviews($('dailyReview'));
 }
@@ -744,14 +780,14 @@ function renderReviewList(groups) {
             <div class="daily-review-title">${esc(title)} <span class="cap">${esc(projectName)}</span></div>
             ${entry.notes ? `<div class="daily-review-notes">${renderMarkdownPreview(entry.notes)}</div>` : ''}
           </div>
-          <div class="daily-review-duration num">${fmtHM(db.durationSec(entry))}</div>
+          <div class="daily-review-duration num">${fmtShort(db.durationSec(entry))}</div>
         </div>`;
       }).join('')
       : `<div class="daily-review-empty">${translateText('report.noWorkThatDay')}</div>`;
     return `<section class="daily-review-day">
       <div class="daily-review-day-head">
         <strong>${esc(displayDate(group.date))}</strong>
-        <span class="cap">${fmtHM(total)} · ${translateText('report.entryCount', { count: group.entries.length })}</span>
+        <span class="cap">${fmtShort(total)} · ${translateText('report.entryCount', { count: group.entries.length })}</span>
       </div>
       <div class="daily-review-list">${entries}</div>
     </section>`;
@@ -778,7 +814,7 @@ function renderDueAlerts() {
     const project = task.projectId && S.projects.find((item) => item.id === task.projectId);
     const projectLabel = project ? pathOf(S.projects, project.id).join(' / ') : '';
     const title = task.title?.trim() || translateText('report.dueAlertsNoTitle');
-    const due = `${task.dueDate}${task.dueTime ? ` ${task.dueTime}` : ''}`;
+    const due = `${slashDate(task.dueDate)}${task.dueTime ? ` ${task.dueTime}` : ''}`;
     return `<button type="button" class="report-due-alert report-due-alert-${task.alertKind}" data-report-task-id="${esc(task.id)}">
       <span class="report-due-alert-main"><strong>${esc(title)}</strong>${projectLabel ? `<span class="sub">${esc(projectLabel)}</span>` : ''}</span>
       <span class="report-due-alert-meta"><span class="badge report-due-alert-badge">${esc(dueLabel(task, false, currentLocale))}</span><span class="report-due-alert-date">${esc(due)}</span></span>
@@ -820,14 +856,9 @@ function sameTrendProject(left, right) {
 function trendOverview() {
   if (!projectTrendState) return '';
   const total = projectTrendState.dailyTotals.reduce((sum, value) => sum + value, 0);
-  const rows = projectTrendState.series
-    .filter((series) => series.total > 0)
-    .map((series) => {
-      const pct = total ? Math.round((series.total / total) * 100) : 0;
-      return `${esc(series.name)} ${fmtHM(series.total)} (${pct}%)`;
-    }).join(' · ');
+  const activeDays = projectTrendState.dailyTotals.filter((value) => value > 0).length;
   return total
-    ? `<strong>${esc(translateText('report.rangeTotal', { duration: fmtHM(total) }))}</strong><br><span>${rows}</span>`
+    ? `<strong>${esc(translateText('report.rangeTotal', { days: projectTrendState.dates.length, duration: fmtShort(total) }))}</strong><br><span>${esc(translateText('report.activeDayAverage', { duration: fmtShort(total / activeDays) }))}</span>`
     : translateText('report.noProjectTime');
 }
 
@@ -843,13 +874,13 @@ function trendSummary(date, projectId = null) {
   const rows = details.length
     ? details.map((item) => {
         const pct = total ? Math.round((item.seconds / total) * 100) : 0;
-        return `${esc(item.name)} ${fmtHM(item.seconds)} (${pct}%)`;
+        return `${esc(item.name)} ${fmtShort(item.seconds)} (${pct}%)`;
       }).join(' · ')
     : translateText('report.noProjectTime');
   const selectedText = selected
-    ? `<strong>${esc(selected.name)} ${fmtHM(selected.seconds)} (${total ? Math.round((selected.seconds / total) * 100) : 0}%)</strong><br>`
+    ? `<strong>${esc(selected.name)} ${fmtShort(selected.seconds)} (${total ? Math.round((selected.seconds / total) * 100) : 0}%)</strong><br>`
     : '';
-  return `${selectedText}<strong>${esc(date)}</strong> · ${esc(translateText('report.dailyTotal', { duration: fmtHM(total) }))}<br><span>${rows}</span>`;
+  return `${selectedText}<strong>${esc(slashDate(date))}</strong> · ${esc(translateText('report.dailyTotal', { duration: fmtShort(total) }))}<br><span>${rows}</span>`;
 }
 
 function setTrendHover(date, projectId = null) {
@@ -908,7 +939,7 @@ function renderTrendDetails(projectId) {
     return `<div class="trend-detail-project-row" role="listitem">
       <div class="trend-detail-project-name"><span class="trend-detail-project-color" style="--project-color:${esc(series.color)}"></span><div><strong>${esc(series.name)}</strong><div class="sub">${esc(seriesPath)}</div></div></div>
       <div class="trend-detail-project-track"><span class="trend-detail-project-bar" style="--bar-width:${width}%;--project-color:${esc(series.color)}"></span></div>
-      <span class="num trend-detail-project-time">${fmtHM(series.seconds)}</span>
+      <span class="num trend-detail-project-time">${fmtShort(series.seconds)}</span>
     </div>`;
   }).join('');
 
@@ -918,7 +949,7 @@ function renderTrendDetails(projectId) {
     <button type="button" class="btn-sm" data-trend-detail-close>${translateText('common.collapse')}</button>
   </div>
   <div class="trend-detail-kpis">
-    <span class="badge">${fmtHM(detail.totalSeconds)} ${translateText('report.totalWork')}</span>
+    <span class="badge">${fmtShort(detail.totalSeconds)} ${translateText('report.totalWork')}</span>
     <span class="badge">${detail.tasksDone}/${detail.tasksTotal} ${translateText('report.todoCompleted')}</span>
   </div>
   <div class="trend-detail-project-chart" role="list" aria-label="${esc(translateText('project.includesChildren'))}">${projectMarkup || `<div class="empty">${translateText('report.noEntriesInRange')}</div>`}</div>`;
@@ -939,9 +970,7 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
   const todoProgress = buildWorkspaceTodoProgress(metrics);
   const actionLabels = {
     overdue: 'report.action.overdue',
-    unlinked: 'report.action.unlinked',
     unclassified: 'report.action.unclassified',
-    'missing-notes': 'report.action.missingNotes',
     clear: 'report.action.clear',
   };
   const statusLabels = {
@@ -957,14 +986,11 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
   };
   const actionValue = (item) => {
     if (item.kind === 'overdue') return translateText('report.actionCount.todos', { count: item.value });
-    if (item.kind === 'missing-notes') return translateText('report.actionCount.entries', { count: item.value });
     if (item.kind === 'clear') return '✓';
-    return fmtHM(item.value);
+    return fmtShort(item.value);
   };
   const issueEntryIds = {
-    unlinked: quality.unlinkedTaskEntryIds,
     unclassified: quality.unclassifiedEntryIds,
-    'missing-notes': quality.missingNotesEntryIds,
   };
   const actionDetails = (item) => {
     const target = reportActionTarget(item.kind);
@@ -974,10 +1000,10 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
     if (!ids?.length) return '';
     const details = target.type === 'entry'
       ? rows.filter((entry) => ids.includes(entry.id)).slice(0, 2).map((entry) =>
-        `<button type="button" class="report-action-detail" data-report-entry-id="${esc(entry.id)}">${esc(entry.description || translateText('common.unnamedWork'))} · ${esc(fmtDate(entry.startedAt))} · ${esc(fmtHM(durationInRange(entry, from, to)))}</button>`
+        `<button type="button" class="report-action-detail" data-report-entry-id="${esc(entry.id)}">${esc(entry.description || translateText('common.unnamedWork'))} · ${esc(slashDate(fmtDate(entry.startedAt)))} · ${esc(fmtShort(durationInRange(entry, from, to)))}</button>`
       ).join('')
       : ids.map((id) => S.tasks.find((task) => task.id === id)).filter(Boolean).slice(0, 2).map((task) =>
-        `<button type="button" class="report-action-detail" data-report-task-id="${esc(task.id)}">${esc(task.title)} · ${translateText('todo.dueDate')} ${esc(task.dueDate || translateText('common.notSet'))}</button>`
+        `<button type="button" class="report-action-detail" data-report-task-id="${esc(task.id)}">${esc(task.title)} · ${translateText('todo.dueDate')} ${esc(task.dueDate ? slashDate(task.dueDate) : translateText('common.notSet'))}</button>`
       ).join('');
   const matchingCount = target.type === 'entry'
       ? rows.filter((entry) => ids.includes(entry.id)).length
@@ -1005,17 +1031,17 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
     ? translateText('report.noIssues')
     : translateText('report.topPriority', { label: translateText(actionLabels[statusItem.kind]) });
   const todoSegments = [
-    { label: translate(currentLocale, 'report.completed'), value: todoProgress.done, color: '#22c55e' },
-    { label: translateText('report.inProgress'), value: todoStatusCounts.doing, color: '#60a5fa' },
-    { label: translateText('todo.status.todo'), value: todoStatusCounts.todo, color: '#d6d3d1' },
+    { label: translate(currentLocale, 'report.completed'), value: todoProgress.done, kind: 'done' },
+    { label: translateText('report.inProgress'), value: todoStatusCounts.doing, kind: 'doing' },
+    { label: translateText('todo.status.todo'), value: todoStatusCounts.todo, kind: 'todo' },
   ];
   const completionRate = todoProgress.total
     ? `${Math.round((todoProgress.done / todoProgress.total) * 100)}%`
     : '—';
-  const todoDonut = donutSVG(todoSegments, currentLocale, {
-    centerValue: completionRate,
-    centerLabel: translateText('report.completionRate'),
-  });
+  const progressLabel = todoSegments.map((segment) => `${segment.label} ${segment.value}`).join(' · ');
+  const todoProgressBar = `<div class="report-status-bar" role="img" aria-label="${esc(progressLabel)}" title="${esc(progressLabel)}">${todoSegments
+    .filter((segment) => segment.value > 0)
+    .map((segment) => `<span class="report-status-bar-${segment.kind}" style="flex-grow:${segment.value}"></span>`).join('')}</div>`;
   const statusMetrics = [
     { label: translate(currentLocale, 'report.completed'), value: `${todoProgress.done} / ${todoProgress.total}`, tone: 'success' },
     { label: translateText('report.inProgress'), value: todoStatusCounts.doing, tone: 'info' },
@@ -1050,16 +1076,18 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
         </div>
         <span class="report-project-status report-project-status-${row.tone}">${esc(translateText(statusLabels[row.status] || 'report.projectStatus.inProgress'))}</span>
         <div class="report-project-progress" tabindex="0" role="img" aria-label="${esc(progressTooltip)}" data-report-project-tooltip="${esc(progressTooltip)}">
-          <span class="report-project-track"><span style="--bar-width:${percentage}%"></span></span>
+          ${row.total <= 10
+            ? `<span class="report-project-pips">${Array.from({ length: row.total }, (_, index) => `<i${index < row.done ? ' class="is-done"' : ''}></i>`).join('')}</span>`
+            : `<span class="report-project-track"><span style="--bar-width:${percentage}%"></span></span>`}
           <span class="report-project-count num">${row.done} / ${row.total}</span>
         </div>
-        <span class="report-project-work num">${fmtHM(row.workedSeconds)}</span>
+        <span class="report-project-work num${row.workedSeconds ? '' : ' is-empty'}">${row.workedSeconds ? fmtShort(row.workedSeconds) : '—'}</span>
       </div>`;
     }).join('')
     : `<div class="report-empty">${translateText('report.noTodoPerformance')}</div>`;
   mount.innerHTML = `<div class="report-status">
     <div class="report-status-overview">
-      <div class="report-status-donut">${todoDonut}</div>
+      <div class="report-status-rate"><strong class="num">${completionRate}</strong><span class="cap">${translateText('report.completionRate')}</span></div>
       <div class="report-status-copy">
         <span class="cap">${translateText('report.workspaceStatus')}</span>
         <strong class="report-status-label report-status-${statusItem.tone}">${statusLabel}</strong>
@@ -1069,6 +1097,7 @@ function renderReportInsights(rows, from = rangeStart(), to = rangeEnd()) {
       <span class="report-status-detail">${statusDetail}</span>
       <div class="report-status-metrics" aria-label="${esc(translateText('report.todoHealth'))}">${statusMetrics}</div>
     </div>
+    ${todoProgressBar}
   </div>
   ${attentionMarkup}
   <section class="report-projects" aria-label="${esc(translateText('report.projectStatus'))}">
@@ -1087,8 +1116,8 @@ function todoTrackerDateTime(value) {
 }
 
 function todoTrackerDateRange(item) {
-  const start = fmtDate(item.openedAt).slice(5);
-  const end = fmtDate(item.endedAt || new Date()).slice(5);
+  const start = shortDate(fmtDate(item.openedAt));
+  const end = shortDate(fmtDate(item.endedAt || new Date()));
   return `${start} ～ ${end}`;
 }
 
@@ -1109,7 +1138,7 @@ function renderTodoTrackerDetail() {
     ? item.entries.map((entry) => `<div class="todo-tracker-entry">
         <span class="num mute">${fmtDate(entry.startedAt)}<br>${fmtClock(entry.startedAt)}–${fmtClock(entry.endedAt)}</span>
         <div class="grow"><strong>${esc(entry.description || translateText('entry.entry'))}</strong><div class="sub">${fmtDate(entry.startedAt)} → ${fmtDate(entry.endedAt)}</div>${entry.notes ? renderMarkdownPreview(entry.notes) : ''}</div>
-        <span class="num">${fmtHM(entry.seconds)}</span>
+        <span class="num">${fmtShort(entry.seconds)}</span>
       </div>`).join('')
     : `<div class="empty">${translateText('report.noActualEntries')}</div>`;
 
@@ -1124,7 +1153,7 @@ function renderTodoTrackerDetail() {
     <span class="badge">${translateText('report.closed')} ${esc(todoTrackerDateTime(item.endedAt))}</span>
     <span class="badge">${translateText('report.crossDays', { count: item.lifecycleDays })}</span>
     <span class="badge">${translateText('report.workedDays', { count: item.workedDays })}</span>
-    <span class="badge">${fmtHM(item.trackedSeconds)} ${translateText('report.totalWork')}</span>
+    <span class="badge">${fmtShort(item.trackedSeconds)} ${translateText('report.totalWork')}</span>
   </div>
   ${task?.notes ? `<div class="todo-tracker-detail-notes">${renderMarkdownPreview(task.notes)}</div>` : ''}
   <div class="todo-tracker-detail-section"><strong>${translateText('report.actualWork')} (${translateText('report.entryCount', { count: item.entries.length })})</strong></div>
@@ -1265,7 +1294,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     return;
   }
 
-  const dateHeaders = visibleDates.map((date) => `<span>${esc(date.slice(5))}</span>`).join('');
+  const dateHeaders = visibleDates.map((date) => `<span>${esc(shortDate(date))}</span>`).join('');
   const filterControl = `<label class="todo-tracker-filter"><span>${translateText('report.show')}</span><select data-todo-tracker-filter aria-label="${esc(translateText('report.filter'))}"><option value="active"${todoTrackerFilter === 'active' ? ' selected' : ''}>${translateText('todo.status.active')}</option><option value="all"${todoTrackerFilter === 'all' ? ' selected' : ''}>${translateText('common.all')}</option><option value="done"${todoTrackerFilter === 'done' ? ' selected' : ''}>${translateText('todo.status.done')}</option></select></label>`;
   const rows = visibleItems.map((item) => {
     const project = item.projectId && S.projects.find((candidate) => candidate.id === item.projectId);
@@ -1278,7 +1307,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       dayEnd.setDate(dayEnd.getDate() + 1);
       return lifecycleStart < dayEnd && lifecycleEnd > dayStart ? { date, day } : null;
     }).filter(Boolean);
-    const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day};--todo-color:${color}" title="${translateText('report.opened')} ${todoTrackerDateTime(item.openedAt)} · ${translateText('report.closed')} ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
+    const lifecycleCells = lifecycleDates.map(({ date, day }) => `<span class="todo-tracker-lifecycle" style="--todo-day:${day}" title="${translateText('report.opened')} ${todoTrackerDateTime(item.openedAt)} · ${translateText('report.closed')} ${todoTrackerDateTime(item.endedAt)}"></span>`).join('');
     const dateRange = todoTrackerDateRange(item);
     const title = `${item.title} · ${todoStatusLabel(item.status)} · ${dateRange} · ${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })}`;
     const collapsed = todoTrackerCollapsedIds.has(item.id);
@@ -1287,11 +1316,11 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
       .filter(({ day }) => day >= 0);
     const workSegments = workDates.map(({ date, day }) => {
       const seconds = item.dailySeconds[date] || 0;
-      const duration = seconds ? fmtHM(seconds) : '';
+      const duration = seconds ? fmtShort(seconds) : '';
       const dateTitle = `${item.title} · ${date} · ${duration || translateText('report.hasWorkEntries')}`;
       return `<button type="button" class="todo-tracker-work${item.id === todoTrackerSelectedId ? ' is-selected' : ''}"
         data-todo-tracker-id="${esc(item.id)}" data-todo-tracker-title="${esc(item.title)}" data-todo-tracker-date="${esc(date)}" data-todo-tracker-duration="${esc(duration)}" data-level="${trackerLevel(seconds)}" aria-label="${esc(dateTitle)}"
-        style="--todo-day:${day};--todo-color:${color}">
+        style="--todo-day:${day}">
       </button>`;
     }).join('');
     return `<div class="todo-tracker-row">
@@ -1299,12 +1328,13 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
         <details class="todo-tracker-label-details" data-todo-tracker-collapse="${esc(item.id)}"${collapsed ? '' : ' open'}>
           <summary><strong>${esc(item.title)}</strong></summary>
           <span class="todo-tracker-label-meta"><i style="background:${color}"></i>${esc(todoStatusLabel(item.status))} · ${esc(dateRange)}</span>
-          <span class="todo-tracker-label-days">${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })} · ${fmtHM(item.trackedSeconds)}</span>
+          <span class="todo-tracker-label-days">${translateText('report.workedDays', { count: item.workedDays })} / ${translateText('report.totalDays', { count: item.lifecycleDays })} · ${fmtShort(item.trackedSeconds)}</span>
         </details>
       </div>
       <div class="todo-tracker-track" style="--todo-tracker-lanes:${item.laneCount}">
         ${lifecycleCells}
         ${workSegments}
+        ${workDates.length ? '' : `<span class="todo-tracker-no-work">${translateText('report.noWorkInView')}</span>`}
       </div>
     </div>`;
   }).join('');
@@ -1314,7 +1344,7 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
     <div class="todo-tracker-toolbar"><span class="todo-tracker-summary">${translateText('report.todayCompleted', { count: data.completedTodayCount })}</span><span class="todo-tracker-range" data-todo-tracker-range>${esc(todoTrackerRangeLabel(visibleDates[0], visibleDates[visibleDates.length - 1]))}</span>${filterControl}<span class="todo-tracker-nav"><button type="button" class="btn-sm" data-todo-tracker-shift="-1" title="${translateText('report.previousDay')}" aria-label="${translateText('report.previousDay')}">←1d</button><button type="button" class="btn-sm" data-todo-tracker-shift="-7" title="${translateText('report.previousWeek')}" aria-label="${translateText('report.previousWeek')}">←1w</button><button type="button" class="btn-sm" data-todo-tracker-today>${translateText('report.today')}</button><button type="button" class="btn-sm" data-todo-tracker-shift="7" title="${translateText('report.nextWeek')}" aria-label="${translateText('report.nextWeek')}">1w→</button><button type="button" class="btn-sm" data-todo-tracker-shift="1" title="${translateText('report.nextDay')}" aria-label="${translateText('report.nextDay')}">1d→</button></span></div>
     <div class="todo-tracker-axis"><span></span><div>${dateHeaders}</div></div>
     <div class="todo-tracker-rows">${rowMarkup}</div>
-    <div class="todo-tracker-legend"><span>${translateText('report.trackerLegend')}</span><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>1h · 2h · 4h</span></div>
+    <div class="todo-tracker-legend"><span>${translateText('report.trackerLegend')}</span><span>&lt;1h</span><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>4h+</span></div>
   </div><div id="todoTrackerHoverTooltip" class="todo-tracker-tooltip" role="tooltip" hidden></div>
   `;
   mount.querySelectorAll('[data-todo-tracker-collapse]').forEach((details) => {
@@ -1328,30 +1358,89 @@ function renderTodoTracker(entries, dates, { restartTimer = true } = {}) {
   if (restartTimer) startTodoTrackerRefresh();
 }
 
+const isFocusableTrendProject = (series) => series.id && series.id !== 'other' && !String(series.id).startsWith('direct:');
+
+// 依實際寬度繪製，座標文字才不會隨視窗等比縮小
+let trendChartWidth = 0;
+function paintTrendChart() {
+  const mount = $('projectTrend');
+  if (!mount || !projectTrendState) return;
+  trendChartWidth = mount.clientWidth;
+  mount.innerHTML = stackedBarSVG(projectTrendState, currentLocale, {
+    width: trendChartWidth || 760,
+    goalHours: S.settings.dailyGoalHours,
+  });
+  applyTrendHighlight();
+}
+new ResizeObserver(() => {
+  const width = $('projectTrend')?.clientWidth;
+  if (width && width !== trendChartWidth) paintTrendChart();
+}).observe($('byProject'));
+
+function renderProjectShare(labels) {
+  const from = rangeStart();
+  const to = rangeEnd();
+  const now = new Date();
+  // 和 KPI 總時數同一個算法，計時中的時間也算進去
+  const items = inRange().map((entry) => ({ projectId: entry.projectId, seconds: durationInRange(entry, from, to) }));
+  const running = runningSecondsSince(S.timer, from, to && to < now ? to : now);
+  if (running) items.push({ projectId: S.timer.projectId, seconds: running });
+  const share = buildProjectShare({ items, projects: S.projects, labels });
+  if (!share.total) return '';
+  const maxSeconds = Math.max(...share.rows.map((row) => row.seconds));
+  const lastDay = to ? fmtDate(new Date(to.getTime() - 1)) : null;
+  const firstDay = fmtDate(from);
+  const rangeLabel = !lastDay
+    ? translateText('common.all')
+    : firstDay === lastDay ? slashDate(firstDay) : todoTrackerRangeLabel(firstDay, lastDay);
+  const rows = share.rows.map((row) => {
+    const content = `<span class="report-share-name"><span class="swatch" style="background:${esc(row.color)}"></span><span>${esc(row.name)}</span></span>
+      <span class="report-share-track"><span style="--bar-width:${Math.max(1, Math.round((row.seconds / maxSeconds) * 100))}%;--project-color:${esc(row.color)}"></span></span>
+      <span class="num report-share-value">${fmtShort(row.seconds)}</span>
+      <span class="num report-share-pct">${Math.round(row.share * 100)}%</span>`;
+    return isFocusableTrendProject(row)
+      ? `<button class="report-share-row" type="button" data-trend-project="${esc(row.id)}" aria-pressed="false">${content}</button>`
+      : `<div class="report-share-row is-static" data-project-id="${esc(row.id)}">${content}</div>`;
+  }).join('');
+  return `<section class="report-share" aria-label="${esc(translateText('report.projectShare'))}">
+    <div class="project-trend-toolbar"><strong class="report-chart-heading">${esc(translateText('report.projectShare'))}</strong><span class="cap">${esc(rangeLabel)}</span></div>
+    ${rows}
+  </section>`;
+}
+
 function renderProjectTrend(entries, dates, trackerEntries = entries) {
   const report = $('byProject');
   const todoTrackerMount = report.querySelector('#todoTracker');
   const todoTrackerDetail = report.querySelector('#todoTrackerDetail');
+  const neutralLabels = { unclassified: translateText('todo.unclassified'), other: translateText('report.otherProjects') };
   const data = buildProjectTrendData({
     entries,
     projects: S.projects,
     dates,
     durationSec: db.durationSec,
+    labels: neutralLabels,
   });
   projectTrendState = data;
   projectTrendSource = { entries, dates };
 
+  // 圖上的每個顏色都要對得到圖例；未分類與其他沒有專案明細，只顯示不能點
   const projectLinks = data.series
-    .filter((series) => series.id && series.id !== 'other' && !String(series.id).startsWith('direct:'))
-    .map((series) => `<button class="trend-project-link" type="button" data-trend-project="${esc(series.id)}" aria-pressed="false">
-      <span class="swatch" style="background:${esc(series.color)}"></span>${esc(series.name)}</button>`)
+    .map((series) => (isFocusableTrendProject(series)
+      ? `<button class="trend-project-link" type="button" data-trend-project="${esc(series.id)}" aria-pressed="false">
+      <span class="swatch" style="background:${esc(series.color)}"></span>${esc(series.name)}</button>`
+      : `<span class="trend-project-link is-static" data-project-id="${esc(series.id)}">
+      <span class="swatch" style="background:${esc(series.color)}"></span>${esc(series.name)}</span>`))
     .join('');
+  const chartLabel = range === 'today' || range === 'all'
+    ? `${translateText('report.dailyHours')} · ${translateText('report.lastDays', { days: dates.length })}`
+    : translateText('report.dailyHours');
 
   $('byProject').innerHTML = `<div class="project-trend-wrap">
-    <div class="project-trend-toolbar"><span class="cap">${dates.length ? `${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}` : ''}</span></div>
-    <div id="projectTrend">${stackedAreaSVG(data, currentLocale)}</div>
+    <div class="project-trend-toolbar"><strong class="report-chart-heading">${esc(chartLabel)}</strong><span class="cap">${dates.length ? esc(todoTrackerRangeLabel(dates[0], dates[dates.length - 1])) : ''}</span></div>
+    <div id="projectTrend"></div>
     <div id="projectTrendTooltip" class="project-trend-tooltip"></div>
     <div class="trend-legend">${projectLinks || `<span class="mute">${translateText('report.noFocusableProject')}</span>`}</div>
+    <div id="projectShare">${renderProjectShare(neutralLabels)}</div>
     <div id="projectTrendDetail" class="project-trend-detail" hidden></div>
   </div>`;
   const trendDetail = report.querySelector('#projectTrendDetail');
@@ -1359,7 +1448,7 @@ function renderProjectTrend(entries, dates, trackerEntries = entries) {
     trendDetail.before(todoTrackerMount, todoTrackerDetail);
   }
   wrapReportChartContent();
-  applyTrendHighlight();
+  paintTrendChart();
   setTrendHover(null);
   renderTrendDetails(highlightProjectId);
   todoTrackerViewStart = null;
@@ -2574,7 +2663,7 @@ async function renderShortcuts() {
   const commands = await chrome.commands?.getAll?.();
   $('stShortcutsRow').hidden = !commands;
   if (!commands) return;
-  const label = { 'toggle-timer': 'settings.shortcutToggle', _execute_action: 'settings.shortcutPopup' };
+  const label = { 'toggle-timer': 'settings.shortcutToggle', _execute_action: 'settings.shortcutPopup', 'open-side-panel': 'settings.shortcutPanel' };
   $('stShortcuts').textContent = commands
     .filter((command) => label[command.name])
     .map((command) => `${translateText(label[command.name])} ${command.shortcut || translateText('settings.shortcutUnset')}`)

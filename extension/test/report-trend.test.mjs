@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import {
   buildProjectTrendData,
   buildProjectDetailData,
+  buildProjectShare,
 } from '../src/lib/project-trend.js';
-import { donutSVG, lineSVG, stackedAreaSVG } from '../src/lib/charts.js';
+import { lineSVG, stackedBarSVG } from '../src/lib/charts.js';
+import { formatCompactDuration } from '../src/lib/i18n.js';
+import { reviewDatesInRange } from '../src/lib/report-range.js';
 
 const projects = [
   { id: 'project-a', parentId: null, name: '專案 A', color: '#61b5dc' },
@@ -53,37 +56,72 @@ assert.deepEqual(detail.projectSeries.map(({ id, seconds }) => ({ id, seconds })
   { id: 'project-a', seconds: 3600 },
 ]);
 
-const stacked = stackedAreaSVG(data);
+const stacked = stackedBarSVG(data, 'zh-TW', { goalHours: 8 });
 const line = lineSVG({ dates: data.dates, values: data.dailyTotals });
-const donut = donutSVG([
-  { label: '已完成', value: 3, color: '#22c55e' },
-  { label: '進行中', value: 2, color: '#60a5fa' },
-  { label: '待辦', value: 1, color: '#d6d3d1' },
-]);
-const interactiveDonut = donutSVG([{ id: 'done', label: 'Done', value: 1, color: '#22c55e' }]);
 assert.match(stacked, /role="img"/);
 assert.match(stacked, /data-trend-date="2026-08-10"/);
 assert.match(stacked, /<title>/);
-const polygons = [...stacked.matchAll(/<polygon[^>]+points="([^"]+)"/g)]
-  .map((match) => match[1].split(' ').map((point) => point.split(',').map(Number)));
-assert.deepEqual(polygons[1].slice(-2), [[742, 226], [48, 71.5]],
-  'stacked area polygons should reverse both x and y coordinates for the lower edge');
+assert.match(stacked, /class="trend-goal-line"/);
+assert.match(stacked, /目標 8h/);
+assert.doesNotMatch(stackedBarSVG(data), /trend-goal-line/, 'no goal line when no goal is set');
+assert.deepEqual(data.series.at(-1).id, null, 'unclassified time should stack on top, not at the base');
+
+const widths = (svg) => [...svg.matchAll(/class="trend-segment"[^>]+width="([\d.]+)"/g)].map((match) => Number(match[1]));
+const oneDay = buildProjectTrendData({
+  entries: entries.slice(0, 1), projects, dates: ['2026-08-10'], durationSec: (entry) => entry.seconds,
+});
+assert.ok(widths(stackedBarSVG(oneDay)).length === 1 && widths(stackedBarSVG(oneDay))[0] > 0,
+  'a single-day range should still draw a visible bar');
+const manyDates = Array.from({ length: 60 }, (_, index) => new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10));
+const many = stackedBarSVG({ ...data, dates: manyDates, dailyTotals: manyDates.map(() => 3600), detailsByDate: [], series: [{ id: 'a', name: 'A', color: '#111111', values: manyDates.map(() => 3600) }] }, 'zh-TW', { width: 500 });
+assert.ok(many.includes('>03/01<'), 'the newest date should always be labelled');
+assert.ok((many.match(/axis-label-sub/g) || []).length < 12, 'date labels should thin out instead of overlapping');
+assert.ok(many.includes('viewBox="0 0 500 260"'), 'the chart should draw at its real width so text keeps its size');
+assert.equal(new Set(stackedBarSVG(oneDay, 'en').match(/>[^<]*(?:Mon|Sun)[^<]*</g) || []).size, 1, 'weekday follows the locale');
+
+const share = buildProjectShare({
+  projects,
+  items: [
+    { projectId: 'project-a-child', seconds: 3600 },
+    { projectId: 'project-a', seconds: 3600 },
+    { projectId: null, seconds: 7200 },
+    { projectId: 'project-b', seconds: 1800 },
+    { projectId: 'deleted-project', seconds: 1800 },
+    { projectId: 'project-b', seconds: 0 },
+  ],
+});
+assert.equal(share.total, 18000, 'share total should match every tracked second');
+assert.deepEqual(share.rows.map(({ id, seconds }) => [id, seconds]), [
+  ['project-a', 7200], ['project-b', 1800], [null, 9000],
+], 'child projects roll up, deleted projects count as unclassified, neutral rows go last');
+assert.equal(share.rows[0].share, 0.4);
+const folded = buildProjectShare({
+  projects: Array.from({ length: 5 }, (_, index) => ({ id: `p${index}`, name: `P${index}`, color: '#111111' })),
+  items: Array.from({ length: 5 }, (_, index) => ({ projectId: `p${index}`, seconds: (index + 1) * 60 })),
+  limit: 3,
+});
+assert.deepEqual(folded.rows.map(({ id, seconds }) => [id, seconds]), [['p4', 300], ['p3', 240], ['other', 360]]);
+
+assert.equal(formatCompactDuration(0), '0m');
+assert.equal(formatCompactDuration(45 * 60), '45m');
+assert.equal(formatCompactDuration(7200), '2h');
+assert.equal(formatCompactDuration(4800), '1h 20m');
+
+const reviewFrom = new Date(2026, 10, 5);
+assert.deepEqual(reviewDatesInRange(['2026-11-04', '2026-11-05', '2026-11-06'], reviewFrom, new Date(2026, 10, 6)), ['2026-11-05'],
+  'a one-day report must not list neighbouring days it has no data for');
+assert.deepEqual(reviewDatesInRange(['2026-11-04', '2026-11-05'], new Date(0), null), ['2026-11-04', '2026-11-05']);
+
 assert.match(line, /class="workspace-process-svg"/);
 assert.match(line, /<polyline[^>]+stroke="var\(--ink\)"/);
 assert.match(line, /data-process-date="2026-08-10"/);
 assert.match(line, /<circle[^>]+data-process-date="2026-08-11"/);
 assert.match(line, /<title>/);
-assert.match(donut, /class="todo-health-donut-svg"/);
-assert.match(donut, /stroke-dasharray=/);
-assert.match(donut, /已完成/);
-assert.match(donut, /role="img"/);
-assert.match(interactiveDonut, /data-todo-health-status="done"/);
-assert.match(interactiveDonut, /tabindex="0"/);
 
 const empty = buildProjectTrendData({
   entries: [], projects, dates: [], durationSec: () => 0,
 });
-assert.match(stackedAreaSVG(empty), /沒有可顯示的資料/);
+assert.match(stackedBarSVG(empty), /沒有可顯示的資料/);
 assert.match(lineSVG({ dates: [], values: [] }), /沒有可顯示的資料/);
 
 const overnight = buildProjectTrendData({

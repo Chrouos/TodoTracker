@@ -22,7 +22,7 @@ test('web note drafts stay with their owner when another interface starts a time
   const web = await context.newPage();
   const errors = [];
   web.on('pageerror', error => errors.push(error.message));
-  await web.goto(process.env.CALENDAR_WEB_URL || 'http://localhost:3014');
+  await web.goto(process.env.CALENDAR_WEB_URL || 'http://localhost:3000');
   const notes = web.locator('.timer-panel textarea');
   await notes.waitFor({ state: 'visible' });
   await notes.fill('A late notes');

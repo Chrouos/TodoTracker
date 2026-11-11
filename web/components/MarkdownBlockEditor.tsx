@@ -54,6 +54,9 @@ const moreCommands: [SourceCommand, string][] = [
   ['rule', '分隔線'],
 ];
 
+const isPreviewShortcut = (event: KeyboardEvent<HTMLElement>): boolean =>
+  (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'e';
+
 const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditorProps>(function MarkdownBlockEditor({
   id,
   value,
@@ -68,10 +71,39 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const sourceRef = useRef<HTMLTextAreaElement | null>(null);
   const moreRef = useRef<HTMLDetailsElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const currentValue = useRef(value);
   currentValue.current = value;
 
   useEffect(() => { setPreview(mode === 'blocks'); }, [mode]);
+
+  // 表單清空時回到編輯，不留下空白預覽
+  useEffect(() => { if (!value.trim()) setPreview(false); }, [value]);
+
+  // 版面會在預覽後改變高度，等 click 才切換，避免按鈕在放開滑鼠前被推走；
+  // 用 pointerdown 記下起點，從編輯區拖曳選字到外面放開時不會誤觸
+  useEffect(() => {
+    let outsidePress = false;
+    const onPointerDown = (event: PointerEvent): void => {
+      const wrapper = wrapperRef.current;
+      outsidePress = Boolean(wrapper?.contains(document.activeElement) && !wrapper.contains(event.target as Node));
+    };
+    const onClick = (event: globalThis.MouseEvent): void => {
+      const pressedOutside = outsidePress;
+      outsidePress = false;
+      const wrapper = wrapperRef.current;
+      // 外部按鈕若攔下 mousedown 保留焦點（例如插入時間），代表仍在編輯
+      if (!pressedOutside || !wrapper || wrapper.contains(event.target as Node) || wrapper.contains(document.activeElement)) return;
+      if (currentValue.current.trim()) setPreview(true);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('click', onClick, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('click', onClick, true);
+    };
+  }, []);
 
   const commit = (nextValue: string): void => {
     currentValue.current = nextValue;
@@ -92,6 +124,14 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
     });
   };
 
+  // 快捷鍵或工具列切換時把焦點留在預覽，才能再按快捷鍵切回
+  const openPreview = (): void => {
+    const hadFocus = wrapperRef.current?.contains(document.activeElement);
+    rememberSelection();
+    setPreview(true);
+    if (hadFocus) requestAnimationFrame(() => previewRef.current?.focus({ preventScroll: true }));
+  };
+
   const applyCommand = (command: SourceCommand): void => {
     const textarea = sourceRef.current;
     const start = textarea?.selectionStart ?? selection.start;
@@ -105,6 +145,11 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape' && moreRef.current) moreRef.current.open = false;
+    if (isPreviewShortcut(event)) {
+      event.preventDefault();
+      openPreview();
+      return;
+    }
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const command = ({ b: 'bold', i: 'italic', k: 'link' } as const)[event.key.toLowerCase() as 'b' | 'i' | 'k'];
     if (!command) return;
@@ -159,7 +204,7 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
   );
 
   return (
-    <div className="markdown-block-editor markdown-text-editor">
+    <div ref={wrapperRef} className="markdown-block-editor markdown-text-editor">
       <div className="markdown-editor-toolbar" role="toolbar" aria-label="Markdown 編輯工具">
         {!preview && <>
           {commonCommands.map(renderCommand)}
@@ -170,9 +215,9 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
           <button type="button" aria-pressed={wrap} title="關閉後可橫向捲動，方便閱讀寬表格"
             onMouseDown={(event) => event.preventDefault()} onClick={() => setWrap(!wrap)}>自動換行</button>
         </>}
-        <button type="button" className="markdown-editor-preview-toggle" aria-pressed={preview}
+        <button type="button" className="markdown-editor-preview-toggle" aria-pressed={preview} title="Ctrl/⌘+E"
           onMouseDown={(event) => { rememberSelection(); event.preventDefault(); }}
-          onClick={() => preview ? focusSource() : setPreview(true)}>{preview ? '繼續編輯' : '預覽'}</button>
+          onClick={() => preview ? focusSource() : openPreview()}>{preview ? '繼續編輯' : '預覽'}</button>
       </div>
       <AutoTextarea
         id={id}
@@ -192,9 +237,16 @@ const MarkdownBlockEditor = forwardRef<MarkdownEditorHandle, MarkdownBlockEditor
         onMouseUp={rememberSelection}
       />
       {preview && <div
+        ref={previewRef}
+        tabIndex={-1}
         className={`markdown-text-preview markdown-preview${wrap ? '' : ' is-nowrap'}`}
         onClick={handlePreviewClick}
-        style={{ minHeight: Math.max(min, 160) }}
+        onKeyDown={(event) => {
+          if (!isPreviewShortcut(event)) return;
+          event.preventDefault();
+          focusSource();
+        }}
+        style={{ minHeight: Math.max(min, 160), outline: 'none' }}
         dangerouslySetInnerHTML={{ __html: renderMarkdown(value, { interactiveTasks: true }) }}
       />}
     </div>

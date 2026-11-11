@@ -47,7 +47,7 @@ async function write(key, value) {
 export async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(await read(K.settings, {})) };
 }
-export async function saveSettings(patch) {
+async function saveSettings(patch) {
   const next = { ...(await getSettings()), ...patch };
   await write(K.settings, next);
   return next;
@@ -62,7 +62,7 @@ export async function listProjects({ includeArchived = false } = {}) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function upsertProject(p) {
+async function upsertProject(p) {
   const all = await read(K.projects, []);
   const i = all.findIndex((x) => x.id === p.id);
   const prev = i >= 0 ? all[i] : null;
@@ -91,7 +91,7 @@ export async function upsertProject(p) {
  * 刪除專案。子專案不會一起消失，會往上接到祖父層（避免誤刪整棵樹）。
  * 既有時間紀錄保留，只是變成未分類。
  */
-export async function deleteProject(id) {
+async function deleteProject(id) {
   const all = await read(K.projects, []);
   const tasks = await read(K.tasks, []);
   const entries = await read(K.entries, []);
@@ -122,7 +122,7 @@ async function withProject(id, fn) {
 }
 
 /** 新增一則，記下寫入當下的時間 */
-export async function addProjectNote(projectId, text) {
+async function addProjectNote(projectId, text) {
   const t = (text || '').trim();
   if (!t) return null;
   return withProject(projectId, (notes) => [
@@ -132,14 +132,14 @@ export async function addProjectNote(projectId, text) {
 }
 
 /** 修改既有的一則；createdAt 保留，另外記 updatedAt */
-export async function updateProjectNote(projectId, noteId, text) {
+async function updateProjectNote(projectId, noteId, text) {
   return withProject(projectId, (notes) =>
     notes.map((n) => (n.id === noteId
       ? { ...n, text: (text || '').trim(), updatedAt: nowISO() }
       : n)));
 }
 
-export async function deleteProjectNote(projectId, noteId) {
+async function deleteProjectNote(projectId, noteId) {
   return withProject(projectId, (notes) => notes.filter((n) => n.id !== noteId));
 }
 
@@ -148,7 +148,7 @@ export async function deleteProjectNote(projectId, noteId) {
 export async function listTags() {
   return (await read(K.tags, [])).sort((a, b) => a.name.localeCompare(b.name));
 }
-export async function upsertTag(t) {
+async function upsertTag(t) {
   const all = await read(K.tags, []);
   const i = all.findIndex((x) => x.id === t.id);
   const row = { id: t.id || uid(), name: (t.name || '').trim(), color: t.color || '#646262' };
@@ -156,7 +156,7 @@ export async function upsertTag(t) {
   await write(K.tags, all);
   return row;
 }
-export async function deleteTag(id) {
+async function deleteTag(id) {
   await write(K.tags, (await read(K.tags, [])).filter((t) => t.id !== id));
   const entries = await read(K.entries, []);
   await write(K.entries, entries.map((e) => ({ ...e, tagIds: (e.tagIds || []).filter((x) => x !== id) })));
@@ -177,7 +177,7 @@ export async function listTasks({ projectId = null, includeDone = true } = {}) {
   return all.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }
 
-export async function upsertTask(t) {
+async function upsertTask(t) {
   const all = await read(K.tasks, []);
   const i = all.findIndex((x) => x.id === t.id);
   const prev = i >= 0 ? all[i] : null;
@@ -216,7 +216,7 @@ export async function upsertTask(t) {
   return row;
 }
 
-export async function deleteTask(id) {
+async function deleteTask(id) {
   await write(K.tasks, (await read(K.tasks, [])).filter((t) => t.id !== id));
   const entries = await read(K.entries, []);
   await write(K.entries, entries.map((e) => (e.taskId === id ? { ...e, taskId: null } : e)));
@@ -232,7 +232,7 @@ export async function listCalendarPlans() {
     (a.startDate || a.startedAt).localeCompare(b.startDate || b.startedAt) || a.id.localeCompare(b.id));
 }
 
-export async function upsertCalendarPlan(input) {
+async function upsertCalendarPlan(input) {
   const all = await listCalendarPlans();
   const previous = all.find((plan) => plan.id === input.id);
   const row = normalizeCalendarPlan(input, { previous, id: input.id || uid(), now: nowISO() });
@@ -248,7 +248,7 @@ export async function upsertCalendarPlan(input) {
   return row;
 }
 
-export async function deleteCalendarPlan(id) {
+async function deleteCalendarPlan(id) {
   const [plans, entries, timer] = await Promise.all([listCalendarPlans(), read(K.entries, []), getTimer()]);
   await chrome.storage.local.set({
     [K.calendarPlans]: plans.filter((plan) => plan.id !== id),
@@ -267,7 +267,7 @@ export async function listSchedules() {
     (a.createTime || '').localeCompare(b.createTime || '') || a.title.localeCompare(b.title));
 }
 
-export async function upsertSchedule(s) {
+async function upsertSchedule(s) {
   const all = await read(K.schedules, []);
   const i = all.findIndex((x) => x.id === s.id);
   const prev = i >= 0 ? all[i] : null;
@@ -292,7 +292,7 @@ export async function upsertSchedule(s) {
   return row;
 }
 
-export async function deleteSchedule(id) {
+async function deleteSchedule(id) {
   await write(K.schedules, (await read(K.schedules, [])).filter((s) => s.id !== id));
 }
 
@@ -307,7 +307,7 @@ const hhmmToMin = (s) => {
  * 由 background 的 alarm 每分鐘叫一次；用 lastRunDate 擋重複。
  * @returns {Promise<Array>} 這次新建的 task
  */
-export async function runDueSchedules(now = new Date()) {
+async function runDueSchedules(now = new Date()) {
   const all = await read(K.schedules, []);
   if (!all.length) return [];
 
@@ -361,7 +361,7 @@ export async function pendingReminders(now = new Date()) {
   });
 }
 
-export async function markReminded(taskId) {
+async function markReminded(taskId) {
   const all = await read(K.tasks, []);
   await write(K.tasks, all.map((t) => (t.id === taskId ? { ...t, remindedAt: nowISO() } : t)));
 }
@@ -382,7 +382,7 @@ export async function listEntries({ from = null, to = null, limit = null } = {})
   return limit ? all.slice(0, limit) : all;
 }
 
-export async function upsertEntry(e) {
+async function upsertEntry(e) {
   const all = await read(K.entries, []);
   const i = all.findIndex((x) => x.id === e.id);
   const row = {
@@ -412,12 +412,12 @@ export async function upsertEntry(e) {
   return row;
 }
 
-export async function deleteEntry(id) {
+async function deleteEntry(id) {
   const all = await read(K.entries, []);
   await write(K.entries, all.map((e) => (e.id === id ? { ...e, deletedAt: nowISO() } : e)));
 }
 
-export async function restoreEntry(id) {
+async function restoreEntry(id) {
   const all = await read(K.entries, []);
   await write(K.entries, all.map((e) => (e.id === id ? { ...e, deletedAt: null } : e)));
 }
@@ -429,7 +429,7 @@ export async function getTimer() {
   return read(K.timer, null);
 }
 
-export async function startTimer({
+async function startTimer({
   projectId = null, taskId = null, description = '', notes = '', tagIds = [],
   planId = null,
 } = {}) {
@@ -447,7 +447,7 @@ export async function startTimer({
 }
 
 /** 更新計時中的欄位（切專案、改描述不必重開計時） */
-export async function patchTimer(patch, { expectedEntryId } = {}) {
+async function patchTimer(patch, { expectedEntryId } = {}) {
   const t = await getTimer();
   if (!t) return null;
   if (expectedEntryId !== undefined && expectedEntryId !== t.entryId) return t;
@@ -463,7 +463,7 @@ export async function patchTimer(patch, { expectedEntryId } = {}) {
 
 /** A notes draft belongs to one timer, even after another interface stops it. */
 /** 補救忘記按開始。開始時間要早於現在；閒置點落在新的開始之前就不用再問。無效時回傳 null */
-export async function setTimerStart(startedAt) {
+async function setTimerStart(startedAt) {
   const t = await getTimer();
   const start = new Date(startedAt).getTime();
   if (!t || !Number.isFinite(start) || start >= Date.now()) return null;
@@ -471,7 +471,7 @@ export async function setTimerStart(startedAt) {
   return patchTimer({ startedAt: new Date(start).toISOString(), ...(idleBeforeStart ? { idleSince: null } : {}) });
 }
 
-export async function saveTimerNotes({ entryId, notes }) {
+async function saveTimerNotes({ entryId, notes }) {
   if (typeof entryId !== 'string' || !entryId || typeof notes !== 'string') throw new Error('Invalid timer note owner');
   const timer = await patchTimer({ notes }, { expectedEntryId: entryId });
   if (timer?.entryId !== entryId) {
@@ -485,7 +485,7 @@ export async function saveTimerNotes({ entryId, notes }) {
  * 處理閒置提示但繼續計時。
  * 保留時只清除 idleSince；扣除時把計時起點往後移，避免結束 timer。
  */
-export async function resolveIdleTimer(discardSeconds = 0) {
+async function resolveIdleTimer(discardSeconds = 0) {
   const t = await getTimer();
   if (!t || !t.idleSince) return t;
 
@@ -513,7 +513,7 @@ export async function resolveIdleTimer(discardSeconds = 0) {
  * @param {number} discardSeconds 要從尾端扣掉的秒數（閒置扣除用）
  * @param {{ completeTask?: boolean }} options 停止時是否完成掛上的 Todo
  */
-export async function stopTimer(endedAt = null, discardSeconds = 0, { completeTask = false } = {}) {
+async function stopTimer(endedAt = null, discardSeconds = 0, { completeTask = false } = {}) {
   const t = await getTimer();
   if (!t) return null;
   let end = new Date(endedAt || nowISO()).getTime() - discardSeconds * 1000;
@@ -584,12 +584,12 @@ export function assertBackup(data) {
 }
 
 export const getBackupState = () => read(K.backupState, {});
-export const markBackedUp = () => write(K.backupState, { lastBackupAt: nowISO() });
-export async function snoozeBackupReminder(snoozeUntil) {
+const markBackedUp = () => write(K.backupState, { lastBackupAt: nowISO() });
+async function snoozeBackupReminder(snoozeUntil) {
   await write(K.backupState, { ...(await getBackupState()), snoozeUntil });
 }
 
-export async function importAll(data) {
+async function importAll(data) {
   assertBackup(data);
   const projectIds = new Set((data.projects || []).map((item) => item.id));
   const taskIds = new Set((data.tasks || []).map((item) => item.id));
@@ -616,3 +616,77 @@ export async function importAll(data) {
     [K.settings]: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
   });
 }
+
+/* ---------------- 寫入排隊 ----------------
+ * 寫入都是「讀整份、改、寫回」。popup、管理頁與 service worker 同時寫時，
+ * 後寫的會蓋掉先寫的，所以每個寫入操作都要拿同一把鎖才能開始。
+ * 鎖不能重入：這個檔案內互相呼叫時用的是上面沒上鎖的函式，只有對外才包鎖。
+ */
+let localWriteQueue = Promise.resolve();
+function withWriteLock(operation) {
+  if (globalThis.navigator?.locks) return navigator.locks.request('todotracker-db', operation);
+  // 沒有 Web Locks 的環境至少讓同一個頁面內排隊
+  const result = localWriteQueue.then(operation, operation);
+  localWriteQueue = result.catch(() => {});
+  return result;
+}
+const locked = (operation) => (...args) => withWriteLock(() => operation(...args));
+
+const locked_saveSettings = locked(saveSettings);
+const locked_upsertProject = locked(upsertProject);
+const locked_deleteProject = locked(deleteProject);
+const locked_addProjectNote = locked(addProjectNote);
+const locked_updateProjectNote = locked(updateProjectNote);
+const locked_deleteProjectNote = locked(deleteProjectNote);
+const locked_upsertTag = locked(upsertTag);
+const locked_deleteTag = locked(deleteTag);
+const locked_upsertTask = locked(upsertTask);
+const locked_deleteTask = locked(deleteTask);
+const locked_upsertCalendarPlan = locked(upsertCalendarPlan);
+const locked_deleteCalendarPlan = locked(deleteCalendarPlan);
+const locked_upsertSchedule = locked(upsertSchedule);
+const locked_deleteSchedule = locked(deleteSchedule);
+const locked_runDueSchedules = locked(runDueSchedules);
+const locked_markReminded = locked(markReminded);
+const locked_upsertEntry = locked(upsertEntry);
+const locked_deleteEntry = locked(deleteEntry);
+const locked_restoreEntry = locked(restoreEntry);
+const locked_startTimer = locked(startTimer);
+const locked_patchTimer = locked(patchTimer);
+const locked_setTimerStart = locked(setTimerStart);
+const locked_saveTimerNotes = locked(saveTimerNotes);
+const locked_resolveIdleTimer = locked(resolveIdleTimer);
+const locked_stopTimer = locked(stopTimer);
+const locked_snoozeBackupReminder = locked(snoozeBackupReminder);
+const locked_importAll = locked(importAll);
+const locked_markBackedUp = locked(markBackedUp);
+export {
+  locked_saveSettings as saveSettings,
+  locked_upsertProject as upsertProject,
+  locked_deleteProject as deleteProject,
+  locked_addProjectNote as addProjectNote,
+  locked_updateProjectNote as updateProjectNote,
+  locked_deleteProjectNote as deleteProjectNote,
+  locked_upsertTag as upsertTag,
+  locked_deleteTag as deleteTag,
+  locked_upsertTask as upsertTask,
+  locked_deleteTask as deleteTask,
+  locked_upsertCalendarPlan as upsertCalendarPlan,
+  locked_deleteCalendarPlan as deleteCalendarPlan,
+  locked_upsertSchedule as upsertSchedule,
+  locked_deleteSchedule as deleteSchedule,
+  locked_runDueSchedules as runDueSchedules,
+  locked_markReminded as markReminded,
+  locked_upsertEntry as upsertEntry,
+  locked_deleteEntry as deleteEntry,
+  locked_restoreEntry as restoreEntry,
+  locked_startTimer as startTimer,
+  locked_patchTimer as patchTimer,
+  locked_setTimerStart as setTimerStart,
+  locked_saveTimerNotes as saveTimerNotes,
+  locked_resolveIdleTimer as resolveIdleTimer,
+  locked_stopTimer as stopTimer,
+  locked_snoozeBackupReminder as snoozeBackupReminder,
+  locked_importAll as importAll,
+  locked_markBackedUp as markBackedUp,
+};

@@ -535,7 +535,7 @@ dialog::backdrop { background: rgba(15, 0, 0, 0.35); }
 
 .report-quality-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid var(--hairline);
   background: var(--canvas);
 }
@@ -562,8 +562,3 @@ dialog::backdrop { background: rgba(15, 0, 0, 0.35); }
 .report-heatmap td { padding: 8px 6px; min-width: 54px; background: color-mix(in srgb, var(--accent) calc(var(--heat) * 100%), var(--surface-soft)); color: var(--text-ink); text-align: center; font-variant-numeric: tabular-nums; }
 .report-pagination { justify-content: center; margin-top: 16px; color: var(--text-mute); font-size: 12px; }
 
-@media (max-width: 720px) {
-  .report-quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .report-quality-grid > div:nth-child(2) { border-right: 0; }
-  .report-quality-grid > div:nth-child(-n + 2) { border-bottom: 1px solid var(--hairline); }
-}

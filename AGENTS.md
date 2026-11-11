@@ -41,4 +41,4 @@ Use concise Conventional Commit-style subjects such as `feat: ...`, `fix: ...`, 
 
 ## Security & Configuration Tips
 
-Keep `extension-key.pem` private; it determines the extension ID. Store local web overrides in uncommitted `web/.env.local`. The web app must run on `localhost` or `127.0.0.1` because the extension’s external messaging allowlist is intentionally restricted.
+Keep `extension-key.pem` private; it determines the extension ID. Store local web overrides in uncommitted `web/.env.local`. The web app must run on `localhost` or `127.0.0.1` at port 3000 because the extension’s external messaging allowlist is intentionally restricted.

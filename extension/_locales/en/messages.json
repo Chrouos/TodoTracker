@@ -10,5 +10,8 @@
   },
   "commandOpenPopup": {
     "message": "Open the TodoTracker popup"
+  },
+  "commandOpenSidePanel": {
+    "message": "Open the TodoTracker side panel"
   }
 }

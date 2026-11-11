@@ -135,7 +135,7 @@ npm run dev
 打開 <http://localhost:3000>，右上角顯示 **已連線擴充** 就成功了。
 
 > [!IMPORTANT]
-> 網址必須是 `localhost` 或 `127.0.0.1`。擴充的 `externally_connectable` 只信任這兩個來源，這是刻意的安全邊界。
+> 網址必須是 `localhost` 或 `127.0.0.1` 的 3000 埠。擴充的 `externally_connectable` 只信任這兩個來源，這是刻意的安全邊界。
 
 ---
 

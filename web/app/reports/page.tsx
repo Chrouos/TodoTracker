@@ -275,8 +275,6 @@ export default function ReportsPage() {
       <Section id="rep-quality" title="資料品質與 Todo 狀況">
         <div className="report-quality-grid">
           <div><span className="cap">未分類工時</span><strong>{fmtHM(quality.unclassifiedSeconds)}</strong></div>
-          <div><span className="cap">沒有 notes</span><strong>{quality.missingNotesCount} 筆</strong></div>
-          <div><span className="cap">未綁定 Todo</span><strong>{fmtHM(quality.unlinkedTaskSeconds)}</strong></div>
           <div className="report-warning"><span className="cap">逾期 Todo</span><strong>{quality.overdueTodoCount}</strong></div>
         </div>
       </Section>

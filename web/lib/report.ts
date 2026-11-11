@@ -86,22 +86,16 @@ export function compareSeconds(currentSeconds: number, previousSeconds: number) 
 
 export function buildReportQuality(entries: Entry[], tasks: Task[], today: string) {
   let unclassifiedSeconds = 0;
-  let missingNotesCount = 0;
-  let unlinkedTaskSeconds = 0;
 
   for (const entry of entries) {
     const valid = validEntry(entry);
     if (!valid) continue;
     const seconds = Math.max(0, Math.round((valid.end.getTime() - valid.start.getTime()) / 1000));
     if (!entry.projectId) unclassifiedSeconds += seconds;
-    if (!String(entry.notes || '').trim()) missingNotesCount += 1;
-    if (entry.projectId && !entry.taskId) unlinkedTaskSeconds += seconds;
   }
 
   return {
     unclassifiedSeconds,
-    missingNotesCount,
-    unlinkedTaskSeconds,
     overdueTodoCount: tasks.filter((task) =>
       task.status !== 'done' && task.status !== 'archived' && Boolean(task.dueDate && task.dueDate < today),
     ).length,

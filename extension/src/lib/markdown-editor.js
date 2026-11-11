@@ -340,6 +340,7 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
   previewButton.className = 'markdown-editor-preview-toggle';
   previewButton.dataset.markdownPreviewToggle = 'true';
   previewButton.textContent = options.translate?.('preview') ?? '預覽';
+  previewButton.title = 'Ctrl/⌘+E';
   previewButton.setAttribute('aria-pressed', 'false');
   previewButton.hidden = options.preview === false;
   toolbar.appendChild(previewButton);
@@ -347,8 +348,15 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
   const preview = document.createElement('div');
   preview.className = 'markdown-text-preview markdown-preview';
   preview.hidden = true;
+  preview.tabIndex = -1;
   wrapper.appendChild(preview);
-  const setPreview = (open) => {
+  let previewSource = '';
+  const renderPreview = () => {
+    previewSource = textarea.value;
+    preview.innerHTML = renderMarkdown(previewSource, { interactiveTasks: true });
+  };
+  const setPreview = (open, { focus = true } = {}) => {
+    const hadFocus = wrapper.contains(document.activeElement);
     preview.hidden = !open;
     textarea.hidden = open;
     wrapper.dataset.preview = String(open);
@@ -356,10 +364,18 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
     previewButton.setAttribute('aria-pressed', String(open));
     if (open) {
       preview.dataset.wrap = textarea.wrap;
-      preview.innerHTML = renderMarkdown(textarea.value, { interactiveTasks: true });
+      renderPreview();
+      // 工具列或快捷鍵切換時把焦點留在預覽，才能再按快捷鍵切回；點擊外部則不搶焦點
+      if (hadFocus) preview.focus({ preventScroll: true });
+    } else {
+      fit();
+      if (focus) textarea.focus();
     }
-    else { fit(); textarea.focus(); }
     more.open = false;
+  };
+  const requestPreview = () => {
+    if (options.onPreviewRequest) options.onPreviewRequest();
+    else if (options.preview !== false) setPreview(true);
   };
 
   let savedStart = null;
@@ -381,7 +397,7 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
   };
   const onInput = () => {
     updateToolbar();
-    if (!preview.hidden) preview.innerHTML = renderMarkdown(textarea.value, { interactiveTasks: true });
+    if (!preview.hidden) renderPreview();
     onChange?.(textarea.value);
   };
   const commit = (value, selectionStart, selectionEnd) => {
@@ -448,12 +464,43 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
   const onKeyDown = (event) => {
     if (composing || event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape' && more.open) { more.open = false; return; }
+    if (isPreviewShortcut(event)) {
+      event.preventDefault();
+      requestPreview();
+      return;
+    }
     const command = { b: 'bold', i: 'italic', k: 'link' }[event.key?.toLowerCase()];
     if (!command || !(event.ctrlKey || event.metaKey) || event.altKey) return;
     event.preventDefault();
     applyCommand(command);
   };
+  const onPreviewKeyDown = (event) => {
+    if (!isPreviewShortcut(event)) return;
+    event.preventDefault();
+    setPreview(false);
+  };
+  // 版面會在預覽後改變高度，等 click 才切換，避免按鈕在放開滑鼠前被推走；
+  // 用 pointerdown 記下起點，從編輯區拖曳選字到外面放開時不會誤觸
+  let outsidePress = false;
+  const onDocumentPointerDown = (event) => {
+    outsidePress = wrapper.contains(document.activeElement) && !wrapper.contains(event.target);
+  };
+  const onDocumentClick = (event) => {
+    const pressedOutside = outsidePress;
+    outsidePress = false;
+    if (wrapper.isConnected === false) { removeDocumentListeners(); return; }
+    // 外部按鈕若攔下 mousedown 保留焦點（例如插入內容），代表仍在編輯
+    if (!pressedOutside || wrapper.contains(event.target) || wrapper.contains(document.activeElement) || !preview.hidden) return;
+    if (textarea.value.trim()) requestPreview();
+  };
+  const removeDocumentListeners = () => {
+    document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    document.removeEventListener('click', onDocumentClick, true);
+  };
   const onComposition = (event) => { composing = event.type === 'compositionstart'; };
+  document.addEventListener('pointerdown', onDocumentPointerDown, true);
+  document.addEventListener('click', onDocumentClick, true);
+  preview.addEventListener('keydown', onPreviewKeyDown);
   toolbar.addEventListener('mousedown', onMouseDown);
   toolbar.addEventListener('click', onClick);
   preview.addEventListener('click', onPreviewClick);
@@ -470,6 +517,8 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
 
   return {
     destroy() {
+      removeDocumentListeners();
+      preview.removeEventListener('keydown', onPreviewKeyDown);
       toolbar.removeEventListener('mousedown', onMouseDown);
       toolbar.removeEventListener('click', onClick);
       preview.removeEventListener('click', onPreviewClick);
@@ -491,7 +540,8 @@ function mountSimpleMarkdownEditor(textarea, onChange, onEmptyParagraphEnter, op
     sync() {
       fit();
       updateToolbar();
-      if (!preview.hidden) preview.innerHTML = renderMarkdown(textarea.value, { interactiveTasks: true });
+      // 表單載入別筆內容或清空時回到編輯，不留下舊內容或空白預覽
+      if (!preview.hidden && (!textarea.value.trim() || textarea.value !== previewSource)) setPreview(false, { focus: false });
     },
     insertText(text) {
       if (!text) return;
@@ -970,6 +1020,10 @@ function deleteAtSelection(blocks, selection, direction) {
     }
   }
   return { blocks: next, nextSelection: selection, changed: false };
+}
+
+export function isPreviewShortcut(event) {
+  return Boolean(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key?.toLowerCase() === 'e';
 }
 
 /**

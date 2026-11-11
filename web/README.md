@@ -28,7 +28,7 @@ npm run dev
    ```
    NEXT_PUBLIC_EXTENSION_ID=lpjffffopipgkkodjjljkhnfdpppbgml
    ```
-4. 網址必須是 `localhost` 或 `127.0.0.1` —— 擴充的 `externally_connectable` 只信任這兩個來源
+4. 網址必須是 `localhost` 或 `127.0.0.1` 的 3000 埠，換埠會連不上 —— 擴充的 `externally_connectable` 只信任這兩個來源
 
 要換 ID 的話建 `.env.local`：
 
@@ -52,7 +52,8 @@ NEXT_PUBLIC_EXTENSION_ID=你的擴充ID
 - 預設直接編輯整篇純文字，保留換行、連續空白與空白行，支援 Markdown 語法及跨段落選取。
 - 編輯區隨內容增高，只保留單一外框。常用格式直接顯示，其餘收進「更多」。
 - `Ctrl/Cmd+B`、`Ctrl/Cmd+I`、`Ctrl/Cmd+K` 可插入格式；格式按鈕只修改選取範圍。
-- 關閉「自動換行」可橫向閱讀寬表格。需要時按「預覽」，點預覽文字即可回到編輯。
+- 關閉「自動換行」可橫向閱讀寬表格。
+- 編輯時點擊編輯器外面會自動切到預覽（內容為空時維持編輯），點預覽文字即可回到編輯；也可以按 `Ctrl/⌘+E` 切換。
 - 預覽保留段內換行與空白；勾選待辦只修改該項的 `[ ]`／`[x]`，不會重新排版整篇筆記。
 
 ## 結構

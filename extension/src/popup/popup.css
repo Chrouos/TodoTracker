@@ -1,4 +1,6 @@
 body { width: 380px; max-height: 600px; overflow-y: auto; }
+/* 側邊欄共用同一頁，寬度由瀏覽器決定、高度不受 popup 限制 */
+html.is-panel body { width: auto; max-height: none; }
 
 header {
   display: flex; align-items: center; justify-content: space-between;
@@ -145,6 +147,10 @@ main[hidden] { display: none; }
 .fields.is-summary #desc, .fields.is-summary .two, .fields.is-summary #tagRow, .fields.is-summary #timerStartField { display: none; }
 .badge.overdue { color: var(--danger); border-color: var(--danger); }
 .badge.due-today { color: var(--warning-text); border-color: var(--warning); }
+/* 標題太長時只截斷文字，優先級與逾期徽章要留著 */
+.item .todo-title { display: flex; align-items: center; gap: var(--xs); }
+.todo-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-title .badge { flex: 0 0 auto; }
 .todo-branch { flex: 0 0 auto; color: var(--text-mute); font-size: 11px; }
 
 .goal { padding-bottom: var(--md); }

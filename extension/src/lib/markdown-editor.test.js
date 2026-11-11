@@ -15,6 +15,7 @@ import {
   indentListItem,
   insertInlineTextAtSelection,
   isAfterInlineBoundary,
+  isPreviewShortcut,
   isTextNodeEndAtOffset,
   listItemPathAfterIndent,
   restoreTextareaFromEditor,
@@ -459,6 +460,19 @@ class EditorFixtureDocument {
   constructor() {
     this.selection = new EditorFixtureSelection();
     this.activeElement = null;
+    this.listeners = new Map();
+  }
+
+  addEventListener(type, listener) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((entry) => entry !== listener));
+  }
+
+  dispatch(type, target) {
+    for (const listener of this.listeners.get(type) ?? []) listener({ type, target });
   }
 
   createElement(tagName) {
@@ -1181,6 +1195,113 @@ test('keyboard formatting after preview uses the new textarea selection', () => 
     fixture.textarea.setSelectionRange(4, 7);
     fixture.host.querySelector('[data-markdown-command="bold"]').dispatchEvent(new EditorFixtureEvent('click', { bubbles: true }));
     assert.equal(editor.getValue(), 'One **Two**');
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+function clickOutside(fixture, target) {
+  fixture.document.dispatch('pointerdown', target);
+  fixture.document.activeElement = target;
+  fixture.document.dispatch('click', target);
+}
+
+test('clicking outside a focused editor opens the preview and clicking the preview edits again', () => {
+  const fixture = editorFixture('**Note**');
+  try {
+    const outside = fixture.document.createElement('button');
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const wrapper = fixture.host.querySelector('.markdown-editor');
+    const preview = fixture.host.querySelector('.markdown-text-preview');
+    clickOutside(fixture, outside);
+    assert.equal(preview.hidden, true, 'an editor the user is not in stays as it is');
+    fixture.textarea.focus();
+    clickOutside(fixture, fixture.textarea);
+    assert.equal(preview.hidden, true, 'clicks inside the editor keep editing');
+    clickOutside(fixture, outside);
+    assert.equal(preview.hidden, false);
+    assert.equal(wrapper.dataset.preview, 'true');
+    preview.dispatchEvent(new EditorFixtureEvent('click', { bubbles: true, target: preview }));
+    assert.equal(preview.hidden, true);
+    assert.equal(fixture.document.activeElement, fixture.textarea);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('click-outside preview skips empty notes, selection drags and destroyed editors', () => {
+  const fixture = editorFixture('   ');
+  try {
+    const outside = fixture.document.createElement('button');
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const preview = fixture.host.querySelector('.markdown-text-preview');
+    fixture.textarea.focus();
+    clickOutside(fixture, outside);
+    assert.equal(preview.hidden, true, 'an empty note keeps its placeholder visible');
+    fixture.textarea.value = 'Text';
+    fixture.textarea.focus();
+    fixture.document.dispatch('pointerdown', fixture.textarea);
+    fixture.document.dispatch('click', outside);
+    assert.equal(preview.hidden, true, 'dragging a selection out of the textarea is not an outside click');
+    fixture.document.dispatch('pointerdown', outside);
+    fixture.document.dispatch('click', outside);
+    assert.equal(preview.hidden, true, 'a button that keeps focus in the textarea is still editing');
+    editor.destroy();
+    assert.deepEqual(fixture.document.listeners.get('click'), []);
+    assert.deepEqual(fixture.document.listeners.get('pointerdown'), []);
+  } finally { fixture.restore(); }
+});
+
+test('Ctrl+E and Cmd+E toggle the preview without triggering on other keys', () => {
+  assert.equal(isPreviewShortcut({ key: 'e', ctrlKey: true }), true);
+  assert.equal(isPreviewShortcut({ key: 'E', metaKey: true }), true);
+  assert.equal(isPreviewShortcut({ key: 'e' }), false);
+  assert.equal(isPreviewShortcut({ key: 'e', ctrlKey: true, shiftKey: true }), false);
+  const fixture = editorFixture('Note');
+  try {
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const preview = fixture.host.querySelector('.markdown-text-preview');
+    fixture.textarea.focus();
+    const open = new EditorFixtureEvent('keydown', { key: 'e', ctrlKey: true });
+    fixture.textarea.dispatchEvent(open);
+    assert.equal(open.defaultPrevented, true);
+    assert.equal(preview.hidden, false);
+    assert.equal(fixture.document.activeElement, preview);
+    preview.dispatchEvent(new EditorFixtureEvent('keydown', { key: 'e', ctrlKey: true }));
+    assert.equal(preview.hidden, true);
+    assert.equal(fixture.document.activeElement, fixture.textarea);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('an editor with an external preview hands click-outside and shortcut requests to its owner', () => {
+  const fixture = editorFixture('Note');
+  try {
+    let requests = 0;
+    const outside = fixture.document.createElement('button');
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar', preview: false, onPreviewRequest: () => { requests += 1; } });
+    fixture.textarea.focus();
+    clickOutside(fixture, outside);
+    fixture.textarea.dispatchEvent(new EditorFixtureEvent('keydown', { key: 'e', ctrlKey: true }));
+    assert.equal(requests, 2);
+    assert.equal(fixture.host.querySelector('.markdown-text-preview').hidden, true);
+    editor.destroy();
+  } finally { fixture.restore(); }
+});
+
+test('sync returns to editing without stealing focus when a form loads other or empty notes', () => {
+  const fixture = editorFixture('Saved note');
+  try {
+    const outside = fixture.document.createElement('button');
+    const editor = mountMarkdownEditor(fixture.textarea, { mode: 'toolbar' });
+    const preview = fixture.host.querySelector('.markdown-text-preview');
+    fixture.textarea.focus();
+    clickOutside(fixture, outside);
+    outside.focus();
+    editor.sync();
+    assert.equal(preview.hidden, false, 'the same notes stay in preview');
+    fixture.textarea.value = '';
+    editor.sync();
+    assert.equal(preview.hidden, true);
+    assert.equal(fixture.document.activeElement, outside);
     editor.destroy();
   } finally { fixture.restore(); }
 });

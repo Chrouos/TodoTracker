@@ -23,6 +23,8 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const showToast = createToast($('appToast'));
+const isSidePanel = new URLSearchParams(location.search).get('view') === 'panel';
+document.documentElement.classList.toggle('is-panel', isSidePanel);
 
 let state = {
   projects: [], tags: [], tasks: [], timer: null, settings: db.DEFAULT_SETTINGS,
@@ -51,7 +53,7 @@ const getDraft = async () =>
 const setDraft = (d) => chrome.storage.local.set({ draft: d });
 
 /* ---------------- 載入 ---------------- */
-async function load() {
+async function fetchState() {
   const [projects, tags, tasks, timer, settings, entries, draft, calendarPlans] = await Promise.all([
     db.listProjects(), db.listTags(), db.listTasks({ includeDone: true }),
     db.getTimer(), db.getSettings(),
@@ -60,10 +62,18 @@ async function load() {
     getDraft(),
     db.listCalendarPlans(),
   ]);
-  state = { projects, tags, tasks, timer, settings, entries, draft, calendarPlans };
-  currentLocale = resolveLocale(settings.language, getBrowserLocale());
+  return { projects, tags, tasks, timer, settings, entries, draft, calendarPlans };
+}
+
+function applyLocale() {
+  currentLocale = resolveLocale(state.settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
+}
+
+async function load() {
+  state = await fetchState();
+  applyLocale();
   await restoreLogDraft();
   if (!popupUiRestored) {
     popupUiRestored = true;
@@ -342,7 +352,7 @@ function renderTodo() {
           ${t.depth ? '<span class="todo-branch" aria-hidden="true">↳</span>' : ''}
           <button class="check${done ? ' is-done' : ''}" data-check="${t.id}" role="checkbox" aria-checked="${done}" aria-label="${translate(currentLocale, done ? 'todo.reopen' : 'todo.markDone')}" title="${translate(currentLocale, done ? 'todo.reopen' : 'todo.markDone')}"><span aria-hidden="true">${done ? '✓' : ''}</span></button>
           <div class="main">
-            <div class="t1">${esc(t.title)}${['urgent', 'high'].includes(normalizePriority(t.priority)) ? ` <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>` : ''}${urgentDue ? ` <span class="badge${due.isLate ? ' overdue' : ' due-today'}">${dueLabel(due, done, currentLocale)}</span>` : ''}</div>
+            <div class="t1 todo-title"><span class="todo-title-text">${esc(t.title)}</span>${['urgent', 'high'].includes(normalizePriority(t.priority)) ? ` <span class="badge priority-${normalizePriority(t.priority)}">${priorityLabel(t.priority, currentLocale)}</span>` : ''}${urgentDue ? ` <span class="badge${due.isLate ? ' overdue' : ' due-today'}">${dueLabel(due, done, currentLocale)}</span>` : ''}</div>
             <div class="t2">${p ? esc(p.name) : translate(currentLocale, 'project.uncategorized')}${t.dueDate ? ' · ' + t.dueDate : ''}</div>
           </div>
           <button class="btn-ghost btn-sm act" data-add-subtask="${t.id}" title="${translate(currentLocale, 'todo.addSubtask')}">${translate(currentLocale, 'popup.addSubtaskButton')}</button>
@@ -621,6 +631,52 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   $('toggle').click();
 });
+
+/* ---------------- 其他頁面改了資料時同步畫面 ----------------
+ * 側邊欄會一直開著，資料可能被管理頁、web 或排程改掉。 */
+let refreshTimeout = null;
+let refreshDeferred = false;
+// 重畫會重建下拉選單，正在選的時候先不動
+const isChoosing = () => document.activeElement?.tagName === 'SELECT';
+async function refresh() {
+  if (isChoosing()) { refreshDeferred = true; return; }
+  refreshDeferred = false;
+  const next = await fetchState();
+  if (isChoosing()) { refreshDeferred = true; return; }
+  if (JSON.stringify(next) === JSON.stringify(state)) return;
+  state = next;
+  applyLocale();
+  render();
+}
+const scheduleRefresh = () => {
+  clearTimeout(refreshTimeout);
+  refreshTimeout = setTimeout(refresh, 80);
+};
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && ['projects', 'tags', 'tasks', 'entries', 'timer', 'settings', 'calendarPlans', 'draft'].some((key) => key in changes)) scheduleRefresh();
+});
+document.addEventListener('focusout', () => { if (refreshDeferred) scheduleRefresh(); });
+
+if (isSidePanel) {
+  window.addEventListener('focus', scheduleRefresh);
+  // 過了午夜「今天」就變了，資料沒變也要重算
+  setInterval(() => {
+    scheduleRefresh();
+    if (isChoosing()) return;
+    renderStats();
+    renderTodo();
+  }, 60000);
+} else if (chrome.sidePanel?.open && chrome.windows?.getCurrent) {
+  // sidePanel.open 必須在點擊當下呼叫，所以視窗 id 要先備好
+  chrome.windows.getCurrent().then(({ id }) => {
+    $('openSidePanel').hidden = false;
+    $('openSidePanel').addEventListener('click', () => {
+      chrome.sidePanel.open({ windowId: id })
+        .then(() => window.close())
+        .catch(() => showToast(translate(currentLocale, 'popup.sidePanelFailed')));
+    });
+  });
+}
 
 initCollapse();
 load();

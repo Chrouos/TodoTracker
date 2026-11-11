@@ -664,18 +664,22 @@ const OPTIONS_ZH_TW = {
   'report.completionRate': '完成率',
   'report.averageCycle': '平均完成週期',
   'report.action.overdue': '逾期 Todo',
-  'report.action.unlinked': '未綁定 Todo',
   'report.action.unclassified': '未分類工時',
-  'report.action.missingNotes': '未填寫工作備註',
   'report.action.clear': '目前沒有待處理項目',
   'report.actionCount.todos': '{count} 個',
-  'report.actionCount.entries': '{count} 筆',
   'report.projectStatus.inProgress': '進行中',
   'report.projectStatus.overdue': '逾期',
   'report.projectStatus.lowProgress': '進度偏低',
   'report.projectStatus.longCycle': '週期偏長',
   'report.projectStatus.done': '已完成',
-  'report.rangeTotal': '區間總計 {duration}',
+  'report.rangeTotal': '這 {days} 天總計 {duration}',
+  'report.activeDayAverage': '有紀錄的日子平均 {duration}',
+  'report.dailyHours': '每日工時',
+  'report.lastDays': '最近 {days} 天',
+  'report.projectShare': '專案時間分配',
+  'report.noWorkInView': '這段日期沒有工時',
+  'report.otherProjects': '其他',
+  'chart.goal': '目標 {hours}h',
   'report.noProjectTime': '這個區間沒有專案工時',
   'report.dailyTotal': '當日總計 {duration}',
   'report.noEntriesInRange': '這個區間沒有工作紀錄',
@@ -710,7 +714,6 @@ const OPTIONS_ZH_TW = {
   'report.previousWeek': '前一週',
   'report.nextWeek': '後一週',
   'report.nextDay': '後一天',
-  'report.projectAll': '全部專案',
   'report.noFocusableProject': '沒有可聚焦的專案',
   'project.formHint': '留空就是最上層。可以一直往下掛，時數會自動累加到上層。',
   'project.save': '儲存專案',
@@ -829,7 +832,7 @@ const OPTIONS_ZH_TW = {
   'settings.idleHint': '計時中這麼久沒碰鍵盤滑鼠（或鎖螢幕），回來時會問你這段要不要扣掉。防止忘記按停止導致時數灌水。',
   'report.trackerLegend': '顏色越濃工時越長',
   'settings.goalLabel': '每日目標（小時）',
-  'settings.goalHint': '顯示在 popup 的今日進度；設 0 就不顯示。', 'todo.titlePlaceholder': '要做什麼？', 'schedule.titleLabel': '要做什麼', 'dialog.discardConfirm': '放棄尚未儲存的內容？', 'popup.logButton': '[紀錄]', 'settings.autoBackupNote': '繼續前會先下載一份目前資料的備份。', 'settings.lastBackup': '上次備份：{date}', 'settings.neverBackedUp': '還沒有備份過', 'backup.reminder': '已經 {days} 天沒有備份，資料只存在這台瀏覽器。', 'backup.reminderNever': '資料只存在這台瀏覽器，而且還沒有備份過。', 'backup.now': '立即備份', 'backup.later': '稍後提醒', 'timer.startedAt': '開始時間', 'timer.startInvalid': '開始時間必須早於現在', 'notification.timerStopped': '已停止計時', 'report.previousPeriod': '上一期', 'report.nextPeriod': '下一期', 'settings.shortcutLabel': '快捷鍵', 'settings.shortcutToggle': '開始／停止計時', 'settings.shortcutPopup': '開啟 popup', 'settings.shortcutUnset': '未設定', 'settings.shortcutEdit': '變更快捷鍵',
+  'settings.goalHint': '顯示在 popup 的今日進度；設 0 就不顯示。', 'popup.openSidePanel': '側邊欄', 'popup.sidePanelFailed': '無法開啟側邊欄', 'settings.shortcutPanel': '開啟側邊欄', 'todo.titlePlaceholder': '要做什麼？', 'schedule.titleLabel': '要做什麼', 'dialog.discardConfirm': '放棄尚未儲存的內容？', 'popup.logButton': '[紀錄]', 'settings.autoBackupNote': '繼續前會先下載一份目前資料的備份。', 'settings.lastBackup': '上次備份：{date}', 'settings.neverBackedUp': '還沒有備份過', 'backup.reminder': '已經 {days} 天沒有備份，資料只存在這台瀏覽器。', 'backup.reminderNever': '資料只存在這台瀏覽器，而且還沒有備份過。', 'backup.now': '立即備份', 'backup.later': '稍後提醒', 'timer.startedAt': '開始時間', 'timer.startInvalid': '開始時間必須早於現在', 'notification.timerStopped': '已停止計時', 'report.previousPeriod': '上一期', 'report.nextPeriod': '下一期', 'settings.shortcutLabel': '快捷鍵', 'settings.shortcutToggle': '開始／停止計時', 'settings.shortcutPopup': '開啟 popup', 'settings.shortcutUnset': '未設定', 'settings.shortcutEdit': '變更快捷鍵',
   'popup.goal': '今日目標 {goal}',
   'popup.editDetails': '[+] 編輯細節',
   'popup.hideDetails': '[-] 收合細節',
@@ -936,18 +939,22 @@ const OPTIONS_EN = {
   'report.completionRate': 'Completion rate',
   'report.averageCycle': 'Average completion cycle',
   'report.action.overdue': 'Overdue Todo',
-  'report.action.unlinked': 'Todo not linked',
   'report.action.unclassified': 'Unclassified time',
-  'report.action.missingNotes': 'Missing work notes',
   'report.action.clear': 'Nothing needs attention',
   'report.actionCount.todos': '{count}',
-  'report.actionCount.entries': '{count}',
   'report.projectStatus.inProgress': 'In progress',
   'report.projectStatus.overdue': 'Overdue',
   'report.projectStatus.lowProgress': 'Low progress',
   'report.projectStatus.longCycle': 'Long cycle',
   'report.projectStatus.done': 'Completed',
-  'report.rangeTotal': 'Period total {duration}',
+  'report.rangeTotal': '{days}-day total {duration}',
+  'report.activeDayAverage': 'Average on active days {duration}',
+  'report.dailyHours': 'Daily hours',
+  'report.lastDays': 'Last {days} days',
+  'report.projectShare': 'Time by project',
+  'report.noWorkInView': 'No hours in these dates',
+  'report.otherProjects': 'Other',
+  'chart.goal': 'Goal {hours}h',
   'report.noProjectTime': 'No project time in this period',
   'report.dailyTotal': 'Daily total {duration}',
   'report.noEntriesInRange': 'No work entries in this period',
@@ -983,7 +990,6 @@ const OPTIONS_EN = {
   'report.previousWeek': 'Previous week',
   'report.nextWeek': 'Next week',
   'report.nextDay': 'Next day',
-  'report.projectAll': 'All projects',
   'report.noFocusableProject': 'No focusable projects',
   'project.formHint': 'Leave blank for a top-level project. Child projects roll their time up automatically.',
   'project.save': 'Save project',
@@ -1102,7 +1108,7 @@ const OPTIONS_EN = {
   'settings.idleHint': 'After this much inactivity while timing (or when the screen is locked), you will be asked whether to remove that time. This prevents forgotten timers from inflating your totals.',
   'report.trackerLegend': 'Stronger color = more hours',
   'settings.goalLabel': 'Daily goal (hours)',
-  'settings.goalHint': 'Shown as today\'s progress in the popup. Set 0 to hide it.', 'todo.titlePlaceholder': 'What needs doing?', 'schedule.titleLabel': 'What needs doing', 'dialog.discardConfirm': 'Discard unsaved changes?', 'popup.logButton': '[log]', 'settings.autoBackupNote': 'A backup of the current data will be downloaded first.', 'settings.lastBackup': 'Last backup: {date}', 'settings.neverBackedUp': 'Never backed up', 'backup.reminder': 'No backup for {days} days, and your data exists only in this browser.', 'backup.reminderNever': 'Your data exists only in this browser and has never been backed up.', 'backup.now': 'Back up now', 'backup.later': 'Remind me later', 'timer.startedAt': 'Started at', 'timer.startInvalid': 'The start time must be in the past', 'notification.timerStopped': 'Timer stopped', 'report.previousPeriod': 'Previous period', 'report.nextPeriod': 'Next period', 'settings.shortcutLabel': 'Shortcuts', 'settings.shortcutToggle': 'Start or stop the timer', 'settings.shortcutPopup': 'Open the popup', 'settings.shortcutUnset': 'Not set', 'settings.shortcutEdit': 'Change shortcuts',
+  'settings.goalHint': 'Shown as today\'s progress in the popup. Set 0 to hide it.', 'popup.openSidePanel': 'Side panel', 'popup.sidePanelFailed': 'Could not open the side panel', 'settings.shortcutPanel': 'Open the side panel', 'todo.titlePlaceholder': 'What needs doing?', 'schedule.titleLabel': 'What needs doing', 'dialog.discardConfirm': 'Discard unsaved changes?', 'popup.logButton': '[log]', 'settings.autoBackupNote': 'A backup of the current data will be downloaded first.', 'settings.lastBackup': 'Last backup: {date}', 'settings.neverBackedUp': 'Never backed up', 'backup.reminder': 'No backup for {days} days, and your data exists only in this browser.', 'backup.reminderNever': 'Your data exists only in this browser and has never been backed up.', 'backup.now': 'Back up now', 'backup.later': 'Remind me later', 'timer.startedAt': 'Started at', 'timer.startInvalid': 'The start time must be in the past', 'notification.timerStopped': 'Timer stopped', 'report.previousPeriod': 'Previous period', 'report.nextPeriod': 'Next period', 'settings.shortcutLabel': 'Shortcuts', 'settings.shortcutToggle': 'Start or stop the timer', 'settings.shortcutPopup': 'Open the popup', 'settings.shortcutUnset': 'Not set', 'settings.shortcutEdit': 'Change shortcuts',
   'popup.goal': 'Today\'s goal {goal}',
   'popup.editDetails': '[+] Edit details',
   'popup.hideDetails': '[-] Hide details',
@@ -1174,7 +1180,8 @@ const OPTIONS_JA = {
   'entry.expandAll': '[+] すべて展開', 'entry.collapseAll': '[-] すべて折りたたむ', 'entry.manual': '手動で追加', 'entry.includeCompletedTodos': '完了したTodoを表示',
   'entry.copyToday': '今日のまとめをコピー', 'entry.copyRange': '期間のまとめをコピー', 'entry.loadMore': 'さらに読み込む（残り{count}件）',
   'entry.edit': '[編集]', 'entry.todoNotes': 'Todoメモを表示', 'toast.todoCreated': 'Todoを追加しました：「{title}」', 'toast.todoUpdated': 'Todoを保存しました：「{title}」', 'toast.todoCompleted': 'Todoを完了しました：「{title}」', 'toast.todoReopened': 'Todoを再開しました：「{title}」', 'toast.todoDeleted': 'Todoを削除しました：「{title}」', 'toast.entryDeleted': '記録を削除しました', 'common.undo': '元に戻す', 'tag.example': '例：会議', 'settings.idleLabel': 'アイドル通知（分）', 'settings.idleHint': '計測中にこの時間操作がない場合、または画面ロックから戻った時に、その時間を除外するか確認します。',
-  'report.trackerLegend': '濃いほど長時間', 'settings.goalLabel': '1日の目標（時間）', 'settings.goalHint': 'ポップアップに今日の進捗を表示します。0で非表示。', 'todo.titlePlaceholder': '何をしますか？', 'schedule.titleLabel': 'やること', 'dialog.discardConfirm': '未保存の内容を破棄しますか？', 'popup.logButton': '[記録]', 'settings.autoBackupNote': '続行する前に現在のデータのバックアップをダウンロードします。', 'settings.lastBackup': '前回のバックアップ：{date}', 'settings.neverBackedUp': 'バックアップしたことがありません', 'backup.reminder': '{days}日間バックアップしていません。データはこのブラウザにのみ保存されています。', 'backup.reminderNever': 'データはこのブラウザにのみ保存され、まだバックアップされていません。', 'backup.now': '今すぐバックアップ', 'backup.later': '後で通知', 'timer.startedAt': '開始時刻', 'timer.startInvalid': '開始時刻は現在より前にしてください', 'notification.timerStopped': 'タイマーを停止しました', 'report.previousPeriod': '前の期間', 'report.nextPeriod': '次の期間', 'settings.shortcutLabel': 'ショートカット', 'settings.shortcutToggle': 'タイマーの開始／停止', 'settings.shortcutPopup': 'ポップアップを開く', 'settings.shortcutUnset': '未設定', 'settings.shortcutEdit': 'ショートカットを変更', 'popup.goal': '今日の目標 {goal}', 'popup.editDetails': '[+] 詳細を編集', 'popup.hideDetails': '[-] 詳細を閉じる',
+  'report.rangeTotal': '{days}日間の合計 {duration}', 'report.activeDayAverage': '記録のある日の平均 {duration}', 'report.dailyHours': '日別作業時間', 'report.lastDays': '直近{days}日', 'report.projectShare': 'プロジェクト別の時間', 'report.noWorkInView': 'この期間の作業時間はありません', 'report.otherProjects': 'その他', 'chart.goal': '目標 {hours}h',
+  'report.trackerLegend': '濃いほど長時間', 'settings.goalLabel': '1日の目標（時間）', 'settings.goalHint': 'ポップアップに今日の進捗を表示します。0で非表示。', 'popup.openSidePanel': 'サイドパネル', 'popup.sidePanelFailed': 'サイドパネルを開けませんでした', 'settings.shortcutPanel': 'サイドパネルを開く', 'todo.titlePlaceholder': '何をしますか？', 'schedule.titleLabel': 'やること', 'dialog.discardConfirm': '未保存の内容を破棄しますか？', 'popup.logButton': '[記録]', 'settings.autoBackupNote': '続行する前に現在のデータのバックアップをダウンロードします。', 'settings.lastBackup': '前回のバックアップ：{date}', 'settings.neverBackedUp': 'バックアップしたことがありません', 'backup.reminder': '{days}日間バックアップしていません。データはこのブラウザにのみ保存されています。', 'backup.reminderNever': 'データはこのブラウザにのみ保存され、まだバックアップされていません。', 'backup.now': '今すぐバックアップ', 'backup.later': '後で通知', 'timer.startedAt': '開始時刻', 'timer.startInvalid': '開始時刻は現在より前にしてください', 'notification.timerStopped': 'タイマーを停止しました', 'report.previousPeriod': '前の期間', 'report.nextPeriod': '次の期間', 'settings.shortcutLabel': 'ショートカット', 'settings.shortcutToggle': 'タイマーの開始／停止', 'settings.shortcutPopup': 'ポップアップを開く', 'settings.shortcutUnset': '未設定', 'settings.shortcutEdit': 'ショートカットを変更', 'popup.goal': '今日の目標 {goal}', 'popup.editDetails': '[+] 詳細を編集', 'popup.hideDetails': '[-] 詳細を閉じる',
   'settings.roundLabel': '記録ごとの丸め（分）', 'settings.roundNone': '丸めない', 'settings.roundHint': '記録時間をこの倍数に切り上げます。正確な時間には「丸めない」を選択してください。',
   'settings.editorLabel': 'メモエディタ', 'settings.editorToolbar': 'テキスト編集＋書式ツールバー', 'settings.editorSource': 'Markdownソース',
   'settings.editorHint': '改行と空白を保ったまま全文を編集できます。ツールバーでMarkdownを入力し、プレビューで書式を確認できます。', 'settings.data': 'データ',
@@ -1261,6 +1268,15 @@ export function formatDisplayTime(value, locale) {
   return new Intl.DateTimeFormat(intlLocale(locale), {
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(value));
+}
+
+/** 報表用的短格式：不分語系都是 45m、2h、1h 20m，方便掃視與對齊。 */
+export function formatCompactDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.floor(Number(seconds) / 60) || 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (!hours) return `${minutes}m`;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 export function formatDuration(seconds, locale) {

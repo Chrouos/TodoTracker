@@ -10,5 +10,8 @@
   },
   "commandOpenPopup": {
     "message": "TodoTracker のポップアップを開く"
+  },
+  "commandOpenSidePanel": {
+    "message": "TodoTracker のサイドパネルを開く"
   }
 }

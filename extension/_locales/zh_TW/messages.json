@@ -10,5 +10,8 @@
   },
   "commandOpenPopup": {
     "message": "開啟 TodoTracker popup"
+  },
+  "commandOpenSidePanel": {
+    "message": "開啟 TodoTracker 側邊欄"
   }
 }

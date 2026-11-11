@@ -8,9 +8,7 @@ import {
 } from '../src/lib/report-navigation.js';
 
 test('reportActionTarget routes entry issues to records and overdue todos to todos', () => {
-  assert.deepEqual(reportActionTarget('missing-notes'), { tab: 'entries', type: 'entry' });
   assert.deepEqual(reportActionTarget('unclassified'), { tab: 'entries', type: 'entry' });
-  assert.deepEqual(reportActionTarget('unlinked'), { tab: 'entries', type: 'entry' });
   assert.deepEqual(reportActionTarget('overdue'), { tab: 'todos', type: 'todo' });
 });
 

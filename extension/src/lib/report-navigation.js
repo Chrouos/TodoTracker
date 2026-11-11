@@ -1,4 +1,4 @@
-const ENTRY_ACTIONS = new Set(['missing-notes', 'unclassified', 'unlinked']);
+const ENTRY_ACTIONS = new Set(['unclassified']);
 
 function normalizedFocus(focus) {
   return {

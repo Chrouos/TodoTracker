@@ -1,10 +1,15 @@
 import { fmtDate, splitEntryByDay } from './time.js';
 
-const UNCLASSIFIED = {
-  id: null,
-  name: '未分類',
-  color: '#9a9898',
-};
+const NEUTRAL_LABELS = { unclassified: '未分類', other: '其他' };
+const UNCLASSIFIED_COLOR = '#9a9898';
+const OTHER_COLOR = '#c5c0bb';
+
+// 未分類與其他不是真的專案，排最後才不會壓在底部搶走視線
+const neutralLast = (series) => [
+  ...series.filter((item) => item.id !== null && item.id !== 'other'),
+  ...series.filter((item) => item.id === null),
+  ...series.filter((item) => item.id === 'other'),
+];
 
 function projectMap(projects) {
   return new Map(projects.map((project) => [project.id, project]));
@@ -25,9 +30,9 @@ function bucketIdFor(projectId, projectsById) {
   return rootIdFor(projectId, projectsById);
 }
 
-function bucketDefinitions(projects, projectsById) {
+function bucketDefinitions(projects, projectsById, labels) {
   const roots = projects.filter((project) => !project.parentId || !projectsById.has(project.parentId));
-  return [...roots, UNCLASSIFIED];
+  return [...roots, { id: null, name: labels.unclassified, color: UNCLASSIFIED_COLOR }];
 }
 
 function emptyValues(dates) {
@@ -40,10 +45,11 @@ export function buildProjectTrendData({
   dates,
   durationSec,
   limit = 8,
+  labels = NEUTRAL_LABELS,
 }) {
   const safeDates = [...dates];
   const projectsById = projectMap(projects);
-  const definitions = bucketDefinitions(projects, projectsById);
+  const definitions = bucketDefinitions(projects, projectsById, labels);
   const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   const valuesById = new Map(definitions.map((definition) => [definition.id, emptyValues(safeDates)]));
   const detailsByDate = safeDates.map(() => []);
@@ -74,7 +80,7 @@ export function buildProjectTrendData({
   const ranked = [...rawSeries].sort((a, b) => b.total - a.total);
   const visible = ranked.length > limit
     ? [...ranked.slice(0, Math.max(1, limit - 1)), {
-        id: 'other', name: '其他', color: '#c5c0bb',
+        id: 'other', name: labels.other, color: OTHER_COLOR,
         values: emptyValues(safeDates), total: 0,
       }]
     : ranked;
@@ -101,10 +107,48 @@ export function buildProjectTrendData({
 
   return {
     dates: safeDates,
-    series: visible,
+    series: neutralLast(visible),
     dailyTotals,
     detailsByDate,
     maxCellSeconds,
+  };
+}
+
+/** 所選區間內各專案（含子專案）的時間占比，總和與 KPI 總時數一致。 */
+export function buildProjectShare({ items, projects, limit = 8, labels = NEUTRAL_LABELS }) {
+  const projectsById = projectMap(projects);
+  const secondsById = new Map();
+  for (const item of items) {
+    const seconds = Math.max(0, Number(item.seconds) || 0);
+    if (!seconds) continue;
+    const rootId = bucketIdFor(item.projectId, projectsById);
+    // 已刪除的專案找不到，算進未分類，總和才對得上
+    const id = projectsById.has(rootId) ? rootId : null;
+    secondsById.set(id, (secondsById.get(id) || 0) + seconds);
+  }
+  const total = [...secondsById.values()].reduce((sum, seconds) => sum + seconds, 0);
+  const rows = [...secondsById.entries()]
+    .map(([id, seconds]) => {
+      const project = id === null ? null : projectsById.get(id);
+      return {
+        id,
+        name: project ? project.name : labels.unclassified,
+        color: project ? project.color : UNCLASSIFIED_COLOR,
+        seconds,
+      };
+    })
+    .sort((a, b) => b.seconds - a.seconds);
+  const shown = rows.length > limit
+    ? [...rows.slice(0, limit - 1), {
+        id: 'other',
+        name: labels.other,
+        color: OTHER_COLOR,
+        seconds: rows.slice(limit - 1).reduce((sum, row) => sum + row.seconds, 0),
+      }]
+    : rows;
+  return {
+    total,
+    rows: neutralLast(shown).map((row) => ({ ...row, share: total ? row.seconds / total : 0 })),
   };
 }
 

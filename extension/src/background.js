@@ -115,7 +115,12 @@ function notify(id, title, message) {
 }
 
 /** 全域快捷鍵：不開 popup 就能開始或停止，開始時沿用 popup 暫存的選擇 */
-chrome.commands.onCommand.addListener(async (command) => {
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  // sidePanel.open 必須在使用者操作的當下呼叫，前面不能有 await
+  if (command === 'open-side-panel') {
+    if (tab?.windowId) chrome.sidePanel.open({ windowId: tab.windowId }).catch((e) => console.error('[TodoTracker] 無法開啟側邊欄', e));
+    return;
+  }
   if (command !== 'toggle-timer') return;
   const locale = await currentLocale();
   const unnamed = translate(locale, 'common.unnamedWork');
@@ -177,7 +182,8 @@ chrome.idle.onStateChanged.addListener(async (state) => {
  * 這裡再檢查一次 origin，多一層保險。
  * ============================================================ */
 
-const ALLOWED_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+// 橋接能讀寫全部資料，所以只信任 web app 固定的 3000 埠，不開放本機其他服務
+const ALLOWED_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):3000$/;
 
 const RPC = {
   ping: async () => ({ ok: true, version: chrome.runtime.getManifest().version }),

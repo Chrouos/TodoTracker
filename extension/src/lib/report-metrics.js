@@ -48,11 +48,7 @@ export function overlapSeconds(entry, fromDate, toDate = fromDate) {
 
 export function buildReportQuality(entries, tasks, today) {
   let unclassifiedSeconds = 0;
-  let missingNotesCount = 0;
-  let unlinkedTaskSeconds = 0;
   const unclassifiedEntryIds = [];
-  const missingNotesEntryIds = [];
-  const unlinkedTaskEntryIds = [];
 
   for (const entry of entries) {
     const valid = validEntry(entry);
@@ -61,14 +57,6 @@ export function buildReportQuality(entries, tasks, today) {
     if (!entry.projectId) {
       unclassifiedSeconds += seconds;
       unclassifiedEntryIds.push(entry.id);
-    }
-    if (!String(entry.notes || '').trim()) {
-      missingNotesCount += 1;
-      missingNotesEntryIds.push(entry.id);
-    }
-    if (entry.projectId && !entry.taskId) {
-      unlinkedTaskSeconds += seconds;
-      unlinkedTaskEntryIds.push(entry.id);
     }
   }
 
@@ -81,13 +69,9 @@ export function buildReportQuality(entries, tasks, today) {
 
   return {
     unclassifiedSeconds,
-    missingNotesCount,
-    unlinkedTaskSeconds,
     overdueTodoCount,
     overdueTaskIds,
     unclassifiedEntryIds,
-    missingNotesEntryIds,
-    unlinkedTaskEntryIds,
   };
 }
 
@@ -96,14 +80,8 @@ export function buildReportActionItems(quality) {
   if (quality.overdueTodoCount > 0) {
     items.push({ kind: 'overdue', tone: 'danger', label: '逾期 Todo', value: quality.overdueTodoCount });
   }
-  if (quality.unlinkedTaskSeconds > 0) {
-    items.push({ kind: 'unlinked', tone: 'warning', label: '未綁定 Todo', value: quality.unlinkedTaskSeconds });
-  }
   if (quality.unclassifiedSeconds > 0) {
     items.push({ kind: 'unclassified', tone: 'warning', label: '未分類工時', value: quality.unclassifiedSeconds });
-  }
-  if (quality.missingNotesCount > 0) {
-    items.push({ kind: 'missing-notes', tone: 'muted', label: '未填寫工作備註', value: quality.missingNotesCount });
   }
   return items.length ? items : [{ kind: 'clear', tone: 'success', label: '目前沒有待處理項目', value: 0 }];
 }

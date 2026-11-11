@@ -75,13 +75,13 @@
           <span data-i18n="timer.notesCurrent">當下紀錄</span>
           <div class="timer-notes-preview-actions">
             <div class="timer-notes-mode" role="group" data-i18n-aria-label="timer.notesMode" aria-label="工作紀錄模式">
-              <button id="mgTimerNotesEditToggle" type="button" class="btn-sm active" data-i18n="timer.edit" aria-pressed="true">編輯</button>
-              <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" data-i18n="timer.preview" aria-pressed="false">預覽</button>
+              <button id="mgTimerNotesEditToggle" type="button" class="btn-sm active" data-i18n="timer.edit" aria-pressed="true" title="Ctrl/⌘+E">編輯</button>
+              <button id="mgTimerNotesPreviewToggle" type="button" class="btn-sm" data-i18n="timer.preview" aria-pressed="false" title="Ctrl/⌘+E">預覽</button>
             </div>
           </div>
         </div>
         <textarea id="mgTimerNotes" data-markdown-editor-input data-i18n-placeholder="timer.notesPlaceholder" placeholder="邊做邊記，停止時會一起保存"></textarea>
-        <div id="mgTimerNotesPreview" class="timer-notes-preview" hidden></div>
+        <div id="mgTimerNotesPreview" class="timer-notes-preview" tabindex="-1" hidden></div>
       </div>
 
       <div class="timer-panel-foot">

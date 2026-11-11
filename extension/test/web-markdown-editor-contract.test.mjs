@@ -48,6 +48,17 @@ test('Extension and Web editors expose whole-document source editing and optiona
   assert.doesNotMatch(webEditor, /contentEditable(?:=|\s)/);
 });
 
+test('Extension and Web editors both preview on an outside click and toggle with Ctrl/Cmd+E', () => {
+  for (const path of ['../src/lib/markdown-editor.js', '../../web/components/MarkdownBlockEditor.tsx']) {
+    const source = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
+    assert.match(source, /addEventListener\('pointerdown', \w+, true\)/);
+    assert.match(source, /addEventListener\('click', \w+, true\)/);
+    assert.match(source, /removeEventListener\('click', \w+, true\)/);
+    assert.match(source, /toLowerCase\(\) === 'e'/);
+    assert.match(source, /Ctrl\/⌘\+E/);
+  }
+});
+
 test('Extension and shared live preview APIs produce identical fixture output', () => {
   for (const fixture of livePreviewFixtures.activeSource) {
     assert.equal(

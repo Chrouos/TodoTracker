@@ -188,14 +188,13 @@ assert.match(options, /data-report-task-id/, 'Due Todo alerts should link direct
 assert.match(options, /if \(!visible\.length\) \{\s*mount\.innerHTML = '';/, 'Report should hide the due alert region when there is nothing to remind');
 assert.match(options, /buildWorkspaceTodoProgress/, 'Workspace status should derive its Todo completion progress');
 assert.match(options, /report-status-metrics/, 'Workspace status should show compact Todo completion metrics');
-assert.match(options, /donutSVG\(/, 'Workspace status should retain a compact Todo status donut');
-assert.match(options, /report-status-donut/, 'Workspace status should mount the compact Todo status donut');
+assert.match(options, /report-status-rate/, 'Workspace status should lead with the Todo completion rate');
+assert.match(options, /report-status-bar/, 'Workspace status should show Todo progress as a bar');
 assert.doesNotMatch(html, /id="todoHealth"|data-collapse="rep-health"/, 'Report should not render a separate Todo health section');
 assert.doesNotMatch(options, /renderTodoHealth\(|todoHealthSelectedStatus/, 'Todo health should not render as a separate chart');
 assert.match(options, /report-status-metrics/, 'Workspace status should contain the compact Todo summary');
 assert.match(css, /\.report-status-metrics\s*\{/, 'Compact Todo summary should have a dedicated layout style');
-assert.match(css, /\.report-status-donut\s*\{[^}]*flex:\s*0\s+0\s+160px/s, 'Todo donut should be large enough to read');
-assert.match(css, /\.report-status-donut \.todo-health-donut-svg\s*\{[^}]*width:\s*160px[^}]*height:\s*160px/s, 'Todo donut SVG should use the larger size');
+assert.match(css, /\.report-status-rate strong\s*\{[^}]*font-size:\s*30px/s, 'Todo completion rate should be large enough to read');
 assert.match(css, /#p-report > h2\.sec,\s*#p-report > \.report-panel > h2\.sec\s*\{/, 'Report section headings should share one typography rule');
 assert.match(options, /function clearFocusedReportTarget\(\)/,
   'Report navigation should expose one way to clear a stale focused target');
@@ -254,7 +253,7 @@ assert.match(options, /class="report-due-alerts-summary(?:\s|\")/, 'Due alerts s
 assert.match(options, /class="report-due-alert-date(?:\s|\")/, 'Due alert dates should have a dedicated metadata element');
 assert.match(css, /\.report-due-alerts\s*\{[^}]*background:\s*var\(--surface-soft\)/s, 'Due alerts should sit in a soft visual container');
 assert.match(css, /\.report-due-alert-badge\s*\{/, 'Due alerts should have a dedicated status badge style');
-assert.match(css, /\.report-due-alert\s*\{[^}]*height:\s*auto;[^}]*min-height:\s*56px;[^}]*line-height:\s*1\.4/s, 'Due alert rows should grow with their two-line content');
+assert.match(css, /\.report-due-alert\s*\{[^}]*height:\s*auto;[^}]*min-height:\s*36px;[^}]*line-height:\s*1\.4/s, 'Due alert rows should stay compact on one line so the charts appear sooner');
 assert.match(css, /\.report-project-row\s*\{/, 'Report should render projects as scannable status rows');
 assert.match(options, /data-report-project-tooltip/, 'Project progress bars should expose Todo summary tooltips');
 assert.match(options, /class="report-project-color"/, 'Project status rows should expose a project color marker');
