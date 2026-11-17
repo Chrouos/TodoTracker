@@ -592,6 +592,9 @@ const JA = {
 };
 
 const OPTIONS_ZH_TW = {
+  'project.historySearch': '搜尋已完成的 Todo',
+  'project.historyUndated': '沒有結案日期',
+  'project.historyNoResults': '找不到符合的紀錄',
   'editor.bold': '粗體', 'editor.heading': '標題', 'editor.unordered-list': '清單', 'editor.link': '連結',
   'editor.italic': '斜體', 'editor.ordered-list': '編號清單', 'editor.todo': '待辦清單', 'editor.quote': '引用',
   'editor.code': '程式碼區塊', 'editor.table': '表格', 'editor.rule': '分隔線', 'editor.more': '更多',
@@ -1021,6 +1024,9 @@ const OPTIONS_EN = {
   'project.noItems': 'No items yet',
   'project.noWorkLog': 'This project has no work log',
   'project.noWorkData': 'No work time available',
+  'project.historySearch': 'Search completed Todos',
+  'project.historyUndated': 'No completion date',
+  'project.historyNoResults': 'No matching records',
   'todo.parent': 'Parent Todo',
   'todo.topLevel': '— Top-level Todo —',
   'todo.parentHint': 'The selected Todo becomes a child task.',
@@ -1144,6 +1150,9 @@ const OPTIONS_EN = {
 
 const OPTIONS_JA = {
   ...OPTIONS_EN,
+  'project.historySearch': '完了した Todo を検索',
+  'project.historyUndated': '完了日なし',
+  'project.historyNoResults': '該当する記録はありません',
   'editor.bold': '太字', 'editor.heading': '見出し', 'editor.unordered-list': 'リスト', 'editor.link': 'リンク',
   'editor.italic': '斜体', 'editor.ordered-list': '番号付きリスト', 'editor.todo': 'タスクリスト', 'editor.quote': '引用',
   'editor.code': 'コードブロック', 'editor.table': '表', 'editor.rule': '区切り線', 'editor.more': 'その他',

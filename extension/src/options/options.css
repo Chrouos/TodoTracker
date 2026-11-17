@@ -1524,3 +1524,18 @@ dialog .field { margin-bottom: var(--md); }
   .report-project-progress { grid-column: 1 / 3; grid-row: 2; }
   .report-project-work { grid-column: 3; grid-row: 1; }
 }
+
+.workspace-history-toolbar { padding: 12px 0 4px; }
+.workspace-history-toolbar input { width: 100%; max-width: 360px; }
+.workspace-history-month[hidden], .workspace-todo-card[hidden], .workspace-history-empty[hidden] { display: none; }
+.workspace-history-month h4 { display: flex; gap: 8px; align-items: center; margin: 16px 0 3px; color: var(--text-mute); font: 600 12px var(--font-mono); }
+.workspace-history-month h4 span { font-weight: 400; }
+.workspace-todo-group-done .workspace-todo-card { padding: 8px 0; }
+.workspace-todo-card.is-done { opacity: 1; }
+.workspace-todo-card.is-done .workspace-todo-title { color: var(--text-body); text-decoration: none; }
+.workspace-history-detail > summary { display: block; cursor: pointer; list-style: none; }
+.workspace-history-detail > summary::-webkit-details-marker { display: none; }
+.workspace-history-detail > summary::after { content: '+'; float: right; margin-top: -30px; color: var(--text-mute); }
+.workspace-history-detail[open] > summary::after { content: '-'; }
+.workspace-history-detail > summary .workspace-todo-title-row { padding-right: 24px; }
+.workspace-history-empty { padding: 18px 0; color: var(--text-mute); font-size: 12px; }

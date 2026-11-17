@@ -1,3 +1,4 @@
+import { groupCompletedTasks } from '../lib/workspace-history.js';
 import * as db from '../lib/db.js';
 import { createCalendarController } from './calendar.js';
 import {
@@ -1749,19 +1750,20 @@ function renderWorkspaceTodo(task, project, allTasks) {
     ? `${task.dueDate}${task.dueTime ? ` ${task.dueTime}` : ''}`
     : translateText('todo.noDueDate');
   const noteLabel = translateText('todo.notes');
-  return `<article class="workspace-todo-card${done ? ' is-done' : ''}" style="--workspace-task-depth:${workspaceTodoDepth(task, allTasks)}">
-    <button type="button" class="workspace-todo-check" data-workspace-todo-check="${esc(task.id)}" aria-label="${esc(done ? translateText('todo.reopen') : translateText('todo.markDone'))}" aria-pressed="${done}">${done ? '✓' : '○'}</button>
-    <div class="workspace-todo-body">
-      <div class="workspace-todo-title-row"><strong class="workspace-todo-title">${esc(task.title)}</strong>${task.status === 'doing' ? `<span class="badge workspace-todo-status">${translateText('todo.status.doing')}</span>` : ''}</div>
-      <div class="workspace-todo-meta"><span>${esc(due)}</span>${metrics.worked ? `<span>${fmtHM(metrics.worked)}</span>` : ''}${project ? `<span>${esc(project.name)}</span>` : ''}</div>
-      <details class="workspace-todo-note">
+  const content = `<details class="workspace-todo-note">
         <summary>${esc(noteLabel)}</summary>
         <div class="workspace-todo-note-editor">
           <textarea data-workspace-todo-note-input="${esc(task.id)}" aria-label="${esc(noteLabel)}" placeholder="${esc(translateText('todo.notesPlaceholder'))}">${esc(task.notes || '')}</textarea>
           <button type="button" class="btn-sm btn-primary" data-workspace-todo-save="${esc(task.id)}">${translateText('common.save')}</button>
         </div>
       </details>
-      ${renderWorkspaceTodoLog(task)}
+      ${renderWorkspaceTodoLog(task)}`;
+  const heading = `<div class="workspace-todo-title-row"><strong class="workspace-todo-title">${esc(task.title)}</strong>${task.status === 'doing' ? `<span class="badge workspace-todo-status">${translateText('todo.status.doing')}</span>` : ''}</div>
+      <div class="workspace-todo-meta"><span>${esc(done && task.completedAt ? fmtDate(task.completedAt) : due)}</span>${metrics.worked ? `<span>${fmtHM(metrics.worked)}</span>` : ''}${project ? `<span>${esc(project.name)}</span>` : ''}</div>`;
+  return `<article class="workspace-todo-card${done ? ' is-done' : ''}" data-workspace-history-search="${esc(`${task.title} ${task.notes || ''} ${project?.name || ''}`.toLowerCase())}" style="--workspace-task-depth:${done ? 0 : workspaceTodoDepth(task, allTasks)}">
+    <button type="button" class="workspace-todo-check" data-workspace-todo-check="${esc(task.id)}" aria-label="${esc(done ? translateText('todo.reopen') : translateText('todo.markDone'))}" aria-pressed="${done}">${done ? '✓' : '○'}</button>
+    <div class="workspace-todo-body">
+      ${done ? `<details class="workspace-history-detail"><summary>${heading}</summary>${content}</details>` : `${heading}${content}`}
     </div>
   </article>`;
 }
@@ -1776,7 +1778,8 @@ function renderWorkspaceTodoGroup(label, items, status, allTasks) {
     const total = items.reduce((sum, task) => sum + taskMetrics(task, S.entries).worked, 0);
     return `<details class="workspace-todo-group${doneClass}" data-workspace-todo-group="done">
       <summary class="workspace-todo-group-head"><span>${label}</span><span class="badge">${items.length}</span><span class="workspace-todo-group-stats">${fmtHM(total)}</span></summary>
-      <div class="workspace-todo-group-content">${body}</div>
+      <div class="workspace-history-toolbar"><input type="search" data-workspace-history-filter placeholder="${esc(translateText('project.historySearch'))}" aria-label="${esc(translateText('project.historySearch'))}"></div>
+      <div class="workspace-todo-group-content">${items.length ? groupCompletedTasks(items).map(({ month, tasks: monthTasks }) => `<section class="workspace-history-month"><h4>${esc(month || translateText('project.historyUndated'))} <span>${monthTasks.length}</span></h4>${monthTasks.map((task) => renderWorkspaceTodo(task, S.projects.find((project) => project.id === task.projectId), allTasks)).join('')}</section>`).join('') : body}<div class="workspace-history-empty" hidden>${translateText('project.historyNoResults')}</div></div>
     </details>`;
   }
   return `<div class="workspace-todo-group${doneClass}" data-workspace-todo-group="${status}">
@@ -1885,6 +1888,22 @@ document.getElementById('projList').addEventListener('click', (event) => {
     scrollToProjectWorkspace();
   }
 });
+document.getElementById('projectWorkspace').addEventListener('input', (event) => {
+  if (!event.target.matches('[data-workspace-history-filter]')) return;
+  const group = event.target.closest('[data-workspace-todo-group="done"]');
+  const query = event.target.value.trim().toLocaleLowerCase();
+  let visible = 0;
+  group.querySelectorAll('.workspace-history-month').forEach((month) => {
+    let monthVisible = 0;
+    month.querySelectorAll('[data-workspace-history-search]').forEach((card) => {
+      card.hidden = !card.dataset.workspaceHistorySearch.includes(query);
+      if (!card.hidden) { monthVisible += 1; visible += 1; }
+    });
+    month.hidden = monthVisible === 0;
+  });
+  group.querySelector('.workspace-history-empty').hidden = !query || visible > 0;
+});
+
 document.getElementById('projectWorkspace').addEventListener('click', async (event) => {
   const toggle = event.target.closest('[data-workspace-toggle]');
   if (toggle) {
@@ -1903,6 +1922,10 @@ document.getElementById('projectWorkspace').addEventListener('click', async (eve
     const projectId = workspaceProjectId;
     const section = event.target.closest('[data-workspace-section="todo"]');
     const keepOpen = section && !section.classList.contains('is-collapsed');
+    const historyGroup = section?.querySelector('[data-workspace-todo-group="done"]');
+    const historyOpen = historyGroup?.open;
+    const historyQuery = historyGroup?.querySelector('[data-workspace-history-filter]')?.value || '';
+    const detailOpen = !!event.target.closest('.workspace-history-detail[open]');
     if (checkId) {
       await db.upsertTask({ ...task, status: task.status === 'done' ? 'todo' : 'done' });
       showToast(translateText(task.status === 'done' ? 'toast.todoReopened' : 'toast.todoCompleted', { title: task.title }));
@@ -1913,7 +1936,21 @@ document.getElementById('projectWorkspace').addEventListener('click', async (eve
       showToast(translateText('toast.todoUpdated', { title: task.title }));
     }
     await load();
-    if (workspaceProjectId === projectId) renderProjectWorkspace(projectId, { openSections: keepOpen ? ['todo'] : [] });
+    if (workspaceProjectId === projectId) {
+      renderProjectWorkspace(projectId, { openSections: keepOpen ? ['todo'] : [] });
+      const group = $('projectWorkspace').querySelector('[data-workspace-todo-group="done"]');
+      if (group && historyOpen) {
+        group.open = true;
+        const filter = group.querySelector('[data-workspace-history-filter]');
+        filter.value = historyQuery;
+        filter.dispatchEvent(new Event('input', { bubbles: true }));
+        if (detailOpen && saveNoteId) {
+          const textarea = [...group.querySelectorAll('[data-workspace-todo-note-input]')].find((item) => item.dataset.workspaceTodoNoteInput === taskId);
+          const detail = textarea?.closest('.workspace-history-detail');
+          if (detail) detail.open = true;
+        }
+      }
+    }
     return;
   }
   if (event.target.closest('[data-close-workspace]')) {
