@@ -398,6 +398,14 @@
           </select>
         </label>
         <label class="field">
+          <span data-i18n="settings.theme">主題</span>
+          <select id="stTheme">
+            <option value="auto" data-i18n="settings.theme.auto">跟隨系統</option>
+            <option value="light" data-i18n="settings.theme.light">淺色</option>
+            <option value="dark" data-i18n="settings.theme.dark">深色</option>
+          </select>
+        </label>
+        <label class="field">
           <span data-i18n="settings.idleLabel">閒置提醒（分）</span>
           <input id="stIdle" type="number" min="1" step="1" />
           <span class="hint" data-i18n="settings.idleHint">計時中這麼久沒碰鍵盤滑鼠（或鎖螢幕），回來時會問你這段要不要扣掉。防止忘記按停止導致時數灌水。</span>

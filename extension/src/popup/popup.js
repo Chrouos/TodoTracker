@@ -1,4 +1,5 @@
 import * as db from '../lib/db.js';
+import { applyTheme } from '../lib/theme.js';
 import { initCollapse } from '../lib/collapse.js';
 import { flattenTree, indentLabel } from '../lib/tree.js';
 import { autoGrow } from '../lib/autogrow.js';
@@ -66,6 +67,7 @@ async function fetchState() {
 }
 
 function applyLocale() {
+  applyTheme(state.settings.theme);
   currentLocale = resolveLocale(state.settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);

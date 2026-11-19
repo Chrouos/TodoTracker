@@ -1,5 +1,6 @@
 import { groupCompletedTasks } from '../lib/workspace-history.js';
 import * as db from '../lib/db.js';
+import { applyTheme, normalizeTheme } from '../lib/theme.js';
 import { createCalendarController } from './calendar.js';
 import {
   applyTranslations,
@@ -217,6 +218,7 @@ async function load() {
     db.listTasks(), db.listEntries(), db.listSchedules(), db.getTimer(), db.getSettings(), db.listCalendarPlans(),
   ]);
   S = { projects, tags, tasks, entries, schedules, timer, settings, calendarPlans, backup: await db.getBackupState() };
+  applyTheme(settings.theme);
   currentLocale = resolveLocale(settings.language, getBrowserLocale());
   document.documentElement.lang = currentLocale === 'zh-TW' ? 'zh-Hant' : currentLocale;
   applyTranslations(document, currentLocale);
@@ -453,7 +455,7 @@ function renderTimer() {
 
   project.innerHTML = `<option value="">${esc(translateText('common.uncategorizedOption'))}</option>` +
     flattenTree(S.projects, { includeArchived: false })
-      .map((p) => `<option value="${p.id}">${esc(p.depth ? `${'› '.repeat(p.depth)}${p.name}` : p.name)}</option>`).join('');
+      .map((p) => `<option value="${p.id}">${esc(indentLabel(p.name, p.depth))}</option>`).join('');
   project.value = projectId;
 
   const tasks = S.tasks
@@ -2676,6 +2678,7 @@ function renderSettings() {
   $('stGoal').value = S.settings.dailyGoalHours;
   $('stNotesEditor').value = normalizeMarkdownEditorMode(S.settings.notesEditor);
   $('stLanguage').value = normalizeLanguagePreference(S.settings.language);
+  $('stTheme').value = normalizeTheme(S.settings.theme);
   initializeMarkdownEditors(S.settings.notesEditor);
   renderShortcuts();
   renderBackupState();
@@ -2714,6 +2717,7 @@ $('saveSettings').addEventListener('click', async () => {
     dailyGoalHours: Math.max(0, Number($('stGoal').value) || 0),
     notesEditor: normalizeMarkdownEditorMode($('stNotesEditor').value),
     language: normalizeLanguagePreference($('stLanguage').value),
+    theme: normalizeTheme($('stTheme').value),
   });
   await load();
   showToast(translate(currentLocale, 'settings.saved'));
@@ -2974,6 +2978,7 @@ function scheduleDataRefresh() {
       S = { ...S, ...next };
       currentLocale = resolveLocale(settings.language, getBrowserLocale());
       if (settingsChanged) {
+        applyTheme(settings.theme);
         applyTranslations(document, currentLocale);
         renderAll();
         return;

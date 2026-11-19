@@ -298,8 +298,8 @@ assert.match(css, /\.timer-fields\s*\{[^}]*grid-template-columns:\s*2fr\s+1\.5fr
   'Management timer should give project and Todo selectors enough width');
 assert.match(css, /\.timer-notes-field textarea\s*\{[^}]*min-height:\s*300px[^}]*max-height:\s*none/s,
   'Management timer notes should grow with the source instead of nesting scroll areas');
-assert.match(options, /'› '\.repeat\(p\.depth\)/,
-  'Management timer project options should use compact hierarchy labels');
+assert.match(options, /project\.innerHTML[\s\S]*?indentLabel\(p\.name, p\.depth\)/,
+  'Management timer project options should use indented hierarchy labels');
 assert.match(collapse, /collapseDefault/, 'Collapse should support a default closed state');
 assert.match(options,
   /const workspaceSections = \$\('projectWorkspace'\)\.querySelectorAll\('\.workspace-section'\);[\s\S]*?workspaceSections\.forEach\(\(section, index\) => \{\s*if \(index > 0 && !openSections\.includes\(section\.dataset\.workspaceSection\)\) section\.classList\.add\('is-collapsed'\);/,

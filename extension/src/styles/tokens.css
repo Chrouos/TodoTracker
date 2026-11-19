@@ -51,16 +51,45 @@
   --r-full: 9999px;
 }
 
-:root { color-scheme: light dark; }
+:root { color-scheme: light; }
 
 /* 日文介面要用日文字形，否則漢字會變成繁中寫法 */
 :root:lang(ja) {
   --font: "Noto Sans JP", "Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
 }
 
-/* 跟著系統切換；只換 token，元件不用各寫一份 */
+/* 手動選擇優先，未指定時跟隨系統。 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #f1eeee;
+  --ink-deep: #ffffff;
+  --canvas: #181616;
+  --surface-soft: #211e1e;
+  --surface-card: #2c2828;
+  --surface-dark: #0f0d0d;
+  --surface-dark-2: #2a2626;
+  --hairline: rgba(255, 255, 255, 0.14);
+  --hairline-strong: #8f8b8b;
+  --text-ink: #f1eeee;
+  --text-charcoal: #e4e0e0;
+  --text-body: #cfcbcb;
+  --text-mute: #a8a3a3;
+  --text-stone: #a3a3a8;
+  --text-ash: #85817f;
+  --accent: #4da3ff;
+  --accent-hover: #7bbcff;
+  --danger: #ff6b61;
+  --danger-hover: #ff8d85;
+  --warning: #ffb340;
+  --success: #3ddc6a;
+  --warning-text: #ffc266;
+  --info: #7db3ee;
+}
+:root[data-theme="dark"] .swatch { box-shadow: 0 0 0 1px var(--hairline); }
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
+    color-scheme: dark;
     --ink: #f1eeee;
     --ink-deep: #ffffff;
     --canvas: #181616;
@@ -86,7 +115,7 @@
     --info: #7db3ee;
   }
   /* 專案預設色接近黑色，深色底上要有邊才看得到 */
-  .swatch { box-shadow: 0 0 0 1px var(--hairline); }
+  :root:not([data-theme]) .swatch { box-shadow: 0 0 0 1px var(--hairline); }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -175,7 +204,48 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--ink);
 }
 input::placeholder, textarea::placeholder { color: var(--text-ash); }
-select { appearance: none; padding-right: var(--xl); cursor: pointer; }
+/* Match native menus to the extension's light surfaces, including on macOS. */
+select { appearance: none; padding-right: var(--xl); cursor: pointer; color-scheme: light; }
+:root[data-theme="dark"] select { color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) select { color-scheme: dark; }
+}
+select option { color: var(--text-ink); background: var(--canvas); }
+
+/* Render the picker in the page so its colors follow the selected theme on macOS. */
+@supports (appearance: base-select) and selector(::picker(select)) {
+  select, select::picker(select) { appearance: base-select; }
+  select { align-items: center; line-height: 1.4; padding-right: var(--sm); }
+  select::picker-icon { color: var(--text-mute); }
+  select::picker(select) {
+    max-height: min(360px, 55vh);
+    margin-top: 6px;
+    padding: 6px;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    background: var(--canvas);
+    box-shadow: 0 8px 24px rgba(15, 0, 0, .12);
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-ash) transparent;
+  }
+  select option {
+    min-height: 34px;
+    padding: 7px 10px;
+    border-radius: 5px;
+    color: var(--text-ink);
+    background: transparent;
+    line-height: 1.4;
+    white-space: normal;
+  }
+  select option:hover, select option:focus { background: var(--surface-soft); }
+  select option:focus { outline: none; }
+  select option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  select option:checked {
+    background: var(--surface-card);
+    font-weight: 600;
+  }
+  select option::checkmark { order: 1; margin-left: auto; padding-left: var(--md); color: var(--accent); }
+}
 
 label.field { display: block; }
 label.field > span { display: block; font-size: 12px; color: var(--text-mute); margin-bottom: var(--xs); }
