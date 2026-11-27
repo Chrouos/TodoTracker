@@ -1,6 +1,6 @@
 # TodoTracker 隱私權政策
 
-最後更新日期：2026 年 8 月 10 日
+最後更新日期：2026 年 11 月 20 日
 
 TodoTracker 是一個用來記錄工作時間、管理 Todo 與設定提醒的 Chrome extension。
 
@@ -14,14 +14,19 @@ TodoTracker 可能會在你的 Chrome 本機儲存以下資料：
 
 這些資料是你主動輸入的內容，並儲存在你自己的 Chrome 本機儲存空間。
 
+## 選用的 Google Drive 備份
+
+授權後，擴充使用 Google Drive 的 `drive.file` 權限，在你自己的 Drive 建立、讀取及管理 TodoTracker 的 JSON 備份。擴充會在本機保存連結帳號的識別資料和電子郵件地址，以確認備份帳號並在設定頁顯示。中斷連結會停用自動備份並清除本機連結資料。你可以在 Google Drive 管理或刪除已上傳的備份。
+
+使用跨瀏覽器授權時，TodoTracker 的 Supabase Edge Function 會將授權碼或更新權杖轉交給 Google，以換取存取權杖。更新權杖儲存在擴充套件的本機儲存空間。備份內容由擴充套件直接傳給 Google Drive。
+
 ## 我們不會做什麼
 
 TodoTracker：
 
-- 不會收集姓名、電子郵件、地址或其他身分資料
 - 不會讀取你的瀏覽紀錄、網站內容或其他網站資料
-- 不會將資料上傳到我們的伺服器
-- 不會出售、出租或分享使用者資料給第三方
+- 不會將待辦、計時紀錄或備份內容上傳到我們的伺服器
+- 不會出售或出租使用者資料
 - 不使用廣告、分析工具或跨網站追蹤
 
 ## 權限用途
@@ -47,7 +52,7 @@ TodoTracker：
 
 # TodoTracker Privacy Policy
 
-Last updated: August 10, 2026
+Last updated: November 20, 2026
 
 TodoTracker is a Chrome extension for tracking work time, managing Todos, and setting reminders.
 
@@ -61,14 +66,19 @@ TodoTracker may store the following data in Chrome's local storage on your devic
 
 This data is entered by you and remains in your local Chrome storage.
 
+## Optional Google Drive backup
+
+If you connect Google Drive, the extension uses the `drive.file` scope to create, read, and manage TodoTracker JSON backups in your Drive. It stores the connected account identifier and email locally to confirm the backup destination and display the account in settings. Disconnecting stops automatic backups and clears the local connection details. You can manage or delete uploaded backups in Google Drive.
+
+For cross-browser authorization, TodoTracker's Supabase Edge Function passes authorization codes or refresh tokens to Google in exchange for access tokens. The extension stores the refresh token locally and sends backup contents directly to Google Drive.
+
 ## What we do not do
 
 TodoTracker:
 
-- Does not collect names, email addresses, addresses, or other identity data
 - Does not read browsing history, website content, or data from other websites
-- Does not upload your data to our servers
-- Does not sell, rent, or share user data with third parties
+- Does not upload your tasks, time entries, or backup contents to our servers
+- Does not sell or rent user data
 - Does not use ads, analytics, or cross-site tracking
 
 ## Permission usage

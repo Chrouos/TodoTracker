@@ -4,7 +4,7 @@ const storage = {};
 let external;
 const event = () => ({ addListener() {} });
 globalThis.chrome = {
-  runtime: { onInstalled: event(), onStartup: event(), onMessageExternal: { addListener(fn) { external = fn; } } },
+  runtime: { onInstalled: event(), onStartup: event(), onMessage: event(), onMessageExternal: { addListener(fn) { external = fn; } } },
   alarms: { onAlarm: event() }, idle: { onStateChanged: event() },
   notifications: { onClicked: event() },
   commands: { onCommand: event() },

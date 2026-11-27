@@ -568,7 +568,7 @@ export function secondsByProject(entries) {
 
 /* ---------------- 匯出 / 匯入 ---------------- */
 
-export async function exportAll() {
+async function exportAll() {
   const [projects, tags, tasks, entries, schedules, settings] = await Promise.all([
     read(K.projects, []), read(K.tags, []), read(K.tasks, []),
     read(K.entries, []), read(K.schedules, []), getSettings(),
@@ -660,6 +660,7 @@ const locked_resolveIdleTimer = locked(resolveIdleTimer);
 const locked_stopTimer = locked(stopTimer);
 const locked_snoozeBackupReminder = locked(snoozeBackupReminder);
 const locked_importAll = locked(importAll);
+const locked_exportAll = locked(exportAll);
 const locked_markBackedUp = locked(markBackedUp);
 export {
   locked_saveSettings as saveSettings,
@@ -689,5 +690,6 @@ export {
   locked_stopTimer as stopTimer,
   locked_snoozeBackupReminder as snoozeBackupReminder,
   locked_importAll as importAll,
+  locked_exportAll as exportAll,
   locked_markBackedUp as markBackedUp,
 };

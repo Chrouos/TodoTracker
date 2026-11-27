@@ -20,6 +20,12 @@
 
 用來在 Todo 到達設定的提醒時間時顯示 Chrome 桌面通知，讓使用者知道該處理哪一項工作。
 
+### identity 和 Google Drive API 網域
+
+使用者主動連結 Google Drive 時，向 Chrome 取得 Google 授權，並呼叫 Drive API 儲存和還原使用者自己的 TodoTracker 備份。使用 `drive.file` 權限範圍。
+
+啟用跨瀏覽器授權的版本也會向 TodoTracker 的 Supabase Edge Function 交換及更新 Google OAuth 權杖。備份內容由擴充套件直接傳給 Google Drive。
+
 ### Remote code
 
 請選擇：**否，我沒有使用遠端程式碼**。
@@ -45,6 +51,12 @@ Used to detect when the user is away from the computer or the screen is locked, 
 ### notifications
 
 Used to show a Chrome desktop notification when a Todo reaches its reminder time, so the user knows which task needs attention.
+
+### identity and Google Drive API host
+
+Used to authorize Google Drive through Chrome after the user connects their account, then call the Drive API to save and restore the user's TodoTracker backups with the `drive.file` scope.
+
+Builds with cross-browser authorization also use TodoTracker's Supabase Edge Function to exchange and refresh Google OAuth tokens. The extension sends backup contents directly to Google Drive.
 
 ### Remote code
 

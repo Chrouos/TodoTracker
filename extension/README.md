@@ -8,7 +8,7 @@ TodoTracker 是一個放在 Chrome 工具列的工作追蹤工具，集中處理
 - 報表與工作回顧
 - 固定週期排程與提醒
 
-目前版本：`0.3.5 beta`
+目前版本：`0.3.6 beta`
 
 ## 功能總覽
 
@@ -211,3 +211,32 @@ node --test extension/test/calendar.browser.mjs
 可用 `PLAYWRIGHT_MODULE` 指定 Playwright 模組路徑；設定 `CALENDAR_SCREENSHOTS=1` 會將週／月檢視截圖存入 `docs/images/calendar/`。
 
 `node --test extension/test/calendar-mv3.browser.mjs` 會以 Playwright 的 Chromium 載入真正的 MV3 extension，驗證 service worker、CSP 與安排儲存。需先執行 `playwright install chromium`；測試使用獨立的暫存 profile。
+
+## Google Drive 自動備份
+
+在「設定 → Google Drive 備份」連結你的 Google 帳號。TodoTracker 繼續把資料儲存在本機。瀏覽器啟動和每小時會檢查資料變更，連線時將 JSON 上傳到你的「我的雲端硬碟」。你也可以點「立即備份」。成功上傳後保留最近 7 份，更舊的檔案移到 Drive 垃圾桶。
+
+換電腦時，使用同一個 Google 帳號與同一版 OAuth 設定，按「載入備份版本」，選擇版本再按「匯入備份」。確認後，擴充會先下載一份目前的本機 JSON，再覆蓋本機資料。也可以直接從 Drive 下載 JSON，使用原本的匯入功能。備份涵蓋專案、標籤、待辦、工作紀錄、排程、行事曆計畫和設定。Web 附件與正在執行的計時器狀態不在備份內。
+
+### 跨瀏覽器授權設定
+
+1. 在 Google Cloud 啟用 Google Drive API，為 OAuth 同意畫面設定 `https://www.googleapis.com/auth/drive.file`。測試模式下，將測試帳號加到名單。測試模式的 Drive 授權七天後到期。
+2. 在與現有 Chrome OAuth 用戶端相同的 Google Cloud 專案建立 **Web application** OAuth 用戶端。授權重新導向 URI 填 `https://<project-ref>.supabase.co/functions/v1/drive-oauth/callback`。
+3. 在 Supabase Edge Function Secrets 設定 `GOOGLE_DRIVE_CLIENT_ID`、`GOOGLE_DRIVE_CLIENT_SECRET`、`GOOGLE_DRIVE_REDIRECT_URI`（上一步的完整 URI）與 `GOOGLE_DRIVE_EXTENSION_IDS`（允許的擴充套件 ID，以逗號分隔）。從儲存庫根目錄部署：
+
+   ```sh
+   supabase functions deploy drive-oauth --project-ref <project-ref> --no-verify-jwt
+   ```
+
+   Google 的回呼本身沒有 Supabase JWT。這個函式會驗證授權狀態與 PKCE，並限制回傳至設定的擴充套件 ID。
+4. 將 `extension/src/lib/drive-oauth-config.js` 的 `driveOAuthEndpoint` 設為 `https://<project-ref>.supabase.co/functions/v1/drive-oauth`，並將 `https://<project-ref>.supabase.co/*` 加到 `extension/manifest.json` 的 `host_permissions`。只將該專案的網域加入權限。Google 用戶端密鑰放在 Supabase 的 Secrets。
+5. 重新載入擴充套件。在 Dia 和 Chrome 各自連結 Drive，按「立即備份」，確認「載入備份版本」可找到檔案。重啟瀏覽器後確認仍可載入備份版本。既有 Chrome 授權可繼續使用，直到使用者重新連結。
+
+### Chrome 原生授權設定
+
+1. 在 Google Cloud 專案啟用 Google Drive API、設定 OAuth 同意畫面，並加入 `https://www.googleapis.com/auth/drive.file` 權限範圍。若應用程式處於測試模式，將測試帳號加到測試使用者清單。
+2. 建立類型為 **Chrome Extension** 的 OAuth 用戶端，Item ID 填入 `chrome://extensions` 顯示的 TodoTracker 擴充 ID。
+3. 將 OAuth Client ID 填入 `extension/manifest.json` 的 `oauth2.client_id`，再重新載入擴充。
+4. 在設定頁連結 Google Drive、立即備份，確認 Google Drive 出現 `TodoTracker-*.json`，再從備份歷史確認可載入及還原。
+
+[Chrome 擴充 OAuth 設定](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth)

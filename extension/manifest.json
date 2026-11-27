@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "0.3.5",
-  "version_name": "0.3.5 beta",
+  "version": "0.3.6",
+  "version_name": "0.3.6 beta",
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzL6ld+WdaegeEkMyYIbpm0Ja0Y0zrtm4pEtQb9VBUd27XSgG2C+nfhf/Xnnu7eOldmUtgTmjKvUSlrxQCsTBeqLFfbMjgzCCNMMJexVY0sLcHJZmSmYm/upUgvmJzbeqeGRWPxoDK1tgVa1jCyCUPiblm8LmKiw59BtBgWOrlS/jdtjrrVFsl/KyNmaD7XPgYfLVV3FfRRtumwquZ+A0dYd0uNkf4MoAF0HxJIS+hvP1vYaZeWn6WK+kdJfbijm99NIvOR01ZusNdS1K7NEp85EGNqZSNYQUm5vzW7yc89YakCv5xRgo7T7UtCd7rqFKNt0HGaXsVpZ2x3JJN7AM5wIDAQAB",
@@ -11,8 +11,17 @@
     "alarms",
     "idle",
     "notifications",
-    "sidePanel"
+    "sidePanel",
+    "identity"
   ],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://fszzhzgsvslluskgcwde.supabase.co/*"
+  ],
+  "oauth2": {
+    "client_id": "52554538928-r21oga8fage04obq05kv0fvq17jui96s.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/drive.file"]
+  },
   "externally_connectable": {
     "matches": [
       "http://localhost/*",

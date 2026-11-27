@@ -8,8 +8,11 @@
 
 import * as db from './lib/db.js';
 import { getTimer, patchTimer, getSettings } from './lib/db.js';
+import { registerDriveBackup } from './lib/drive-backup-worker.js';
 import { fmtBadge } from './lib/time.js';
 import { formatDuration, getBrowserLocale, resolveLocale, translate } from './lib/i18n.js';
+
+registerDriveBackup();
 
 const ALARM_TICK = 'tt-tick';
 const ALARM_SCHED = 'tt-sched';   // 每分鐘檢查排程與提醒

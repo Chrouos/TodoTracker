@@ -463,6 +463,24 @@
         <button id="wipe" class="btn-danger" data-i18n="settings.wipe">[x] 清空所有資料</button>
       </div>
     </div>
+
+    <h2 class="sec" data-i18n="driveBackup.title">Google Drive 備份</h2>
+    <div class="card">
+      <p class="cap" data-i18n="driveBackup.hint">自動備份到你的 Google Drive，保留最近 7 份。</p>
+      <p id="driveBackupStatus" class="cap" role="status"></p>
+      <p id="driveBackupFeedback" class="cap" role="status"></p>
+      <div class="actions">
+        <button id="driveBackupConnect" hidden data-i18n="driveBackup.connect">連結 Google Drive</button>
+        <button id="driveBackupDisconnect" hidden data-i18n="driveBackup.disconnect">中斷連結</button>
+        <button id="driveBackupNow" hidden data-i18n="backup.now">立即備份</button>
+        <button id="driveBackupList" hidden data-i18n="driveBackup.history">載入備份版本</button>
+      </div>
+      <div id="driveBackupRestoreControls" class="actions" hidden>
+        <label for="driveBackupVersion" data-i18n="driveBackup.version">備份版本</label>
+        <select id="driveBackupVersion"></select>
+        <button id="driveBackupRestore" data-i18n="settings.restore">匯入備份</button>
+      </div>
+    </div>
   </section>
 </div>
 

@@ -2685,6 +2685,7 @@ function renderSettings() {
 }
 
 function renderBackupState() {
+  renderDriveBackup();
   const { lastBackupAt = null, snoozeUntil = null } = S.backup || {};
   $('stLastBackup').textContent = lastBackupAt
     ? translateText('settings.lastBackup', { date: fmtDate(lastBackupAt) })
@@ -2751,8 +2752,8 @@ function exportCsvOf(rows, tag) {
     '﻿' + [head.join(','), ...lines].join('\n'), 'text/csv;charset=utf-8');
 }
 
-async function downloadBackup(tag = 'backup') {
-  const data = await db.exportAll();
+async function downloadBackup(tag = 'backup', snapshot) {
+  const data = snapshot ?? await db.exportAll();
   download(`todotracker-${tag}-${fmtDate(new Date().toISOString())}.json`,
     JSON.stringify(data, null, 2), 'application/json');
   await db.markBackedUp();
@@ -2762,7 +2763,8 @@ async function downloadBackup(tag = 'backup') {
 
 // 匯入和清空都無法復原，有資料就先留一份
 async function backupBeforeOverwrite(tag) {
-  if (S.projects.length || S.tasks.length || S.entries.length) await downloadBackup(tag);
+  const data = await db.exportAll();
+  await downloadBackup(tag, data);
 }
 
 $('backup').addEventListener('click', () => downloadBackup());
@@ -2773,19 +2775,134 @@ $('backupBannerLater').addEventListener('click', async () => {
   renderBackupState();
 });
 
+async function restoreBackup(data) {
+  db.assertBackup(data);
+  if (!confirm(`${translateText('settings.importConfirm')}\n${translateText('settings.autoBackupNote')}`)) return;
+  await backupBeforeOverwrite('before-import');
+  await db.importAll(data);
+  await load();
+  showToast(translateText('settings.imported'));
+}
+
+let driveBackupState = {};
+let driveBackupBusy = false;
+const driveBackupButtons = ['Connect', 'Disconnect', 'Now', 'List', 'Restore'];
+const driveBackupNode = (suffix) => $('driveBackup' + suffix);
+
+async function driveBackupRequest(action, id) {
+  const response = await chrome.runtime.sendMessage({ type: 'drive-backup', action, id });
+  if (!response?.ok) throw new Error(response?.error || 'backupFailed');
+  return response.value;
+}
+
+function renderDriveBackup() {
+  const { configured, enabled, lastBackupAt, error } = driveBackupState;
+  driveBackupNode('Connect').hidden = !configured || (enabled && error !== 'authorizationRequired');
+  for (const suffix of ['Disconnect', 'Now', 'List']) driveBackupNode(suffix).hidden = !enabled;
+  for (const suffix of driveBackupButtons) driveBackupNode(suffix).disabled = driveBackupBusy;
+  const messages = [];
+  if (!configured) messages.push(translateText('driveBackup.setupRequired'));
+  else if (!enabled) messages.push(translateText('driveBackup.disconnected'));
+  else {
+    messages.push(translateText('driveBackup.connected', { account: driveBackupState.email || 'Google Drive' }));
+    messages.push(lastBackupAt
+      ? translateText('settings.lastBackup', { date: new Date(lastBackupAt).toLocaleString(currentLocale) })
+      : translateText('settings.neverBackedUp'));
+    if (error) messages.push(translateText(`driveBackup.${error}`));
+  }
+  driveBackupNode('Status').textContent = messages.join(' ');
+}
+
+async function refreshDriveBackup() {
+  try {
+    driveBackupState = await driveBackupRequest('status');
+    renderDriveBackup();
+  } catch {
+    driveBackupNode('Status').textContent = translateText('driveBackup.backupFailed');
+  }
+}
+
+function driveBackupAction(suffix, action) {
+  driveBackupNode(suffix).addEventListener('click', async () => {
+    driveBackupBusy = true;
+    driveBackupNode('Feedback').textContent = '';
+    renderDriveBackup();
+    try {
+      await action();
+    } catch (error) {
+      const code = ['authorizationRequired', 'invalidBackup', 'setupRequired'].includes(error.message)
+        ? error.message : 'backupFailed';
+      driveBackupNode('Feedback').textContent = translateText(`driveBackup.${code}`);
+      if (code === 'authorizationRequired') {
+        driveBackupNode('RestoreControls').hidden = true;
+        await refreshDriveBackup();
+        driveBackupState.error = code;
+      }
+    } finally {
+      driveBackupBusy = false;
+      renderDriveBackup();
+    }
+  });
+}
+
+function clearDriveBackupHistory() {
+  driveBackupNode('RestoreControls').hidden = true;
+  driveBackupNode('Version').replaceChildren();
+}
+
+driveBackupAction('Connect', async () => {
+  await driveBackupRequest('connect');
+  clearDriveBackupHistory();
+  await refreshDriveBackup();
+});
+driveBackupAction('Disconnect', async () => {
+  await driveBackupRequest('disconnect');
+  clearDriveBackupHistory();
+  await refreshDriveBackup();
+});
+driveBackupAction('Now', async () => {
+  await driveBackupRequest('backup');
+  clearDriveBackupHistory();
+  await refreshDriveBackup();
+  driveBackupNode('Feedback').textContent = translateText('driveBackup.upToDate');
+  S.backup = await db.getBackupState();
+  renderBackupState();
+});
+driveBackupAction('List', async () => {
+  clearDriveBackupHistory();
+  const files = await driveBackupRequest('list');
+  if (!files.length) {
+    driveBackupNode('Feedback').textContent = translateText('driveBackup.empty');
+    return;
+  }
+  driveBackupNode('Version').replaceChildren(...files.map(({ id, createdTime }) =>
+    new Option(new Date(createdTime).toLocaleString(currentLocale), id)));
+  driveBackupNode('RestoreControls').hidden = false;
+});
+driveBackupAction('Restore', async () => {
+  const id = driveBackupNode('Version').value;
+  if (!id) return;
+  const data = await driveBackupRequest('download', id);
+  try {
+    await restoreBackup(data);
+  } catch (error) {
+    alert(`${translateText('settings.importFailed')}: ${error.message}`);
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.driveBackupState) return;
+  if (!changes.driveBackupState.newValue?.enabled) clearDriveBackupHistory();
+  refreshDriveBackup();
+});
+refreshDriveBackup();
+
 $('restoreBtn').addEventListener('click', () => $('restoreFile').click());
 $('restoreFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
   try {
-    // 先確認檔案能用，才詢問與備份
-    const data = JSON.parse(await f.text());
-    db.assertBackup(data);
-    if (!confirm(`${translateText('settings.importConfirm')}\n${translateText('settings.autoBackupNote')}`)) return;
-    await backupBeforeOverwrite('before-import');
-    await db.importAll(data);
-    await load();
-    showToast(translateText('settings.imported'));
+    await restoreBackup(JSON.parse(await f.text()));
   } catch (err) {
     alert(`${translateText('settings.importFailed')}: ${err.message}`);
   } finally {

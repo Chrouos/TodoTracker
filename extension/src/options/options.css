@@ -70,6 +70,7 @@ section[hidden] { display: none; }
 .grid4[style*="margin-top"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .grid4[style*="margin-top"] > .hint { display: none; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--md); }
+#driveBackupRestoreControls[hidden] { display: none; }
 .actions { display: flex; gap: var(--sm); margin-top: var(--md); flex-wrap: wrap; }
 
 .timer-panel { padding: var(--lg); }

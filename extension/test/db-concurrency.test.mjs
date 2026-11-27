@@ -14,6 +14,23 @@ globalThis.chrome = {
   },
 };
 
+// Node versions without Web Locks need a shared lock across the simulated pages.
+if (!globalThis.navigator?.locks) {
+  const queues = new Map();
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {
+      locks: {
+        request(name, operation) {
+          const result = (queues.get(name) ?? Promise.resolve()).then(operation);
+          queues.set(name, result.catch(() => {}));
+          return result;
+        },
+      },
+    },
+  });
+}
+
 // Separate module instances stand in for the popup, the options page and the service worker.
 const popup = await import('../src/lib/db.js?instance=popup');
 const worker = await import('../src/lib/db.js?instance=worker');
